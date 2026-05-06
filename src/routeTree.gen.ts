@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TavernRouteImport } from './routes/tavern'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as QuestsRouteImport } from './routes/quests'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ArchivesRouteImport } from './routes/archives'
@@ -18,6 +19,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const TavernRoute = TavernRouteImport.update({
   id: '/tavern',
   path: '/tavern',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const QuestsRoute = QuestsRouteImport.update({
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/archives': typeof ArchivesRoute
   '/auth': typeof AuthRoute
   '/quests': typeof QuestsRoute
+  '/settings': typeof SettingsRoute
   '/tavern': typeof TavernRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/archives': typeof ArchivesRoute
   '/auth': typeof AuthRoute
   '/quests': typeof QuestsRoute
+  '/settings': typeof SettingsRoute
   '/tavern': typeof TavernRoute
 }
 export interface FileRoutesById {
@@ -61,14 +69,22 @@ export interface FileRoutesById {
   '/archives': typeof ArchivesRoute
   '/auth': typeof AuthRoute
   '/quests': typeof QuestsRoute
+  '/settings': typeof SettingsRoute
   '/tavern': typeof TavernRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/archives' | '/auth' | '/quests' | '/tavern'
+  fullPaths: '/' | '/archives' | '/auth' | '/quests' | '/settings' | '/tavern'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/archives' | '/auth' | '/quests' | '/tavern'
-  id: '__root__' | '/' | '/archives' | '/auth' | '/quests' | '/tavern'
+  to: '/' | '/archives' | '/auth' | '/quests' | '/settings' | '/tavern'
+  id:
+    | '__root__'
+    | '/'
+    | '/archives'
+    | '/auth'
+    | '/quests'
+    | '/settings'
+    | '/tavern'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -76,6 +92,7 @@ export interface RootRouteChildren {
   ArchivesRoute: typeof ArchivesRoute
   AuthRoute: typeof AuthRoute
   QuestsRoute: typeof QuestsRoute
+  SettingsRoute: typeof SettingsRoute
   TavernRoute: typeof TavernRoute
 }
 
@@ -86,6 +103,13 @@ declare module '@tanstack/react-router' {
       path: '/tavern'
       fullPath: '/tavern'
       preLoaderRoute: typeof TavernRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/quests': {
@@ -124,8 +148,19 @@ const rootRouteChildren: RootRouteChildren = {
   ArchivesRoute: ArchivesRoute,
   AuthRoute: AuthRoute,
   QuestsRoute: QuestsRoute,
+  SettingsRoute: SettingsRoute,
   TavernRoute: TavernRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

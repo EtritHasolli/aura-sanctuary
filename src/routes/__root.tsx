@@ -11,6 +11,7 @@ import { useProfile, useApplyReward } from "@/hooks/useProfile";
 import { HUD } from "@/components/aura/HUD";
 import { SideNav } from "@/components/aura/SideNav";
 import { PomodoroProvider } from "@/components/aura/PomodoroContext";
+import { NotificationsProvider, useNotifications } from "@/components/aura/NotificationsContext";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 
@@ -83,14 +84,98 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
-      <AppGate />
-      <Toaster />
+      <NotificationsProvider>
+        <PersistentYouTubeAudio />
+        <AppGate />
+        <Toaster />
+      </NotificationsProvider>
     </QueryClientProvider>
+  );
+}
+
+function PersistentYouTubeAudio() {
+  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+  const path = useRouterState({ select: (s) => s.location.pathname });
+  const [slotRect, setSlotRect] = useState<DOMRect | null>(null);
+
+  useEffect(() => {
+    const onSet = (event: Event) => {
+      const custom = event as CustomEvent<{ embedUrl?: string }>;
+      const url = custom.detail?.embedUrl ?? null;
+      setEmbedUrl(url);
+      if (url) window.localStorage.setItem("aura:youtube-embed-url", url);
+    };
+    const onClear = () => {
+      setEmbedUrl(null);
+      window.localStorage.removeItem("aura:youtube-embed-url");
+    };
+
+    window.addEventListener("aura:set-youtube-audio", onSet as EventListener);
+    window.addEventListener("aura:clear-youtube-audio", onClear);
+
+    const saved = window.localStorage.getItem("aura:youtube-embed-url");
+    if (saved) setEmbedUrl(saved);
+
+    return () => {
+      window.removeEventListener("aura:set-youtube-audio", onSet as EventListener);
+      window.removeEventListener("aura:clear-youtube-audio", onClear);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (path !== "/") {
+      setSlotRect(null);
+      return;
+    }
+
+    const updateRect = () => {
+      const slot = document.getElementById("aura-youtube-slot");
+      setSlotRect(slot ? slot.getBoundingClientRect() : null);
+    };
+
+    updateRect();
+    const timer = window.setInterval(updateRect, 250);
+    window.addEventListener("resize", updateRect);
+    window.addEventListener("scroll", updateRect, true);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("resize", updateRect);
+      window.removeEventListener("scroll", updateRect, true);
+    };
+  }, [path, embedUrl]);
+
+  if (!embedUrl) return null;
+
+  const className =
+    path === "/" && slotRect
+      ? "fixed z-50 border-2 border-border bg-black shadow-xl"
+      : "fixed bottom-4 right-4 z-50 w-[420px] h-[236px] border-2 border-border bg-black shadow-xl";
+
+  const style =
+    path === "/" && slotRect
+      ? {
+          left: `${slotRect.left}px`,
+          top: `${slotRect.top}px`,
+          width: `${slotRect.width}px`,
+          height: `${slotRect.height}px`,
+        }
+      : undefined;
+
+  return (
+    <iframe
+      title="Persistent YouTube audio"
+      src={embedUrl}
+      className={className}
+      style={style}
+      allow="autoplay; encrypted-media; picture-in-picture"
+      referrerPolicy="strict-origin-when-cross-origin"
+    />
   );
 }
 
 function AppGate() {
   const { user, loading } = useAuth();
+  const { push } = useNotifications();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();
 
@@ -108,20 +193,29 @@ function AppGate() {
     );
   }
 
-  if (!user) return <Outlet />;
-
+  // PomodoroProvider wraps everything so usePomodoro() is always available,
+  // even during the brief render before the redirect to /auth fires.
   return (
-    <PomodoroProvider onFocusComplete={() => toast.success("+10 INT — focus complete!")}>
-      <FocusReward />
-      <div className="h-screen flex flex-col bg-background overflow-hidden">
-        <HUD />
-        <div className="flex-1 flex overflow-hidden">
-          <SideNav />
-          <main className="flex-1 overflow-auto">
-            <Outlet />
-          </main>
-        </div>
-      </div>
+    <PomodoroProvider onFocusComplete={() => {
+        toast.success("+10 INT — focus complete!");
+        push("Focus session complete! +10 INT +3 gold", "success");
+      }}>
+      {!user ? (
+        path === "/auth" ? <Outlet /> : null
+      ) : (
+        <>
+          <FocusReward />
+          <div className="h-screen flex flex-col bg-background overflow-hidden">
+            <HUD />
+            <div className="flex-1 flex overflow-hidden">
+              <SideNav />
+              <main className="flex-1 overflow-auto">
+                <Outlet />
+              </main>
+            </div>
+          </div>
+        </>
+      )}
     </PomodoroProvider>
   );
 }

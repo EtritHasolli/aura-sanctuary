@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, Swords, BookOpen, Beer, LogOut } from "lucide-react";
+import { Home, Swords, BookOpen, Beer, Settings, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const items = [
@@ -7,6 +7,7 @@ const items = [
   { to: "/quests", icon: Swords, label: "Quests" },
   { to: "/archives", icon: BookOpen, label: "Archives" },
   { to: "/tavern", icon: Beer, label: "Tavern" },
+  { to: "/settings", icon: Settings, label: "Settings" },
 ] as const;
 
 export function SideNav() {

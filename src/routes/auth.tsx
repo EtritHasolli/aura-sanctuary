@@ -32,8 +32,8 @@ function AuthPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed");
     } finally {
       setLoading(false);
     }
@@ -51,6 +51,8 @@ function AuthPage() {
             The Desktop Sanctuary
           </p>
         </div>
+
+        {/* Google OAuth disabled — will be re-enabled for desktop app */}
 
         <form onSubmit={submit} className="space-y-3">
           {mode === "signup" && (

@@ -1,10 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { Plus, Minus, Check, Trash2, FileDown, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Minus, Check, Trash2, FileDown, X, ExternalLink } from "lucide-react";
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from "@/hooks/useTasks";
 import { useApplyReward } from "@/hooks/useProfile";
-import { useCreateNote } from "@/hooks/useNotes";
+import { useNotes, useCreateNote, useUpdateNote } from "@/hooks/useNotes";
 import type { Task, TaskType, Difficulty } from "@/lib/aura/types";
+import type { Note } from "@/lib/aura/types";
 import { DIFFICULTY_GOLD, DIFFICULTY_HP_LOSS, DIFFICULTY_XP } from "@/lib/aura/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -20,8 +21,16 @@ const COLUMNS: { type: TaskType; label: string; stat: "strength" | "constitution
   { type: "todo", label: "TO-DOS", stat: "intelligence", hint: "One-time quests" },
 ];
 
+const DIFF_STARS: Record<Difficulty, string> = {
+  trivial: "★",
+  easy: "★★",
+  medium: "★★★",
+  hard: "★★★★",
+};
+
 function QuestsPage() {
   const { data: tasks = [] } = useTasks();
+  const { data: notes = [] } = useNotes();
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <h1 className="text-lg text-primary mb-4" style={{ fontFamily: "var(--font-pixel)" }}>QUEST LOG</h1>
@@ -34,6 +43,7 @@ function QuestsPage() {
             stat={col.stat}
             hint={col.hint}
             tasks={tasks.filter((t) => t.type === col.type)}
+            notes={notes}
           />
         ))}
       </div>
@@ -41,7 +51,7 @@ function QuestsPage() {
   );
 }
 
-function Column({ type, label, stat, hint, tasks }: { type: TaskType; label: string; stat: any; hint: string; tasks: Task[] }) {
+function Column({ type, label, stat, hint, tasks, notes }: { type: TaskType; label: string; stat: any; hint: string; tasks: Task[]; notes: Note[] }) {
   const [title, setTitle] = useState("");
   const [diff, setDiff] = useState<Difficulty>("easy");
   const create = useCreateTask();
@@ -49,8 +59,8 @@ function Column({ type, label, stat, hint, tasks }: { type: TaskType; label: str
   return (
     <div className="pixel-panel p-3 flex flex-col">
       <div className="mb-3">
-        <h2 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>{label}</h2>
-        <p className="text-[10px] text-muted-foreground">{hint}</p>
+        <h2 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>{label}</h2>
+        <p className="text-sm text-muted-foreground">{hint}</p>
       </div>
 
       <form
@@ -66,16 +76,17 @@ function Column({ type, label, stat, hint, tasks }: { type: TaskType; label: str
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="New quest..."
-          className="flex-1 px-2 py-1.5 bg-input border-2 border-border focus:border-primary outline-none text-xs"
+          className="flex-1 px-2 py-1.5 bg-input border-2 border-border focus:border-primary outline-none text-sm"
         />
         <select
           value={diff} onChange={(e) => setDiff(e.target.value as Difficulty)}
-          className="bg-input border-2 border-border text-xs px-1"
+          className="bg-input border-2 border-border text-sm px-1"
+          title={diff}
         >
-          <option value="trivial">○</option>
-          <option value="easy">◐</option>
-          <option value="medium">●</option>
-          <option value="hard">★</option>
+          <option value="trivial">★</option>
+          <option value="easy">★★</option>
+          <option value="medium">★★★</option>
+          <option value="hard">★★★★</option>
         </select>
         <button className="px-2 bg-primary text-primary-foreground"><Plus size={14} /></button>
       </form>
@@ -88,7 +99,7 @@ function Column({ type, label, stat, hint, tasks }: { type: TaskType; label: str
           {tasks.map((t) => (
             <motion.div key={t.id} layout
               initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 20 }}>
-              <TaskRow task={t} stat={stat} />
+              <TaskRow task={t} stat={stat} notes={notes} />
             </motion.div>
           ))}
         </AnimatePresence>
@@ -97,13 +108,21 @@ function Column({ type, label, stat, hint, tasks }: { type: TaskType; label: str
   );
 }
 
-function TaskRow({ task, stat }: { task: Task; stat: "strength" | "intelligence" | "constitution" }) {
+function TaskRow({ task, stat, notes }: { task: Task; stat: "strength" | "intelligence" | "constitution"; notes: Note[] }) {
   const update = useUpdateTask();
+  const updateNote = useUpdateNote();
   const del = useDeleteTask();
   const reward = useApplyReward();
   const createNote = useCreateNote();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+
+  const linkedNote = notes.find((n) => n.id === task.source_note_id) ?? null;
+  const [notesText, setNotesText] = useState(linkedNote?.content ?? task.notes ?? "");
+
+  useEffect(() => {
+    setNotesText(linkedNote?.content ?? task.notes ?? "");
+  }, [linkedNote?.content, task.notes, task.source_note_id]);
 
   const completePositive = () => {
     reward.mutate({
@@ -125,12 +144,18 @@ function TaskRow({ task, stat }: { task: Task; stat: "strength" | "intelligence"
     toast.error(`-${DIFFICULTY_HP_LOSS[task.difficulty]} HP`);
   };
 
+  const saveNotes = (val: string) => {
+    update.mutate({ id: task.id, patch: { notes: val } });
+    if (linkedNote) updateNote.mutate({ id: linkedNote.id, patch: { content: val } });
+  };
+
   const convertToNote = async () => {
     const note = await createNote.mutateAsync({
       title: task.title,
       content: task.notes || `*Converted from quest.*`,
       source_task_id: task.id,
     });
+    update.mutate({ id: task.id, patch: { source_note_id: note.id } });
     toast.success("Saved to Archives");
     navigate({ to: "/archives", search: { id: note.id } as any });
   };
@@ -159,21 +184,35 @@ function TaskRow({ task, stat }: { task: Task; stat: "strength" | "intelligence"
         <button className="flex-1 text-left text-sm" onClick={() => setOpen((o) => !o)}>
           {task.title}
         </button>
-        <span className="text-[10px] text-muted-foreground">{task.difficulty[0].toUpperCase()}</span>
+        <span className="text-xs text-primary" title={task.difficulty}>{DIFF_STARS[task.difficulty]}</span>
       </div>
 
       {open && (
         <div className="mt-2 pt-2 border-t border-border space-y-2">
+          {linkedNote && (
+            <div className="flex items-center justify-between" style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
+              <span className="text-accent truncate">↗ {linkedNote.title}</span>
+              <button
+                onClick={() => navigate({ to: "/archives", search: { id: linkedNote.id } as any })}
+                className="flex items-center gap-1 text-muted-foreground hover:text-primary ml-2 shrink-0"
+              >
+                <ExternalLink size={10} /> VIEW FULL NOTE
+              </button>
+            </div>
+          )}
           <textarea
             placeholder="Notes..."
-            defaultValue={task.notes ?? ""}
-            onBlur={(e) => update.mutate({ id: task.id, patch: { notes: e.target.value } })}
+            value={notesText}
+            onChange={(e) => setNotesText(e.target.value)}
+            onBlur={(e) => saveNotes(e.target.value)}
             className="w-full bg-input border border-border px-2 py-1 text-xs min-h-[60px]"
           />
           <div className="flex gap-1">
-            <button onClick={convertToNote} className="flex-1 text-xs px-2 py-1 bg-accent text-accent-foreground flex items-center justify-center gap-1" style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
-              <FileDown size={10} /> CONVERT TO NOTE
-            </button>
+            {!linkedNote && (
+              <button onClick={convertToNote} className="flex-1 text-sm px-2 py-1 bg-accent text-accent-foreground flex items-center justify-center gap-1" style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
+                <FileDown size={10} /> SAVE TO ARCHIVES
+              </button>
+            )}
             <button onClick={() => del.mutate(task.id)} className="px-2 py-1 bg-destructive/20 text-destructive border border-destructive">
               <Trash2 size={12} />
             </button>
@@ -182,7 +221,7 @@ function TaskRow({ task, stat }: { task: Task; stat: "strength" | "intelligence"
             </button>
           </div>
           {task.type === "habit" && (
-            <div className="text-[10px] text-muted-foreground">+{task.positive_count} / -{task.negative_count}</div>
+            <div className="text-xs text-muted-foreground">+{task.positive_count} / -{task.negative_count}</div>
           )}
         </div>
       )}

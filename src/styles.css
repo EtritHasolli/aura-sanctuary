@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap");
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
@@ -39,45 +40,45 @@
 :root {
   --radius: 0.25rem;
 
-  /* Deep blue night sanctuary */
-  --background: oklch(0.18 0.04 240);
-  --foreground: oklch(0.95 0.02 150);
+  /* Clean dark charcoal */
+  --background: oklch(0.12 0.005 240);
+  --foreground: oklch(0.92 0.01 140);
 
-  --card: oklch(0.22 0.05 240);
-  --card-foreground: oklch(0.95 0.02 150);
+  --card: oklch(0.17 0.008 240);
+  --card-foreground: oklch(0.92 0.01 140);
 
-  --popover: oklch(0.22 0.05 240);
-  --popover-foreground: oklch(0.95 0.02 150);
+  --popover: oklch(0.17 0.008 240);
+  --popover-foreground: oklch(0.92 0.01 140);
 
-  /* Lively green primary */
+  /* Green primary */
   --primary: oklch(0.72 0.18 145);
-  --primary-foreground: oklch(0.15 0.04 240);
+  --primary-foreground: oklch(0.1 0.01 0);
 
-  --secondary: oklch(0.28 0.06 240);
-  --secondary-foreground: oklch(0.95 0.02 150);
+  --secondary: oklch(0.22 0.008 240);
+  --secondary-foreground: oklch(0.92 0.01 140);
 
-  --muted: oklch(0.25 0.04 240);
-  --muted-foreground: oklch(0.7 0.03 200);
+  --muted: oklch(0.2 0.006 240);
+  --muted-foreground: oklch(0.6 0.01 200);
 
-  --accent: oklch(0.55 0.15 200);
-  --accent-foreground: oklch(0.98 0.01 150);
+  --accent: oklch(0.55 0.14 165);
+  --accent-foreground: oklch(0.98 0.005 0);
 
   --destructive: oklch(0.6 0.22 25);
-  --destructive-foreground: oklch(0.98 0.01 150);
+  --destructive-foreground: oklch(0.98 0.005 0);
 
-  --border: oklch(0.32 0.05 240);
-  --input: oklch(0.28 0.05 240);
+  --border: oklch(0.28 0.008 240);
+  --input: oklch(0.22 0.008 240);
   --ring: oklch(0.72 0.18 145);
 
   /* RPG semantic */
   --hp: oklch(0.62 0.22 25);
   --xp: oklch(0.75 0.2 145);
-  --gold: oklch(0.82 0.15 90);
-  --focus: oklch(0.65 0.18 235);
+  --gold: oklch(0.78 0.13 90);
+  --focus: oklch(0.62 0.16 195);
 
   /* Sanctuary atmosphere */
-  --sanctuary-floor: oklch(0.25 0.05 240);
-  --sanctuary-wall: oklch(0.2 0.05 245);
+  --sanctuary-floor: oklch(0.2 0.008 240);
+  --sanctuary-wall: oklch(0.16 0.008 240);
   --sanctuary-glow: oklch(0.72 0.18 145);
 }
 
@@ -88,6 +89,46 @@
 
 .theme-wounded {
   --sanctuary-glow: oklch(0.55 0.22 25);
+}
+
+/* Light mode — warm parchment RPG feel */
+.light, :root.light {
+  --background: oklch(0.91 0.025 80);      /* warm parchment */
+  --foreground: oklch(0.18 0.03 60);       /* dark ink brown */
+
+  --card: oklch(0.87 0.03 75);             /* aged paper */
+  --card-foreground: oklch(0.18 0.03 60);
+
+  --popover: oklch(0.87 0.03 75);
+  --popover-foreground: oklch(0.18 0.03 60);
+
+  --primary: oklch(0.48 0.18 145);         /* deep forest green */
+  --primary-foreground: oklch(0.97 0.01 0);
+
+  --secondary: oklch(0.84 0.03 75);        /* slightly darker parchment */
+  --secondary-foreground: oklch(0.18 0.03 60);
+
+  --muted: oklch(0.85 0.025 78);
+  --muted-foreground: oklch(0.42 0.03 65);
+
+  --accent: oklch(0.52 0.15 155);          /* muted teal-green */
+  --accent-foreground: oklch(0.97 0.01 0);
+
+  --destructive: oklch(0.52 0.22 25);      /* deep red */
+  --destructive-foreground: oklch(0.97 0.01 0);
+
+  --border: oklch(0.76 0.04 72);           /* warm tan border */
+  --input: oklch(0.84 0.03 75);
+  --ring: oklch(0.48 0.18 145);
+
+  --hp: oklch(0.52 0.22 25);
+  --xp: oklch(0.48 0.18 145);
+  --gold: oklch(0.58 0.14 72);             /* warm amber */
+  --focus: oklch(0.46 0.16 200);
+
+  --sanctuary-floor: oklch(0.82 0.035 72);
+  --sanctuary-wall: oklch(0.85 0.03 75);
+  --sanctuary-glow: oklch(0.48 0.18 145);
 }
 
 @layer base {
@@ -125,5 +166,4 @@
   .glow-primary { box-shadow: 0 0 24px color-mix(in oklab, var(--sanctuary-glow) 50%, transparent); }
 }
 
-/* Pixel fonts */
-@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap");
+
