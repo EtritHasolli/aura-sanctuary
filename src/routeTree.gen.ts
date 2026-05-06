@@ -9,8 +9,32 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TavernRouteImport } from './routes/tavern'
+import { Route as QuestsRouteImport } from './routes/quests'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as ArchivesRouteImport } from './routes/archives'
 import { Route as IndexRouteImport } from './routes/index'
 
+const TavernRoute = TavernRouteImport.update({
+  id: '/tavern',
+  path: '/tavern',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuestsRoute = QuestsRouteImport.update({
+  id: '/quests',
+  path: '/quests',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArchivesRoute = ArchivesRouteImport.update({
+  id: '/archives',
+  path: '/archives',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +43,72 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/archives': typeof ArchivesRoute
+  '/auth': typeof AuthRoute
+  '/quests': typeof QuestsRoute
+  '/tavern': typeof TavernRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/archives': typeof ArchivesRoute
+  '/auth': typeof AuthRoute
+  '/quests': typeof QuestsRoute
+  '/tavern': typeof TavernRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/archives': typeof ArchivesRoute
+  '/auth': typeof AuthRoute
+  '/quests': typeof QuestsRoute
+  '/tavern': typeof TavernRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/archives' | '/auth' | '/quests' | '/tavern'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/archives' | '/auth' | '/quests' | '/tavern'
+  id: '__root__' | '/' | '/archives' | '/auth' | '/quests' | '/tavern'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ArchivesRoute: typeof ArchivesRoute
+  AuthRoute: typeof AuthRoute
+  QuestsRoute: typeof QuestsRoute
+  TavernRoute: typeof TavernRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/tavern': {
+      id: '/tavern'
+      path: '/tavern'
+      fullPath: '/tavern'
+      preLoaderRoute: typeof TavernRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quests': {
+      id: '/quests'
+      path: '/quests'
+      fullPath: '/quests'
+      preLoaderRoute: typeof QuestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/archives': {
+      id: '/archives'
+      path: '/archives'
+      fullPath: '/archives'
+      preLoaderRoute: typeof ArchivesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,17 +121,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ArchivesRoute: ArchivesRoute,
+  AuthRoute: AuthRoute,
+  QuestsRoute: QuestsRoute,
+  TavernRoute: TavernRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

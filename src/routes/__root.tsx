@@ -1,32 +1,28 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
-  Outlet,
-  Link,
-  createRootRouteWithContext,
-  useRouter,
-  HeadContent,
-  Scripts,
+  Outlet, Link, createRootRouteWithContext, useRouter, HeadContent, Scripts, useRouterState,
 } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile, useApplyReward } from "@/hooks/useProfile";
+import { HUD } from "@/components/aura/HUD";
+import { SideNav } from "@/components/aura/SideNav";
+import { PomodoroProvider } from "@/components/aura/PomodoroContext";
+import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
-        </p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Go home
-          </Link>
-        </div>
+      <div className="text-center">
+        <h1 className="text-4xl text-primary" style={{ fontFamily: "var(--font-pixel)" }}>404</h1>
+        <p className="mt-4 text-muted-foreground">Lost in the void.</p>
+        <Link to="/" className="mt-6 inline-block px-4 py-2 bg-primary text-primary-foreground" style={{ fontFamily: "var(--font-pixel)", fontSize: 12 }}>
+          Return Home
+        </Link>
       </div>
     </div>
   );
@@ -35,33 +31,16 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Try again
-          </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            Go home
-          </a>
-        </div>
+        <h1 className="text-xl text-primary" style={{ fontFamily: "var(--font-pixel)" }}>A wild bug appeared!</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+        <button
+          onClick={() => { router.invalidate(); reset(); }}
+          className="mt-6 px-4 py-2 bg-primary text-primary-foreground"
+          style={{ fontFamily: "var(--font-pixel)", fontSize: 12 }}
+        >Retry</button>
       </div>
     </div>
   );
@@ -72,21 +51,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { title: "Aura — The Desktop Sanctuary" },
+      { name: "description", content: "A productivity RPG where your habits power your sanctuary." },
     ],
-    links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-    ],
+    links: [{ rel: "stylesheet", href: appCss }],
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -97,23 +65,68 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
+      <head><HeadContent /></head>
+      <body>{children}<Scripts /></body>
     </html>
   );
 }
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <AppGate />
+      <Toaster />
     </QueryClientProvider>
   );
+}
+
+function AppGate() {
+  const { user, loading } = useAuth();
+  const path = useRouterState({ select: (s) => s.location.pathname });
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user && path !== "/auth") router.navigate({ to: "/auth" });
+    if (user && path === "/auth") router.navigate({ to: "/" });
+  }, [user, loading, path, router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-primary" style={{ fontFamily: "var(--font-pixel)" }}>LOADING...</div>
+      </div>
+    );
+  }
+
+  if (!user) return <Outlet />;
+
+  return (
+    <PomodoroProvider onFocusComplete={() => toast.success("+10 INT — focus complete!")}>
+      <FocusReward />
+      <div className="h-screen flex flex-col bg-background overflow-hidden">
+        <HUD />
+        <div className="flex-1 flex overflow-hidden">
+          <SideNav />
+          <main className="flex-1 overflow-auto">
+            <Outlet />
+          </main>
+        </div>
+      </div>
+    </PomodoroProvider>
+  );
+}
+
+// Awards INT + XP whenever a focus cycle completes
+function FocusReward() {
+  const reward = useApplyReward();
+  // capture function via state-less effect: re-mount provider would call onFocusComplete prop;
+  // simpler: subscribe via a tiny event
+  useEffect(() => {
+    const handler = () => reward.mutate({ xp: 10, gold: 3, stat: "intelligence" });
+    window.addEventListener("aura:focus-complete", handler);
+    return () => window.removeEventListener("aura:focus-complete", handler);
+  }, [reward]);
+  return null;
 }
