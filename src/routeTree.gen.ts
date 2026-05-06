@@ -10,8 +10,11 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TavernRouteImport } from './routes/tavern'
+import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as QuestsRouteImport } from './routes/quests'
+import { Route as ForgeRouteImport } from './routes/forge'
+import { Route as EquipmentRouteImport } from './routes/equipment'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ArchivesRouteImport } from './routes/archives'
 import { Route as IndexRouteImport } from './routes/index'
@@ -19,6 +22,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const TavernRoute = TavernRouteImport.update({
   id: '/tavern',
   path: '/tavern',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShopRoute = ShopRouteImport.update({
+  id: '/shop',
+  path: '/shop',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -29,6 +37,16 @@ const SettingsRoute = SettingsRouteImport.update({
 const QuestsRoute = QuestsRouteImport.update({
   id: '/quests',
   path: '/quests',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgeRoute = ForgeRouteImport.update({
+  id: '/forge',
+  path: '/forge',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EquipmentRoute = EquipmentRouteImport.update({
+  id: '/equipment',
+  path: '/equipment',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -51,16 +69,22 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/archives': typeof ArchivesRoute
   '/auth': typeof AuthRoute
+  '/equipment': typeof EquipmentRoute
+  '/forge': typeof ForgeRoute
   '/quests': typeof QuestsRoute
   '/settings': typeof SettingsRoute
+  '/shop': typeof ShopRoute
   '/tavern': typeof TavernRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/archives': typeof ArchivesRoute
   '/auth': typeof AuthRoute
+  '/equipment': typeof EquipmentRoute
+  '/forge': typeof ForgeRoute
   '/quests': typeof QuestsRoute
   '/settings': typeof SettingsRoute
+  '/shop': typeof ShopRoute
   '/tavern': typeof TavernRoute
 }
 export interface FileRoutesById {
@@ -68,22 +92,46 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/archives': typeof ArchivesRoute
   '/auth': typeof AuthRoute
+  '/equipment': typeof EquipmentRoute
+  '/forge': typeof ForgeRoute
   '/quests': typeof QuestsRoute
   '/settings': typeof SettingsRoute
+  '/shop': typeof ShopRoute
   '/tavern': typeof TavernRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/archives' | '/auth' | '/quests' | '/settings' | '/tavern'
+  fullPaths:
+    | '/'
+    | '/archives'
+    | '/auth'
+    | '/equipment'
+    | '/forge'
+    | '/quests'
+    | '/settings'
+    | '/shop'
+    | '/tavern'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/archives' | '/auth' | '/quests' | '/settings' | '/tavern'
+  to:
+    | '/'
+    | '/archives'
+    | '/auth'
+    | '/equipment'
+    | '/forge'
+    | '/quests'
+    | '/settings'
+    | '/shop'
+    | '/tavern'
   id:
     | '__root__'
     | '/'
     | '/archives'
     | '/auth'
+    | '/equipment'
+    | '/forge'
     | '/quests'
     | '/settings'
+    | '/shop'
     | '/tavern'
   fileRoutesById: FileRoutesById
 }
@@ -91,8 +139,11 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ArchivesRoute: typeof ArchivesRoute
   AuthRoute: typeof AuthRoute
+  EquipmentRoute: typeof EquipmentRoute
+  ForgeRoute: typeof ForgeRoute
   QuestsRoute: typeof QuestsRoute
   SettingsRoute: typeof SettingsRoute
+  ShopRoute: typeof ShopRoute
   TavernRoute: typeof TavernRoute
 }
 
@@ -103,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/tavern'
       fullPath: '/tavern'
       preLoaderRoute: typeof TavernRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shop': {
+      id: '/shop'
+      path: '/shop'
+      fullPath: '/shop'
+      preLoaderRoute: typeof ShopRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -117,6 +175,20 @@ declare module '@tanstack/react-router' {
       path: '/quests'
       fullPath: '/quests'
       preLoaderRoute: typeof QuestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forge': {
+      id: '/forge'
+      path: '/forge'
+      fullPath: '/forge'
+      preLoaderRoute: typeof ForgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/equipment': {
+      id: '/equipment'
+      path: '/equipment'
+      fullPath: '/equipment'
+      preLoaderRoute: typeof EquipmentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -147,8 +219,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ArchivesRoute: ArchivesRoute,
   AuthRoute: AuthRoute,
+  EquipmentRoute: EquipmentRoute,
+  ForgeRoute: ForgeRoute,
   QuestsRoute: QuestsRoute,
   SettingsRoute: SettingsRoute,
+  ShopRoute: ShopRoute,
   TavernRoute: TavernRoute,
 }
 export const routeTree = rootRouteImport

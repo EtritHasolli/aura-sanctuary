@@ -33,6 +33,7 @@
   --color-xp: var(--xp);
   --color-gold: var(--gold);
   --color-focus: var(--focus);
+  --color-stamina: var(--stamina);
   --font-pixel: "Press Start 2P", monospace;
   --font-display: "VT323", monospace;
 }
@@ -40,95 +41,96 @@
 :root {
   --radius: 0.25rem;
 
-  /* Clean dark charcoal */
-  --background: oklch(0.12 0.005 240);
-  --foreground: oklch(0.92 0.01 140);
+  /* Midnight Calico dark palette */
+  --background: #1a1714;         /* Deep Espresso */
+  --foreground: #e6e2d3;         /* Soft Parchment */
 
-  --card: oklch(0.17 0.008 240);
-  --card-foreground: oklch(0.92 0.01 140);
+  --card: #231f1b;
+  --card-foreground: #e6e2d3;
 
-  --popover: oklch(0.17 0.008 240);
-  --popover-foreground: oklch(0.92 0.01 140);
+  --popover: #231f1b;
+  --popover-foreground: #e6e2d3;
 
-  /* Green primary */
-  --primary: oklch(0.72 0.18 145);
-  --primary-foreground: oklch(0.1 0.01 0);
+  --primary: #d99630;            /* Muted Amber */
+  --primary-foreground: #1a1714;
 
-  --secondary: oklch(0.22 0.008 240);
-  --secondary-foreground: oklch(0.92 0.01 140);
+  --secondary: #2b2621;
+  --secondary-foreground: #e6e2d3;
 
-  --muted: oklch(0.2 0.006 240);
-  --muted-foreground: oklch(0.6 0.01 200);
+  --muted: #2a2520;
+  --muted-foreground: #b9b29d;
 
-  --accent: oklch(0.55 0.14 165);
-  --accent-foreground: oklch(0.98 0.005 0);
+  --accent: #bf651f;             /* Burnt Sienna */
+  --accent-foreground: #e6e2d3;
 
-  --destructive: oklch(0.6 0.22 25);
-  --destructive-foreground: oklch(0.98 0.005 0);
+  --destructive: #b24a35;
+  --destructive-foreground: #e6e2d3;
 
-  --border: oklch(0.28 0.008 240);
-  --input: oklch(0.22 0.008 240);
-  --ring: oklch(0.72 0.18 145);
+  --border: #40362e;
+  --input: #2b2621;
+  --ring: #bf651f;
 
   /* RPG semantic */
-  --hp: oklch(0.62 0.22 25);
-  --xp: oklch(0.75 0.2 145);
-  --gold: oklch(0.78 0.13 90);
-  --focus: oklch(0.62 0.16 195);
+  --hp: #5b7d56;                 /* Moss Green for health/completed */
+  --xp: #bf651f;                 /* Burnt Sienna for active streak/progress */
+  --gold: #d99630;               /* Muted Amber for reward */
+  --focus: #bf651f;
+  --stamina: #4f8cff;
 
   /* Sanctuary atmosphere */
-  --sanctuary-floor: oklch(0.2 0.008 240);
-  --sanctuary-wall: oklch(0.16 0.008 240);
-  --sanctuary-glow: oklch(0.72 0.18 145);
+  --sanctuary-floor: #2a2520;
+  --sanctuary-wall: #231f1b;
+  --sanctuary-glow: #d99630;
 }
 
 .theme-focused {
-  --sanctuary-glow: oklch(0.65 0.18 235);
-  --primary: oklch(0.65 0.18 235);
+  --sanctuary-glow: #bf651f;
+  --primary: #bf651f;
 }
 
 .theme-wounded {
-  --sanctuary-glow: oklch(0.55 0.22 25);
+  --sanctuary-glow: #c85a3d;
 }
 
-/* Light mode — warm parchment RPG feel */
+/* Light mode override intentionally matches base warm palette */
 .light, :root.light {
-  --background: oklch(0.91 0.025 80);      /* warm parchment */
-  --foreground: oklch(0.18 0.03 60);       /* dark ink brown */
+  --background: #fff9f0;
+  --foreground: #2c3e50;
 
-  --card: oklch(0.87 0.03 75);             /* aged paper */
-  --card-foreground: oklch(0.18 0.03 60);
+  --card: #fff9f0;
+  --card-foreground: #2c3e50;
 
-  --popover: oklch(0.87 0.03 75);
-  --popover-foreground: oklch(0.18 0.03 60);
+  --popover: #fff9f0;
+  --popover-foreground: #2c3e50;
 
-  --primary: oklch(0.48 0.18 145);         /* deep forest green */
-  --primary-foreground: oklch(0.97 0.01 0);
+  --primary: #ffb347;
+  --primary-foreground: #2c3e50;
 
-  --secondary: oklch(0.84 0.03 75);        /* slightly darker parchment */
-  --secondary-foreground: oklch(0.18 0.03 60);
+  --secondary: #f4ead9;
+  --secondary-foreground: #2c3e50;
 
-  --muted: oklch(0.85 0.025 78);
-  --muted-foreground: oklch(0.42 0.03 65);
+  --muted: #f7efe3;
+  --muted-foreground: #7a8794;
 
-  --accent: oklch(0.52 0.15 155);          /* muted teal-green */
-  --accent-foreground: oklch(0.97 0.01 0);
+  --accent: #e67e22;
+  --accent-foreground: #fff9f0;
 
-  --destructive: oklch(0.52 0.22 25);      /* deep red */
-  --destructive-foreground: oklch(0.97 0.01 0);
+  --destructive: #c85a3d;
+  --destructive-foreground: #fff9f0;
 
-  --border: oklch(0.76 0.04 72);           /* warm tan border */
-  --input: oklch(0.84 0.03 75);
-  --ring: oklch(0.48 0.18 145);
+  --border: #2c3e50;
+  --input: #f4ead9;
+  --ring: #e67e22;
 
-  --hp: oklch(0.52 0.22 25);
-  --xp: oklch(0.48 0.18 145);
-  --gold: oklch(0.58 0.14 72);             /* warm amber */
-  --focus: oklch(0.46 0.16 200);
+  --hp: #82a67d;
+  --xp: #e67e22;
+  --gold: #ffb347;
+  --focus: #e67e22;
+  --stamina: #4f8cff;
 
-  --sanctuary-floor: oklch(0.82 0.035 72);
-  --sanctuary-wall: oklch(0.85 0.03 75);
-  --sanctuary-glow: oklch(0.48 0.18 145);
+  --sanctuary-floor: #f4ead9;
+  --sanctuary-wall: #fff9f0;
+  --sanctuary-glow: #ffb347;
 }
 
 @layer base {

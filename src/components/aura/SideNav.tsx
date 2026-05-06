@@ -1,11 +1,14 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, Swords, BookOpen, Beer, Settings, LogOut } from "lucide-react";
+import { Home, Swords, BookOpen, Beer, ShoppingBag, Shirt, Hammer, Settings, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const items = [
   { to: "/", icon: Home, label: "Sanctuary" },
   { to: "/quests", icon: Swords, label: "Quests" },
   { to: "/archives", icon: BookOpen, label: "Archives" },
+  { to: "/shop", icon: ShoppingBag, label: "Shop" },
+  { to: "/equipment", icon: Shirt, label: "Gear" },
+  { to: "/forge", icon: Hammer, label: "Forge" },
   { to: "/tavern", icon: Beer, label: "Tavern" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ] as const;

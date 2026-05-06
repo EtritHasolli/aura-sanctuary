@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
 import { PetSprite } from "@/components/aura/PetSprite";
 import { useProfile } from "@/hooks/useProfile";
+import { useEquippedPetGear } from "@/hooks/useShop";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
@@ -50,6 +51,7 @@ function getYouTubeVideoId(raw: string) {
 function SanctuaryPage() {
   const { running, mode, secondsLeft, start, pause, reset, petState } = usePomodoro();
   const { data: profile } = useProfile();
+  const petGear = useEquippedPetGear();
   const [muted, setMuted] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -298,19 +300,80 @@ function SanctuaryPage() {
           <div className="relative aspect-[16/10] pixel-panel overflow-hidden scanlines"
             style={{
               background: focused
-                ? "linear-gradient(180deg, oklch(0.18 0.09 42) 0%, oklch(0.12 0.07 38) 60%, oklch(0.09 0.04 35) 100%)"
-                : "linear-gradient(180deg, oklch(0.17 0.05 260) 0%, oklch(0.12 0.04 255) 55%, oklch(0.09 0.02 250) 100%)",
+                ? "linear-gradient(180deg, color-mix(in oklab, var(--sanctuary-wall) 70%, var(--color-primary)) 0%, color-mix(in oklab, var(--sanctuary-wall) 88%, black) 60%, color-mix(in oklab, var(--sanctuary-wall) 75%, var(--sanctuary-floor)) 100%)"
+                : "linear-gradient(180deg, color-mix(in oklab, var(--sanctuary-wall) 80%, var(--color-primary)) 0%, color-mix(in oklab, var(--sanctuary-wall) 92%, black) 55%, color-mix(in oklab, var(--sanctuary-floor) 85%, black) 100%)",
               transition: "background 1.4s ease",
             }}
           >
-            {/* floor */}
-            <div className="absolute bottom-0 left-0 right-0 h-1/3"
+            {/* rainy outside ambience */}
+            <div className="absolute inset-0 opacity-30"
               style={{
                 background: focused
-                  ? "linear-gradient(180deg, transparent, oklch(0.14 0.05 40))"
-                  : "linear-gradient(180deg, transparent, oklch(0.10 0.03 258))"
+                  ? "linear-gradient(180deg, color-mix(in oklab, var(--color-background) 10%, transparent), color-mix(in oklab, var(--sanctuary-wall) 35%, transparent))"
+                  : "linear-gradient(180deg, color-mix(in oklab, var(--color-background) 20%, transparent), color-mix(in oklab, var(--sanctuary-wall) 45%, transparent))",
               }}
             />
+            <div
+              className="absolute inset-0 pointer-events-none opacity-25"
+              style={{
+                background: "repeating-linear-gradient(105deg, transparent 0 10px, color-mix(in oklab, var(--color-foreground) 20%, transparent) 10px 12px)",
+              }}
+            />
+
+            {/* Isometric room shell */}
+            <div
+              className="absolute left-[18%] right-[18%] top-[14%] h-[48%] border-2 border-border/70"
+              style={{
+                background: "color-mix(in oklab, var(--sanctuary-wall) 95%, var(--color-primary))",
+                clipPath: "polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)",
+              }}
+            />
+            <div
+              className="absolute left-[16%] right-[16%] bottom-[10%] h-[38%] border-2 border-border/70"
+              style={{
+                background: "color-mix(in oklab, var(--sanctuary-floor) 92%, var(--color-primary))",
+                clipPath: "polygon(50% 0%, 100% 35%, 50% 100%, 0% 35%)",
+              }}
+            />
+
+            {/* left fireplace block */}
+            <div className="absolute left-[23%] top-[45%] w-[12%] h-[24%] border-2 border-border/70 bg-card/80" />
+            <div className="absolute left-[25.2%] top-[53%] w-[7.6%] h-[9%] border border-border/70 bg-secondary/80" />
+            <motion.div
+              className="absolute left-[27.8%] top-[55.5%] w-[2.4%] h-[4.5%]"
+              animate={{ opacity: [0.45, 0.95, 0.45], y: [0, -1, 0] }}
+              transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+              style={{ background: "var(--color-primary)" }}
+            />
+
+            {/* desk + task tablet */}
+            <div
+              className="absolute left-[39%] top-[64%] w-[22%] h-[11%] border-2 border-border/70"
+              style={{
+                background: "color-mix(in oklab, var(--sanctuary-floor) 85%, var(--color-background))",
+                clipPath: "polygon(10% 0%, 92% 0%, 100% 25%, 8% 25%)",
+              }}
+            />
+            <div className="absolute left-[46%] top-[67%] w-[7%] h-[5%] border border-border/70 bg-muted/80" />
+
+            {/* garden bed */}
+            <div
+              className="absolute right-[20%] top-[58%] w-[19%] h-[21%] border-2 border-border/70"
+              style={{
+                background: "color-mix(in oklab, var(--sanctuary-floor) 70%, #3b2a1f)",
+                clipPath: "polygon(8% 0%, 100% 12%, 92% 100%, 0% 88%)",
+              }}
+            />
+            <div className="absolute right-[29%] top-[56%] w-[1.2%] h-[8%] bg-[color:var(--color-hp)]" />
+            <div className="absolute right-[24.5%] top-[53%] w-[1.2%] h-[11%] bg-[color:var(--color-hp)]" />
+            <div className="absolute right-[20.5%] top-[57%] w-[1.2%] h-[7%] bg-[color:var(--color-hp)]" />
+
+            {/* shelf + rewards */}
+            <div className="absolute right-[25%] top-[35%] w-[18%] h-[2.5%] border border-border/70 bg-secondary/90" />
+            <div className="absolute right-[37%] top-[30%] w-[3.2%] h-[4.7%] border border-border/70 bg-muted" />
+            <div className="absolute right-[32%] top-[30.5%] w-[3.2%] h-[4.2%] border border-border/70 bg-[color:var(--color-accent)]/80" />
+            <div className="absolute right-[27%] top-[30.5%] w-[3.2%] h-[4.2%] border border-border/70 bg-[color:var(--color-primary)]/80" />
+
             {/* glow */}
             <motion.div
               className="absolute inset-0"
@@ -318,22 +381,14 @@ function SanctuaryPage() {
               transition={{ duration: 4, repeat: Infinity }}
               style={{
                 background: focused
-                  ? `radial-gradient(ellipse at 50% 70%, oklch(0.55 0.18 55), transparent 62%)`
-                  : `radial-gradient(ellipse at 50% 65%, oklch(0.38 0.12 200), transparent 62%)`,
+                  ? `radial-gradient(ellipse at 50% 70%, color-mix(in oklab, var(--sanctuary-glow) 72%, var(--color-accent)), transparent 62%)`
+                  : `radial-gradient(ellipse at 50% 65%, color-mix(in oklab, var(--sanctuary-glow) 55%, var(--sanctuary-wall)), transparent 62%)`,
               }}
             />
-            {/* window */}
-            <div className="absolute top-6 left-1/2 -translate-x-1/2 w-24 h-16 border-2 border-border bg-card/40">
-              <div className="grid grid-cols-2 grid-rows-2 h-full">
-                <div className="border border-border/50" />
-                <div className="border border-border/50" />
-                <div className="border border-border/50" />
-                <div className="border border-border/50" />
-              </div>
-            </div>
+
             {/* pet center stage */}
-            <div className="absolute bottom-12 left-1/2 -translate-x-1/2">
-              <PetSprite state={petState} size={140} />
+            <div className="absolute bottom-[21%] left-1/2 -translate-x-1/2">
+              <PetSprite state={petState} size={140} gear={petGear} />
               <p className="text-center mt-2 text-primary" style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}>
                 {profile?.pet_name ?? "Sprig"} · <span className="text-muted-foreground">{petState}</span>
               </p>

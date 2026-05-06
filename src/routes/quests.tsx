@@ -2,7 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Plus, Minus, Check, Trash2, FileDown, X, ExternalLink } from "lucide-react";
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from "@/hooks/useTasks";
-import { useApplyReward } from "@/hooks/useProfile";
+import { useApplyReward, useProfile } from "@/hooks/useProfile";
+import { withGoldEquipBonus, withXpEquipBonus } from "@/lib/aura/equipmentBonuses";
 import { useNotes, useCreateNote, useUpdateNote } from "@/hooks/useNotes";
 import type { Task, TaskType, Difficulty } from "@/lib/aura/types";
 import type { Note } from "@/lib/aura/types";
@@ -113,6 +114,7 @@ function TaskRow({ task, stat, notes }: { task: Task; stat: "strength" | "intell
   const updateNote = useUpdateNote();
   const del = useDeleteTask();
   const reward = useApplyReward();
+  const { data: prof } = useProfile();
   const createNote = useCreateNote();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -125,9 +127,11 @@ function TaskRow({ task, stat, notes }: { task: Task; stat: "strength" | "intell
   }, [linkedNote?.content, task.notes, task.source_note_id]);
 
   const completePositive = () => {
+    const baseXp = DIFFICULTY_XP[task.difficulty];
+    const baseGold = DIFFICULTY_GOLD[task.difficulty];
     reward.mutate({
-      xp: DIFFICULTY_XP[task.difficulty],
-      gold: DIFFICULTY_GOLD[task.difficulty],
+      xp: baseXp,
+      gold: baseGold,
       stat,
     });
     if (task.type === "habit") {
@@ -135,7 +139,9 @@ function TaskRow({ task, stat, notes }: { task: Task; stat: "strength" | "intell
     } else {
       update.mutate({ id: task.id, patch: { completed: true } });
     }
-    toast.success(`+${DIFFICULTY_XP[task.difficulty]} XP`);
+    const xpOut = prof ? withXpEquipBonus(baseXp, prof) : baseXp;
+    const goldOut = prof ? withGoldEquipBonus(baseGold, prof) : baseGold;
+    toast.success(`+${xpOut} XP · +${goldOut}g`);
   };
 
   const negative = () => {

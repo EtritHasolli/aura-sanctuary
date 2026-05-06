@@ -1,7 +1,18 @@
 import { motion } from "framer-motion";
 import type { PetState } from "@/lib/aura/types";
+import type { EquippedPetGearEntry } from "@/lib/aura/petEquipmentLayers";
+import { PetEquipmentBack, PetEquipmentFront } from "@/lib/aura/petEquipmentLayers";
 
-export function PetSprite({ state, size = 96 }: { state: PetState; size?: number }) {
+export function PetSprite({
+  state,
+  size = 96,
+  gear = [],
+}: {
+  state: PetState;
+  size?: number;
+  /** Equipped items that map to SVG overlays (`useEquippedPetGear`). */
+  gear?: EquippedPetGearEntry[];
+}) {
   const colors = {
     idle: "var(--color-primary)",
     working: "var(--color-focus)",
@@ -23,6 +34,7 @@ export function PetSprite({ state, size = 96 }: { state: PetState; size?: number
     >
       {/* Pixel pet — built with divs */}
       <svg viewBox="0 0 16 16" width={size} height={size} shapeRendering="crispEdges" style={{ imageRendering: "pixelated" }}>
+        <PetEquipmentBack state={state} gear={gear} />
         {/* body */}
         <rect x="4" y="6" width="8" height="6" fill={colors[state]} />
         <rect x="3" y="7" width="1" height="4" fill={colors[state]} />
@@ -47,6 +59,7 @@ export function PetSprite({ state, size = 96 }: { state: PetState; size?: number
         {/* feet */}
         <rect x="5" y="12" width="2" height="1" fill={colors[state]} />
         <rect x="9" y="12" width="2" height="1" fill={colors[state]} />
+        <PetEquipmentFront state={state} gear={gear} />
       </svg>
       {state === "sleeping" && (
         <motion.span

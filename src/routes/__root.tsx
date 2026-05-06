@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import {
   Outlet, Link, createRootRouteWithContext, useRouter, HeadContent, Scripts, useRouterState,
 } from "@tanstack/react-router";
@@ -14,6 +14,8 @@ import { PomodoroProvider } from "@/components/aura/PomodoroContext";
 import { NotificationsProvider, useNotifications } from "@/components/aura/NotificationsContext";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
+
+const FOCUS_STAMINA_RESTORE = 15;
 
 function NotFoundComponent() {
   return (
@@ -198,13 +200,14 @@ function AppGate() {
   return (
     <PomodoroProvider onFocusComplete={() => {
         toast.success("+10 INT — focus complete!");
-        push("Focus session complete! +10 INT +3 gold", "success");
+        push(`Focus session complete! +10 INT +3 gold +${FOCUS_STAMINA_RESTORE} stamina`, "success");
       }}>
       {!user ? (
         path === "/auth" ? <Outlet /> : null
       ) : (
         <>
           <FocusReward />
+          <StaminaRecoveryLoop />
           <div className="h-screen flex flex-col bg-background overflow-hidden">
             <HUD />
             <div className="flex-1 flex overflow-hidden">
@@ -226,9 +229,34 @@ function FocusReward() {
   // capture function via state-less effect: re-mount provider would call onFocusComplete prop;
   // simpler: subscribe via a tiny event
   useEffect(() => {
-    const handler = () => reward.mutate({ xp: 10, gold: 3, stat: "intelligence" });
+    const handler = () => reward.mutate({ xp: 10, gold: 3, stamina: FOCUS_STAMINA_RESTORE, stat: "intelligence" });
     window.addEventListener("aura:focus-complete", handler);
     return () => window.removeEventListener("aura:focus-complete", handler);
   }, [reward]);
+  return null;
+}
+
+function StaminaRecoveryLoop() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    if (!user) return;
+
+    const tick = async () => {
+      const { data, error } = await supabase.rpc("apply_stamina_regen");
+      if (error) return;
+      const row = Array.isArray(data) ? data[0] : null;
+      if (!row) return;
+      if (row.reset_applied || row.regen_applied > 0) {
+        qc.invalidateQueries({ queryKey: ["profile", user.id] });
+      }
+    };
+
+    void tick();
+    const timer = window.setInterval(() => { void tick(); }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [user?.id, qc]);
+
   return null;
 }

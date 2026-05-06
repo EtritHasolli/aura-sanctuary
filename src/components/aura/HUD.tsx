@@ -1,7 +1,14 @@
 import { useProfile } from "@/hooks/useProfile";
+import {
+  effectiveConstitution,
+  effectiveIntelligence,
+  effectiveMaxStamina,
+  effectiveStrength,
+} from "@/lib/aura/equipmentBonuses";
 import { usePomodoro } from "./PomodoroContext";
 import { useNotifications } from "./NotificationsContext";
 import { PetSprite } from "./PetSprite";
+import { useEquippedPetGear } from "@/hooks/useShop";
 import { xpForLevel } from "@/lib/aura/types";
 import { Coins, Swords, Brain, Heart, Bell, Sun, Moon } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -128,8 +135,13 @@ function NotificationsBell() {
 export function HUD() {
   const { data: profile } = useProfile();
   const { petState } = usePomodoro();
+  const petGear = useEquippedPetGear();
   if (!profile) return null;
   const xpMax = xpForLevel(profile.level);
+  const staCap = effectiveMaxStamina(profile);
+  const effStr = effectiveStrength(profile);
+  const effInt = effectiveIntelligence(profile);
+  const effCon = effectiveConstitution(profile);
 
   return (
     <header className="border-b-2 border-border bg-card/80 backdrop-blur px-4 py-3">
@@ -142,7 +154,7 @@ export function HUD() {
             </span>
           </div>
           <div className="w-14 h-14 flex items-center justify-center">
-            <PetSprite state={petState} size={56} />
+            <PetSprite state={petState} size={56} gear={petGear} />
           </div>
         </div>
 
@@ -154,9 +166,10 @@ export function HUD() {
               LV {profile.level}
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-2 max-w-md">
+          <div className="grid grid-cols-3 gap-2 max-w-xl">
             <Bar value={profile.hp} max={profile.max_hp} color="var(--color-hp)" label="HP" />
             <Bar value={profile.xp} max={xpMax} color="var(--color-xp)" label="XP" />
+            <Bar value={profile.stamina} max={staCap} color="var(--color-stamina)" label="STA" />
           </div>
         </div>
 
@@ -167,9 +180,15 @@ export function HUD() {
             <Coins size={16} /> <span className="text-base">{profile.gold}</span>
           </div>
           <div className="h-8 w-px bg-border" />
-          <div className="flex items-center gap-2" title="Strength"><Swords size={18} className="text-destructive" /> {profile.strength}</div>
-          <div className="flex items-center gap-2" title="Intelligence"><Brain size={18} className="text-accent" /> {profile.intelligence}</div>
-          <div className="flex items-center gap-2" title="Constitution"><Heart size={18} className="text-primary" /> {profile.constitution}</div>
+          <div className="flex items-center gap-2" title="Strength (gear included)">
+            <Swords size={18} className="text-destructive" /> {effStr}
+          </div>
+          <div className="flex items-center gap-2" title="Intelligence (gear included)">
+            <Brain size={18} className="text-accent" /> {effInt}
+          </div>
+          <div className="flex items-center gap-2" title="Constitution (gear included)">
+            <Heart size={18} className="text-primary" /> {effCon}
+          </div>
           <ThemeToggle />
         </div>
       </div>

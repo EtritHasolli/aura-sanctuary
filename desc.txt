@@ -1,0 +1,70 @@
+This is a powerful "Productivity RPG" concept. By merging the **immersion** of Zen Scenery, the **emotional bond** of a Focus Pet, and the **deep mechanics** of Habitica, you get a desktop app that isn't just a tool—it's a living representation of your discipline.
+
+Let’s call this concept **"Aura: The Desktop Sanctuary."**
+
+---
+
+## 1. The Core Loop: Life-to-Game Pipeline
+In Habitica, your tasks are just list items. In **Aura**, your tasks are the **physical fuel** for your pet’s world.
+
+*   **Habits (+/-):** Positive habits (e.g., "Drank Water") cast a small "glimmer" of light into the room. Negative habits (e.g., "Browsed Social Media") cause a small patch of "Corruption" or "Dust" to appear on the floor.
+*   **Dailies:** Completing these keeps the pet’s **Vitality** high. If you miss a Daily, the pet looks tired the next morning, and the "Zen" music becomes slightly melancholic.
+*   **To-Dos:** These are "Bounties." Completing a big project earns "Zen Gold," used to buy furniture or pet evolutions.
+
+---
+
+## 2. The Pet: Your Silent Partner
+Instead of a separate menu, the pet is always present in the room. Its behavior is perfectly synced to your real-time computer activity:
+
+*   **State: Deep Work (Pomodoro):** When you start a focus timer, the pet sits down at its own tiny desk, puts on headphones, and starts "working." If you leave the "Deep Work" window, the pet stops and looks at you expectantly.
+*   **State: Idle:** If your mouse hasn't moved for 10 minutes, the pet curls up and takes a nap.
+*   **State: Exploration:** When you complete a task, the pet might get up and water a plant in the room or "clean" a spot of dust.
+
+### The Evolution System
+Like a classic RPG, your pet grows. But instead of just "Leveling Up," it evolves based on *how* you work:
+*   **The Scholar Path:** Evolves if you complete many "Learning/Reading" tasks. (The pet might grow glasses or a sage-like glow).
+*   **The Builder Path:** Evolves if you complete heavy "Development/Project" tasks. (The pet becomes more robust or gains tools).
+
+---
+
+## 3. The Zen Environment (The "Habitica World")
+The "Room" isn't just a background; it is the **visual dashboard** of your week.
+
+*   **The Windows (Weather-Sync):** If it’s raining in your real city, it’s raining in the app.
+*   **The Garden (Task History):** To the left of the pet is a small indoor garden. Each plant represents a long-term goal. As you check off sub-tasks, that specific plant grows. If you abandon a project, the plant wilts.
+*   **The Soundscape Mixer:** High-quality loops (Fireplace, Rain, Library, Cafe).
+    *   *Habitica Twist:* You "unlock" new high-fidelity sounds by reaching certain levels. (e.g., Level 5 unlocks "Thunderstorm," Level 10 unlocks "Underwater Temple").
+
+---
+
+## 4. "The Shadow" (The Boss Battles)
+Habitica has Bosses you fight with a party. In **Aura**, the "Boss" is **Procrastination.**
+
+*   **The Infestation:** If you have 5+ overdue tasks, the room starts to look dark. "Shadow Sprites" (visual glitches) appear in the corners.
+*   **The Battle:** You "defeat" the boss by clearing your overdue list. As you check them off, the pet performs "attacks" (bursts of light) that clear the room of shadows and restore the Zen atmosphere.
+
+---
+
+## 5. Technical Implementation (The "Electron" Advantage)
+Since you are building this with Electron, you can do things a web app can't:
+
+| Feature | Description |
+| :--- | :--- |
+| **System Tray "Ghost"** | When the main window is closed, the pet’s face appears in the system tray, showing a tiny progress bar for your current task. |
+| **Active Window Detection** | The app can detect if you open a "Blacklisted" app (like a game or Reddit). If you do, the pet’s room begins to fill with "Fog," making it harder to see the Zen scenery until you close the distraction. |
+| **Transparent Overlay** | A "Widget Mode" where the pet sits directly on your taskbar or in the corner of your screen, semi-transparent, while you work in other apps. |
+| **Local-First Privacy** | Unlike Habitica, all task data and "life history" are stored in a local SQLite or JSON database. Users love this for sensitive work tasks. |
+
+---
+
+## 6. The "Fun" Creative Details
+*   **The "Loot" System:** Occasionally, completing a task drops a "Mystery Box." Inside could be a new hat for the pet, a different color of "Neon Lights" for the room, or a rare Lo-fi track.
+*   **The Mood Palette:** Allow the user to pick a "Vibe."
+    *   *Cyberpunk:* Blue/Purple lights, rain on a neon window, synth-wave lo-fi.
+    *   *Forest Cabin:* Green/Brown tones, birds chirping, acoustic guitar.
+    *   *Studio Ghibli-esque:* Soft watercolors, piano music, bright sunshine.
+
+### Why this beats a standard website:
+A website is a tab you close. This app is a **companion** that lives on your hardware. It turns the boring act of "checking off a task" into a moment of nurturing a small, beautiful world.
+
+Does this level of detail help you see the vision, or should we dive deeper into the "Battle" mechanics for the tasks?

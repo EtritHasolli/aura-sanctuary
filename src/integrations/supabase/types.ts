@@ -137,14 +137,24 @@ export type Database = {
           constitution: number
           created_at: string
           display_name: string
+          equip_con_bonus: number
+          equip_gold_bonus_pct: number
+          equip_int_bonus: number
+          equip_max_stamina_bonus: number
+          equip_str_bonus: number
+          equip_xp_bonus_pct: number
           gold: number
           hp: number
           id: string
           intelligence: number
+          last_stamina_regen_at: string
+          last_stamina_reset_on: string
           level: number
+          max_stamina: number
           max_hp: number
           pet_name: string
           pet_state: string
+          stamina: number
           strength: number
           updated_at: string
           xp: number
@@ -153,14 +163,24 @@ export type Database = {
           constitution?: number
           created_at?: string
           display_name?: string
+          equip_con_bonus?: number
+          equip_gold_bonus_pct?: number
+          equip_int_bonus?: number
+          equip_max_stamina_bonus?: number
+          equip_str_bonus?: number
+          equip_xp_bonus_pct?: number
           gold?: number
           hp?: number
           id: string
           intelligence?: number
+          last_stamina_regen_at?: string
+          last_stamina_reset_on?: string
           level?: number
+          max_stamina?: number
           max_hp?: number
           pet_name?: string
           pet_state?: string
+          stamina?: number
           strength?: number
           updated_at?: string
           xp?: number
@@ -169,19 +189,144 @@ export type Database = {
           constitution?: number
           created_at?: string
           display_name?: string
+          equip_con_bonus?: number
+          equip_gold_bonus_pct?: number
+          equip_int_bonus?: number
+          equip_max_stamina_bonus?: number
+          equip_str_bonus?: number
+          equip_xp_bonus_pct?: number
           gold?: number
           hp?: number
           id?: string
           intelligence?: number
+          last_stamina_regen_at?: string
+          last_stamina_reset_on?: string
           level?: number
+          max_stamina?: number
           max_hp?: number
           pet_name?: string
           pet_state?: string
+          stamina?: number
           strength?: number
           updated_at?: string
           xp?: number
         }
         Relationships: []
+      }
+      shop_items: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          forge_exclusive: boolean
+          id: string
+          is_active: boolean
+          metadata: Json
+          name: string
+          price: number
+          rarity: string
+          slug: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string
+          forge_exclusive?: boolean
+          id?: string
+          is_active?: boolean
+          metadata?: Json
+          name: string
+          price: number
+          rarity?: string
+          slug: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          forge_exclusive?: boolean
+          id?: string
+          is_active?: boolean
+          metadata?: Json
+          name?: string
+          price?: number
+          rarity?: string
+          slug?: string
+        }
+        Relationships: []
+      }
+      shop_purchases: {
+        Row: {
+          created_at: string
+          id: string
+          item_id: string
+          quantity: number
+          total_cost: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_id: string
+          quantity: number
+          total_cost: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_id?: string
+          quantity?: number
+          total_cost?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_purchases_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "shop_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_items: {
+        Row: {
+          acquired_at: string
+          equipped: boolean
+          id: string
+          item_id: string
+          quantity: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          acquired_at?: string
+          equipped?: boolean
+          id?: string
+          item_id: string
+          quantity?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          acquired_at?: string
+          equipped?: boolean
+          id?: string
+          item_id?: string
+          quantity?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "shop_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tasks: {
         Row: {
@@ -242,6 +387,61 @@ export type Database = {
       is_party_member: {
         Args: { _party_id: string; _user_id: string }
         Returns: boolean
+      }
+      purchase_shop_item: {
+        Args: { p_item_slug: string; p_quantity?: number }
+        Returns: {
+          gold_left: number
+          item_slug: string
+          new_quantity: number
+          quantity_purchased: number
+        }[]
+      }
+      apply_stamina_regen: {
+        Args: { p_gain_per_tick?: number; p_tick_minutes?: number }
+        Returns: {
+          max_stamina: number
+          regen_applied: number
+          reset_applied: boolean
+          stamina: number
+        }[]
+      }
+      consume_user_item: {
+        Args: { p_item_slug: string; p_quantity?: number }
+        Returns: {
+          consumed_quantity: number
+          hp_after: number
+          item_slug: string
+          quantity_left: number
+          stamina_after: number
+        }[]
+      }
+      sync_party_boss_scaling: {
+        Args: { p_party_id: string }
+        Returns: {
+          boss_hp: number
+          boss_max_hp: number
+        }[]
+      }
+      strike_party_boss: {
+        Args: { p_party_id: string }
+        Returns: Json
+      }
+      equip_user_item: {
+        Args: { p_user_item_id: string }
+        Returns: undefined
+      }
+      unequip_user_item: {
+        Args: { p_user_item_id: string }
+        Returns: undefined
+      }
+      forge_three_equipment: {
+        Args: {
+          p_user_item_id_a: string
+          p_user_item_id_b: string
+          p_user_item_id_c: string
+        }
+        Returns: Json
       }
     }
     Enums: {

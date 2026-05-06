@@ -184,6 +184,7 @@ function SettingsPage() {
             <Stat label="Level" value={profile.level} />
             <Stat label="Gold" value={profile.gold} />
             <Stat label="HP" value={`${profile.hp}/${profile.max_hp}`} />
+            <Stat label="Stamina" value={`${profile.stamina}/${profile.max_stamina}`} />
             <Stat label="XP" value={`${profile.xp}/${xpForLevel(profile.level)}`} />
             <Stat label="Strength" value={profile.strength} />
             <Stat label="Intelligence" value={profile.intelligence} />

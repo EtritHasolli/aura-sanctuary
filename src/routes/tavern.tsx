@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Send, Swords, UserPlus, Check, Mail } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile, useApplyReward } from "@/hooks/useProfile";
+import { InventoryBag } from "@/components/aura/InventoryBag";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -16,9 +18,29 @@ export const Route = createFileRoute("/tavern")({
 
 interface Party { id: string; name: string; boss_name: string; boss_hp: number; boss_max_hp: number }
 interface ChatMsg { id: string; user_id: string; display_name: string; content: string; created_at: string }
+const ATTACK_STAMINA_COST = 10;
+
+interface StrikePartyBossResult {
+  dmg: number;
+  killed: boolean;
+  boss_hp: number;
+  boss_max_hp: number;
+  bonus_gold: number;
+  drop_slug: string | null;
+  drop_name: string | null;
+  stamina_spent: number;
+}
+
+async function refreshPartyScaled(partyId: string) {
+  const { error: syncErr } = await supabase.rpc("sync_party_boss_scaling", { p_party_id: partyId });
+  if (syncErr) console.warn("sync_party_boss_scaling:", syncErr.message);
+  const { data } = await supabase.from("parties").select("*").eq("id", partyId).maybeSingle();
+  return data as Party | null;
+}
 
 function TavernPage() {
   const { user } = useAuth();
+  const qc = useQueryClient();
   const { data: profile } = useProfile();
   const reward = useApplyReward();
   const { invite } = Route.useSearch();
@@ -56,8 +78,8 @@ function TavernPage() {
         await supabase.from("party_members").upsert({ party_id: p.id, user_id: user.id });
       }
 
-      const { data: full } = await supabase.from("parties").select("*").eq("id", p.id).maybeSingle();
-      setParty(full as Party);
+      const full = await refreshPartyScaled(p.id);
+      setParty(full);
       const { data: msgs } = await supabase.from("chat_messages").select("*").eq("party_id", p.id).order("created_at", { ascending: true }).limit(100);
       setMessages((msgs ?? []) as ChatMsg[]);
       if (invite) toast.success("Joined the party!");
@@ -93,13 +115,37 @@ function TavernPage() {
 
   const attackBoss = async () => {
     if (!party || !profile) return;
-    const dmg = 5 + profile.strength * 2;
-    const newHp = Math.max(0, party.boss_hp - dmg);
-    const { error } = await supabase.from("parties").update({ boss_hp: newHp === 0 ? party.boss_max_hp : newHp }).eq("id", party.id);
-    if (!error) {
-      reward.mutate({ xp: dmg, gold: 2, stat: "strength" });
-      toast.success(`Dealt ${dmg} damage!`);
-    } else toast.error(error.message);
+    if (profile.stamina < ATTACK_STAMINA_COST) {
+      toast.error(`Not enough stamina. Need ${ATTACK_STAMINA_COST}.`);
+      return;
+    }
+    const { data: raw, error } = await supabase.rpc("strike_party_boss", { p_party_id: party.id });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    const r = raw as StrikePartyBossResult | null;
+    if (!r || typeof r.dmg !== "number") {
+      toast.error("Boss strike failed.");
+      return;
+    }
+
+    setParty((prev) =>
+      prev
+        ? { ...prev, boss_hp: r.boss_hp, boss_max_hp: r.boss_max_hp }
+        : prev,
+    );
+    await qc.invalidateQueries({ queryKey: ["profile", user?.id] });
+    reward.mutate({ xp: r.dmg, gold: 2, stat: "strength" });
+
+    if (r.killed) {
+      await qc.invalidateQueries({ queryKey: ["userItems", user?.id] });
+      toast.success(
+        `SHADOW DOWN! +${r.bonus_gold} gold${r.drop_name ? ` · ${r.drop_name}` : ""} — next boss is up!`,
+      );
+    } else {
+      toast.success(`Dealt ${r.dmg} damage! -${r.stamina_spent} stamina`);
+    }
   };
 
   const createParty = async () => {
@@ -111,8 +157,12 @@ function TavernPage() {
       p_boss_hp: 1000,
     });
     if (error) { toast.error(error.message); return; }
-    const { data: p } = await supabase.from("parties").select("*").eq("id", partyId).maybeSingle();
-    if (p) { setParty(p as Party); toast.success("The Tavern is open!"); }
+    if (!partyId) return;
+    const p = await refreshPartyScaled(typeof partyId === "string" ? partyId : String(partyId));
+    if (p) {
+      setParty(p);
+      toast.success("The Tavern is open!");
+    }
   };
 
   const sendEmailInvite = () => {
@@ -170,7 +220,7 @@ function TavernPage() {
               <h2 className="text-sm text-destructive flex-1" style={{ fontFamily: "var(--font-pixel)" }}>
                 {party.boss_name}
               </h2>
-              <button onClick={attackBoss} className="px-3 py-2 bg-destructive text-destructive-foreground flex items-center gap-1"
+              <button onClick={attackBoss} disabled={!profile || profile.stamina < ATTACK_STAMINA_COST} className="px-3 py-2 bg-destructive text-destructive-foreground flex items-center gap-1 disabled:opacity-50"
                 style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}>
                 <Swords size={12} /> ATTACK
               </button>
@@ -185,6 +235,10 @@ function TavernPage() {
             </div>
             <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: "var(--font-pixel)" }}>
               {party.boss_hp} / {party.boss_max_hp} HP
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-1" style={{ fontFamily: "var(--font-display)" }}>
+              Toughness rises with the combined levels of everyone in this party (refreshes when you enter the Tavern).
+              On a kill you get bonus gold and a random drop (gear in your bag).
             </p>
           </div>
 
@@ -265,9 +319,13 @@ function TavernPage() {
           {profile && (
             <div className="border-2 border-primary p-2">
               <div className="text-sm" style={{ fontFamily: "var(--font-pixel)" }}>{profile.display_name}</div>
-              <div className="text-xs text-muted-foreground">LV {profile.level} · {profile.gold}g</div>
+              <div className="text-xs text-muted-foreground">LV {profile.level} · {profile.gold}g · {profile.stamina}/{profile.max_stamina} STA</div>
             </div>
           )}
+
+          <div className="mt-4">
+            <InventoryBag listMaxHeightClass="max-h-52" />
+          </div>
         </div>
       </div>
     </div>

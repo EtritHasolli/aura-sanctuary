@@ -7,14 +7,19 @@ import {
 } from "@/lib/aura/types";
 
 describe("xpForLevel", () => {
-  it("returns 50 xp for level 1", () => {
-    expect(xpForLevel(1)).toBe(50);
+  it("returns base XP for level 1", () => {
+    expect(xpForLevel(1)).toBe(45);
   });
 
-  it("increases by 25 xp per level", () => {
-    expect(xpForLevel(2)).toBe(75);
-    expect(xpForLevel(3)).toBe(100);
-    expect(xpForLevel(10)).toBe(275);
+  it("increases each level", () => {
+    expect(xpForLevel(2)).toBeGreaterThan(xpForLevel(1));
+    expect(xpForLevel(10)).toBeGreaterThan(xpForLevel(5));
+  });
+
+  it("ramps harder at higher levels than early on", () => {
+    const stepEarly = xpForLevel(3) - xpForLevel(2);
+    const stepMid = xpForLevel(11) - xpForLevel(10);
+    expect(stepMid).toBeGreaterThan(stepEarly);
   });
 });
 

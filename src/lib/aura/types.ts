@@ -9,10 +9,19 @@ export interface Profile {
   xp: number;
   hp: number;
   max_hp: number;
+  stamina: number;
+  max_stamina: number;
   gold: number;
   strength: number;
   intelligence: number;
   constitution: number;
+  /** Cached sum from equipped gear (server-maintained). */
+  equip_str_bonus?: number;
+  equip_int_bonus?: number;
+  equip_con_bonus?: number;
+  equip_max_stamina_bonus?: number;
+  equip_xp_bonus_pct?: number;
+  equip_gold_bonus_pct?: number;
   pet_name: string;
   pet_state: PetState;
 }
@@ -51,4 +60,16 @@ export const DIFFICULTY_HP_LOSS: Record<Difficulty, number> = {
   trivial: 2, easy: 5, medium: 10, hard: 18,
 };
 
-export function xpForLevel(level: number) { return 50 + (level - 1) * 25; }
+/**
+ * XP required to advance FROM `level` TO `level + 1`
+ * (`useApplyReward` subtracts this while `xp >= xpForLevel(level)`).
+ *
+ * Gentle early game; curves upward so high levels grind more than linear.
+ */
+export function xpForLevel(level: number) {
+  const n = Math.max(0, level - 1);
+  const base = 45;
+  const linear = n * 24;
+  const quad = Math.floor(n * n * 3.5);
+  return Math.max(25, base + linear + quad);
+}

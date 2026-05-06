@@ -52,4 +52,11 @@ describe("PetSprite", () => {
     expect(svg?.getAttribute("width")).toBe("32");
     expect(svg?.getAttribute("height")).toBe("32");
   });
+
+  it("renders equipment overlay when gear is provided", () => {
+    const { container } = render(
+      <PetSprite state="idle" gear={[{ slug: "eq-wooden-training-blade", slot: "weapon" }]} />,
+    );
+    expect(container.querySelector('[data-testid="pet-gear-eq-wooden-training-blade"]')).toBeTruthy();
+  });
 });
