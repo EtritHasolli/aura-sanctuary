@@ -14,16 +14,239 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          display_name: string
+          id: string
+          party_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          display_name: string
+          id?: string
+          party_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          display_name?: string
+          id?: string
+          party_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notes: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          source_task_id: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          source_task_id?: string | null
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          source_task_id?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      parties: {
+        Row: {
+          boss_hp: number
+          boss_max_hp: number
+          boss_name: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          boss_hp?: number
+          boss_max_hp?: number
+          boss_name?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Update: {
+          boss_hp?: number
+          boss_max_hp?: number
+          boss_name?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      party_members: {
+        Row: {
+          joined_at: string
+          party_id: string
+          user_id: string
+        }
+        Insert: {
+          joined_at?: string
+          party_id: string
+          user_id: string
+        }
+        Update: {
+          joined_at?: string
+          party_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "party_members_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          constitution: number
+          created_at: string
+          display_name: string
+          gold: number
+          hp: number
+          id: string
+          intelligence: number
+          level: number
+          max_hp: number
+          pet_name: string
+          pet_state: string
+          strength: number
+          updated_at: string
+          xp: number
+        }
+        Insert: {
+          constitution?: number
+          created_at?: string
+          display_name?: string
+          gold?: number
+          hp?: number
+          id: string
+          intelligence?: number
+          level?: number
+          max_hp?: number
+          pet_name?: string
+          pet_state?: string
+          strength?: number
+          updated_at?: string
+          xp?: number
+        }
+        Update: {
+          constitution?: number
+          created_at?: string
+          display_name?: string
+          gold?: number
+          hp?: number
+          id?: string
+          intelligence?: number
+          level?: number
+          max_hp?: number
+          pet_name?: string
+          pet_state?: string
+          strength?: number
+          updated_at?: string
+          xp?: number
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          completed: boolean
+          created_at: string
+          difficulty: Database["public"]["Enums"]["task_difficulty"]
+          id: string
+          last_completed_at: string | null
+          negative_count: number
+          notes: string | null
+          position: number
+          positive_count: number
+          source_note_id: string | null
+          title: string
+          type: Database["public"]["Enums"]["task_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          difficulty?: Database["public"]["Enums"]["task_difficulty"]
+          id?: string
+          last_completed_at?: string | null
+          negative_count?: number
+          notes?: string | null
+          position?: number
+          positive_count?: number
+          source_note_id?: string | null
+          title: string
+          type: Database["public"]["Enums"]["task_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          difficulty?: Database["public"]["Enums"]["task_difficulty"]
+          id?: string
+          last_completed_at?: string | null
+          negative_count?: number
+          notes?: string | null
+          position?: number
+          positive_count?: number
+          source_note_id?: string | null
+          title?: string
+          type?: Database["public"]["Enums"]["task_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_party_member: {
+        Args: { _party_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      task_difficulty: "trivial" | "easy" | "medium" | "hard"
+      task_type: "habit" | "daily" | "todo"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +373,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      task_difficulty: ["trivial", "easy", "medium", "hard"],
+      task_type: ["habit", "daily", "todo"],
+    },
   },
 } as const
