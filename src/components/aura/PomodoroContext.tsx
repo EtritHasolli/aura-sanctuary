@@ -38,6 +38,7 @@ export function PomodoroProvider({ children, onFocusComplete }: { children: Reac
         // cycle complete
         if (mode === "focus") {
           cbRef.current?.();
+          if (typeof window !== "undefined") window.dispatchEvent(new Event("aura:focus-complete"));
           setMode("break");
           return BREAK_SECS;
         } else {
