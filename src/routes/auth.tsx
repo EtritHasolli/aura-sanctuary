@@ -3,10 +3,25 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AURA_PATHS, type AuraPath } from "@/lib/aura/types";
 import { toast } from "sonner";
+import swordsmanIdle from "../../characters/swordsman/idle.gif";
+import swordsmanStance from "../../characters/swordsman/stance.gif";
+import mageIdle from "../../characters/mage/idle.gif";
+import mageStance from "../../characters/mage/stance.gif";
+import paladinIdle from "../../characters/paladin/idle.gif";
+import paladinStance from "../../characters/paladin/stance.gif";
+import rogueIdle from "../../characters/rogue/idle.gif";
+import rogueStance from "../../characters/rogue/stance.gif";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
+
+const PATH_GIFS: Record<AuraPath, { idle: string; stance: string }> = {
+  swordsman: { idle: swordsmanIdle, stance: swordsmanStance },
+  mage: { idle: mageIdle, stance: mageStance },
+  tank: { idle: paladinIdle, stance: paladinStance },
+  rogue: { idle: rogueIdle, stance: rogueStance },
+};
 
 function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
@@ -74,17 +89,32 @@ function AuthPage() {
               />
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground block">Choose your path</label>
-                <select
-                  value={path}
-                  onChange={(e) => setPath(e.target.value as AuraPath)}
-                  className="w-full px-3 py-2 bg-input border-2 border-border focus:border-primary outline-none text-sm"
-                >
-                  {AURA_PATHS.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.label} - {p.skill}
-                    </option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  {AURA_PATHS.map((p) => {
+                    const selected = p.id === path;
+                    const sprite = selected ? PATH_GIFS[p.id].stance : PATH_GIFS[p.id].idle;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setPath(p.id)}
+                        className={`border-2 p-2 text-left transition-colors ${
+                          selected
+                            ? "border-primary bg-primary/10"
+                            : "border-border bg-secondary/30 hover:border-primary/60"
+                        }`}
+                      >
+                        <div className="w-full h-24 mb-2 border border-border bg-black/20 flex items-center justify-center overflow-hidden">
+                          <img src={sprite} alt={`${p.label} preview`} className="h-full w-auto object-contain" />
+                        </div>
+                        <div className="text-primary text-xs" style={{ fontFamily: "var(--font-pixel)" }}>
+                          {p.label}
+                        </div>
+                        <div className="text-muted-foreground text-xs">{p.skill}</div>
+                      </button>
+                    );
+                  })}
+                </div>
                 <div className="border border-border bg-secondary/40 p-2 text-xs">
                   {AURA_PATHS.filter((p) => p.id === path).map((p) => (
                     <div key={p.id} className="space-y-1">

@@ -8,6 +8,14 @@ import { AURA_PATHS, xpForLevel, type AuraPath } from "@/lib/aura/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import swordsmanIdle from "../../characters/swordsman/idle.gif";
+import swordsmanStance from "../../characters/swordsman/stance.gif";
+import mageIdle from "../../characters/mage/idle.gif";
+import mageStance from "../../characters/mage/stance.gif";
+import paladinIdle from "../../characters/paladin/idle.gif";
+import paladinStance from "../../characters/paladin/stance.gif";
+import rogueIdle from "../../characters/rogue/idle.gif";
+import rogueStance from "../../characters/rogue/stance.gif";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Settings — Aura" }] }),
@@ -35,6 +43,13 @@ const FALLBACK_TIMEZONES = [
   "Asia/Tokyo",
   "Australia/Sydney",
 ];
+
+const PATH_GIFS: Record<AuraPath, { idle: string; stance: string }> = {
+  swordsman: { idle: swordsmanIdle, stance: swordsmanStance },
+  mage: { idle: mageIdle, stance: mageStance },
+  tank: { idle: paladinIdle, stance: paladinStance },
+  rogue: { idle: rogueIdle, stance: rogueStance },
+};
 
 async function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -773,10 +788,12 @@ function SettingsPage() {
                     SELECTED
                   </span>
                 )}
-                <div className="w-full aspect-square border-2 border-border bg-secondary/40 mb-3 flex items-center justify-center">
-                  <span className="text-[10px] text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
-                    CHARACTER
-                  </span>
+                <div className="w-full aspect-square border-2 border-border bg-secondary/40 mb-3 flex items-center justify-center overflow-hidden">
+                  <img
+                    src={selectedPathId === path.id ? PATH_GIFS[path.id].stance : PATH_GIFS[path.id].idle}
+                    alt={`${path.label} preview`}
+                    className="h-full w-auto object-contain"
+                  />
                 </div>
                 <div className="text-primary mb-2" style={{ fontFamily: "var(--font-pixel)" }}>
                   {path.label}
