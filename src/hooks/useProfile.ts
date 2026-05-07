@@ -78,6 +78,7 @@ export interface RewardDelta {
   hp?: number;
   stamina?: number;
   stat?: "strength" | "intelligence" | "constitution";
+  statAmount?: number;
 }
 
 export function useApplyReward() {
@@ -95,12 +96,15 @@ export function useApplyReward() {
         ...prev,
         hp: Math.max(0, Math.min(prev.max_hp, prev.hp + (delta.hp ?? 0))),
         stamina: Math.max(0, prev.stamina + (delta.stamina ?? 0)),
-        xp: prev.xp + (delta.xp ?? 0),
+        xp: Math.max(0, prev.xp + (delta.xp ?? 0)),
         gold: Math.max(0, prev.gold + (delta.gold ?? 0)),
       };
-      if (delta.stat === "strength") next.strength = prev.strength + 1;
-      else if (delta.stat === "intelligence") next.intelligence = prev.intelligence + 1;
-      else if (delta.stat === "constitution") next.constitution = prev.constitution + 1;
+      const statAmount = delta.statAmount ?? 1;
+      if (delta.stat === "strength") next.strength = Math.max(0, prev.strength + statAmount);
+      else if (delta.stat === "intelligence")
+        next.intelligence = Math.max(0, prev.intelligence + statAmount);
+      else if (delta.stat === "constitution")
+        next.constitution = Math.max(0, prev.constitution + statAmount);
       // Keep optimistic preview bounded when this is not a level-up flow.
       if ((delta.xp ?? 0) <= 0) next.stamina = Math.min(effMaxSta, next.stamina);
       qc.setQueryData(key, next);
@@ -132,7 +136,7 @@ export function useApplyReward() {
 
       const xpDelta = withXpEquipBonus(xpGain, p);
       const goldDelta = withGoldEquipBonus(delta.gold ?? 0, p);
-      let xp = p.xp + xpDelta;
+      let xp = Math.max(0, p.xp + xpDelta);
       let level = p.level;
       let max_hp = Math.max(p.max_hp, canonicalMaxHpForLevel(p.level));
       let hp = Math.min(max_hp, p.hp + (delta.hp ?? 0));
@@ -180,9 +184,12 @@ export function useApplyReward() {
       if (!leveledUp) stamina = Math.min(effMaxSta, stamina);
 
       const patch: Partial<Profile> = { xp, level, max_hp, hp, stamina, gold };
-      if (delta.stat === "strength") patch.strength = p.strength + 1;
-      else if (delta.stat === "intelligence") patch.intelligence = p.intelligence + 1;
-      else if (delta.stat === "constitution") patch.constitution = p.constitution + 1;
+      const statAmount = delta.statAmount ?? 1;
+      if (delta.stat === "strength") patch.strength = Math.max(0, p.strength + statAmount);
+      else if (delta.stat === "intelligence")
+        patch.intelligence = Math.max(0, p.intelligence + statAmount);
+      else if (delta.stat === "constitution")
+        patch.constitution = Math.max(0, p.constitution + statAmount);
 
       const { error } = await supabase.from("profiles").update(patch).eq("id", user!.id);
       if (error) throw error;

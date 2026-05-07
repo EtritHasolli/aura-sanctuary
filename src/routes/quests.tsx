@@ -335,16 +335,25 @@ function TaskRow({
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const linkedNote = notes.find((n) => n.id === task.source_note_id) ?? null;
+  const [titleText, setTitleText] = useState(task.title);
   const [notesText, setNotesText] = useState(linkedNote?.content ?? task.notes ?? "");
   const todoCleanupStarted = useRef(false);
   const todayLocalDate = prof ? calendarDateInTimeZone(prof.timezone || "UTC") : null;
   const isDailyDoneToday =
     task.type === "daily" && !!todayLocalDate && task.last_completed_local_date === todayLocalDate;
-  const isCheckDisabled = task.type === "todo" ? task.completed : isDailyDoneToday;
+  const isQuestChecked = task.type === "todo" ? task.completed : isDailyDoneToday;
+  const isCheckDisabled = task.type === "todo" && task.completed;
+  const dailyContentOpacity = isDailyDoneToday ? "opacity-50" : "";
+  const habitStreak = task.type === "habit" ? (task.streak_current ?? 0) : 0;
+  const showStreak = task.type === "daily" || habitStreak >= 3;
 
   useEffect(() => {
     setNotesText(linkedNote?.content ?? task.notes ?? "");
   }, [linkedNote?.content, task.notes, task.source_note_id]);
+
+  useEffect(() => {
+    setTitleText(task.title);
+  }, [task.title]);
 
   const cleanupTodoAndLinkedNotes = useCallback(async () => {
     // Delete any note linked by source_task_id for full cleanup,
@@ -395,7 +404,14 @@ function TaskRow({
     });
 
     if (task.type === "habit") {
-      update.mutate({ id: task.id, patch: { positive_count: task.positive_count + 1 } });
+      update.mutate({
+        id: task.id,
+        patch: {
+          positive_count: task.positive_count + 1,
+          streak_current: habitStreak + 1,
+          streak_best: Math.max(task.streak_best ?? 0, habitStreak + 1),
+        },
+      });
     } else if (task.type === "daily") {
       const yesterday = addCalendarDays(today, -1);
       let streak = 1;
@@ -436,15 +452,62 @@ function TaskRow({
     toast.success(`+${xpOut} XP · +${goldOut}g`);
   };
 
+  const uncompleteDaily = async () => {
+    if (!prof || task.type !== "daily" || !todayLocalDate) return;
+    const previousStreak = Math.max(0, (task.streak_current ?? 0) - 1);
+    const previousCompletionDate = previousStreak > 0 ? addCalendarDays(todayLocalDate, -1) : null;
+    const baseXp = DIFFICULTY_XP[task.difficulty];
+    const baseGold = DIFFICULTY_GOLD[task.difficulty];
+
+    await update.mutateAsync({
+      id: task.id,
+      patch: {
+        completed: false,
+        last_completed_local_date: previousCompletionDate,
+        streak_current: previousStreak,
+        last_completed_at: null,
+      },
+    });
+    await reward.mutateAsync({
+      xp: -withXpEquipBonus(baseXp, prof),
+      gold: -withGoldEquipBonus(baseGold, prof),
+      stat,
+      statAmount: -1,
+    });
+    toast.info("Daily unsealed.");
+  };
+
   const negative = () => {
     reward.mutate({ hp: -DIFFICULTY_HP_LOSS[task.difficulty] });
-    update.mutate({ id: task.id, patch: { negative_count: task.negative_count + 1 } });
+    update.mutate({
+      id: task.id,
+      patch: { negative_count: task.negative_count + 1, streak_current: 0 },
+    });
     toast.error(`-${DIFFICULTY_HP_LOSS[task.difficulty]} HP`);
   };
 
   const saveNotes = (val: string) => {
     update.mutate({ id: task.id, patch: { notes: val } });
     if (linkedNote) updateNote.mutate({ id: linkedNote.id, patch: { content: val } });
+  };
+
+  const saveTitle = (val: string) => {
+    const title = val.trim();
+    if (!title) {
+      setTitleText(task.title);
+      toast.error("Quest title cannot be empty.");
+      return;
+    }
+    if (title === task.title) {
+      setTitleText(title);
+      return;
+    }
+
+    update.mutate({ id: task.id, patch: { title } });
+    if (linkedNote && linkedNote.title === task.title) {
+      updateNote.mutate({ id: linkedNote.id, patch: { title } });
+    }
+    setTitleText(title);
   };
 
   const convertToNote = async () => {
@@ -472,9 +535,7 @@ function TaskRow({
   };
 
   return (
-    <div
-      className={`border-2 border-border bg-secondary/50 p-2 ${task.completed ? "opacity-50" : ""}`}
-    >
+    <div className="border-2 border-border bg-secondary/50 p-2">
       <div className="flex items-center gap-2">
         {task.type === "habit" ? (
           <>
@@ -493,25 +554,30 @@ function TaskRow({
           </>
         ) : (
           <button
-            onClick={() => void completePositive()}
+            onClick={() => void (isDailyDoneToday ? uncompleteDaily() : completePositive())}
             disabled={isCheckDisabled}
-            className={`w-7 h-7 border-2 ${isCheckDisabled ? "bg-primary border-primary" : "border-border hover:border-primary"} flex items-center justify-center`}
+            className={`w-7 h-7 border-2 ${isQuestChecked ? "bg-primary border-primary" : "border-border hover:border-primary"} flex items-center justify-center`}
+            aria-pressed={isQuestChecked}
+            title={isDailyDoneToday ? "Uncheck daily" : "Complete quest"}
           >
-            {isCheckDisabled && <Check size={14} className="text-primary-foreground" />}
+            {isQuestChecked && <Check size={14} className="text-primary-foreground" />}
           </button>
         )}
-        <button className="flex-1 text-left text-sm" onClick={() => setOpen(true)}>
+        <button
+          className={`flex-1 text-left text-sm ${dailyContentOpacity}`}
+          onClick={() => setOpen(true)}
+        >
           {task.title}
         </button>
-        <span className="text-xs text-primary" title={task.difficulty}>
+        <span className={`text-sm text-primary ${dailyContentOpacity}`} title={task.difficulty}>
           {DIFF_STARS[task.difficulty]}
         </span>
-        {task.type === "daily" && (
+        {showStreak && (
           <span
-            className="text-[10px] text-[color:var(--color-gold)] flex items-center gap-0.5"
+            className={`text-sm text-[color:var(--color-gold)] flex items-center gap-1 ${dailyContentOpacity}`}
             title="Streak"
           >
-            <Flame size={10} />
+            <Flame size={14} />
             {task.streak_current ?? 0}
           </span>
         )}
@@ -524,7 +590,16 @@ function TaskRow({
               className="flex items-center gap-2"
               style={{ fontFamily: "var(--font-pixel)" }}
             >
-              <span>{task.title}</span>
+              <input
+                value={titleText}
+                onChange={(e) => setTitleText(e.target.value)}
+                onBlur={(e) => saveTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+                className="w-full max-w-sm bg-input border border-border px-2 py-1 text-sm"
+                aria-label="Quest title"
+              />
               <button
                 type="button"
                 onClick={() => setConfirmDeleteOpen(true)}
