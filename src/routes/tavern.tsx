@@ -99,6 +99,7 @@ function TavernPage() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const reconnectDelayRef = useRef(1000);
+  const INVITE_PROCESSED_KEY = "tavernInviteProcessed";
 
   const loadAdventure = async (partyId: string) => {
     const { data: adv } = await supabase
@@ -162,12 +163,18 @@ function TavernPage() {
     if (!user) return;
     (async () => {
       const targetId: string | undefined = invite;
+      const inviteProcessKey = targetId ? `${user.id}:${targetId}` : null;
+      const alreadyProcessedInvite =
+        inviteProcessKey && sessionStorage.getItem(`${INVITE_PROCESSED_KEY}:${inviteProcessKey}`) === "1";
 
-      if (targetId) await supabase.rpc("join_party_by_id", { p_party_id: targetId });
+      if (targetId && !alreadyProcessedInvite) {
+        sessionStorage.setItem(`${INVITE_PROCESSED_KEY}:${inviteProcessKey}`, "1");
+        await supabase.rpc("join_party_by_id", { p_party_id: targetId });
+      }
       const parties = await loadMyParties();
       const initialId = targetId && parties.some((p) => p.id === targetId) ? targetId : undefined;
       if (initialId) await loadParty(initialId);
-      if (invite) toast.success("Joined the party!");
+      if (targetId && !alreadyProcessedInvite) toast.success("Joined the party!");
       setLoading(false);
     })();
   }, [user, invite]);

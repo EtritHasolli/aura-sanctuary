@@ -90,6 +90,7 @@ function FriendsPage() {
   const friendWsRef = useRef<WebSocket | null>(null);
   const friendReconnectTimerRef = useRef<number | null>(null);
   const friendReconnectDelayRef = useRef(1000);
+  const INVITE_PROCESSED_KEY = "friendInviteProcessed";
 
   const directRoomId = useMemo(() => {
     if (!user?.id || !selectedFriendId) return null;
@@ -98,6 +99,9 @@ function FriendsPage() {
 
   useEffect(() => {
     if (!user || !invite || invite === user.id) return;
+    const inviteProcessKey = `${user.id}:${invite}`;
+    if (sessionStorage.getItem(`${INVITE_PROCESSED_KEY}:${inviteProcessKey}`) === "1") return;
+    sessionStorage.setItem(`${INVITE_PROCESSED_KEY}:${inviteProcessKey}`, "1");
     sendFriendRequest
       .mutateAsync(invite)
       .then(() => toast.success("Friend request sent."))
