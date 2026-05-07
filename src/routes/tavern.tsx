@@ -522,7 +522,7 @@ function TavernPage() {
           setMessages([]);
           setAdventure(null);
         }}
-        className="absolute -left-12 top-2 z-10 px-2 py-1 border-2 border-border hover:border-primary text-xs bg-background"
+        className="absolute -left-12 top-8 z-10 px-2 py-1 border-2 border-border hover:border-primary text-xs bg-background"
         style={{ fontFamily: "var(--font-pixel)" }}
         title="Back to party list"
       >
@@ -531,54 +531,42 @@ function TavernPage() {
       <div className="space-y-4 h-full">
         <div className="pixel-panel p-3 flex flex-col lg:flex-row lg:items-start gap-3">
           <div className="flex-1 min-w-0">
-            <div className="max-h-28 overflow-y-auto space-y-1">
-              {myParties.map((p) => (
-                <div
-                  key={p.id}
-                  className={`w-full border text-xs ${party.id === p.id ? "border-primary bg-primary/10" : "border-border"}`}
-                >
-                  <div className="flex items-center gap-1 px-2 py-1">
-                    {editingPartyId === p.id ? (
-                      <input
-                        autoFocus
-                        value={editingPartyName}
-                        onChange={(e) => setEditingPartyName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") void commitInlineRename(p);
-                          if (e.key === "Escape") setEditingPartyId(null);
-                        }}
-                        className="flex-1 bg-input border border-border px-1 py-0.5 outline-none"
-                        style={{ fontFamily: "var(--font-pixel)" }}
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => void loadParty(p.id)}
-                        className="flex-1 text-left"
-                        style={{ fontFamily: "var(--font-pixel)" }}
-                      >
-                        {p.name}
-                      </button>
-                    )}
-                    {profile?.id === p.leader_id && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (editingPartyId === p.id) {
-                            void commitInlineRename(p);
-                            return;
-                          }
-                          beginInlineRename(p);
-                        }}
-                        className="px-1.5 py-0.5 border border-border hover:border-primary text-[10px]"
-                        style={{ fontFamily: "var(--font-pixel)" }}
-                      >
-                        {editingPartyId === p.id ? "SAVE" : "EDIT"}
-                      </button>
-                    )}
+            <div className="w-full border border-primary bg-primary/10 text-xs">
+              <div className="flex items-center gap-1 px-2 py-1">
+                {editingPartyId === party.id ? (
+                  <input
+                    autoFocus
+                    value={editingPartyName}
+                    onChange={(e) => setEditingPartyName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void commitInlineRename(party);
+                      if (e.key === "Escape") setEditingPartyId(null);
+                    }}
+                    className="flex-1 bg-input border border-border px-1 py-0.5 outline-none"
+                    style={{ fontFamily: "var(--font-pixel)" }}
+                  />
+                ) : (
+                  <div className="flex-1 truncate" style={{ fontFamily: "var(--font-pixel)" }}>
+                    {party.name}
                   </div>
-                </div>
-              ))}
+                )}
+                {profile?.id === party.leader_id && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editingPartyId === party.id) {
+                        void commitInlineRename(party);
+                        return;
+                      }
+                      beginInlineRename(party);
+                    }}
+                    className="px-1.5 py-0.5 border border-border hover:border-primary text-[10px]"
+                    style={{ fontFamily: "var(--font-pixel)" }}
+                  >
+                    {editingPartyId === party.id ? "SAVE" : "EDIT"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-1">
