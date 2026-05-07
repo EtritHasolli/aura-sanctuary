@@ -6,6 +6,12 @@ import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile, useApplyReward } from "@/hooks/useProfile";
+import {
+  useSkillFocusWard,
+  useSkillPartyMend,
+  useSkillSecondWind,
+  useSkillShadowStrike,
+} from "@/hooks/useSkills";
 import { InventoryBag } from "@/components/aura/InventoryBag";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -16,8 +22,24 @@ export const Route = createFileRoute("/tavern")({
   component: TavernPage,
 });
 
-interface Party { id: string; name: string; boss_name: string; boss_hp: number; boss_max_hp: number }
-interface ChatMsg { id: string; user_id: string; display_name: string; content: string; created_at: string }
+interface Party {
+  id: string;
+  name: string;
+  boss_name: string;
+  boss_hp: number;
+  boss_max_hp: number;
+  invite_code?: string | null;
+  leader_id?: string | null;
+  boss_rage?: number | null;
+  shadow_pressure_mode?: string | null;
+}
+interface ChatMsg {
+  id: string;
+  user_id: string;
+  display_name: string;
+  content: string;
+  created_at: string;
+}
 const ATTACK_STAMINA_COST = 10;
 
 interface StrikePartyBossResult {
@@ -29,6 +51,7 @@ interface StrikePartyBossResult {
   drop_slug: string | null;
   drop_name: string | null;
   stamina_spent: number;
+  boss_rage_after?: number;
 }
 
 async function refreshPartyScaled(partyId: string) {
@@ -43,6 +66,10 @@ function TavernPage() {
   const qc = useQueryClient();
   const { data: profile } = useProfile();
   const reward = useApplyReward();
+  const focusWard = useSkillFocusWard();
+  const partyMend = useSkillPartyMend();
+  const shadowStrike = useSkillShadowStrike();
+  const secondWind = useSkillSecondWind();
   const { invite } = Route.useSearch();
   const [party, setParty] = useState<Party | null>(null);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -51,6 +78,8 @@ function TavernPage() {
   const [copied, setCopied] = useState(false);
   const [showEmailInvite, setShowEmailInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [joinCode, setJoinCode] = useState("");
+  const [creating, setCreating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // bootstrap: get or create the global tavern party, handle invite link
@@ -64,7 +93,7 @@ function TavernPage() {
         await supabase.from("party_members").upsert({ party_id: targetId, user_id: user.id });
       }
 
-      let { data: p } = targetId
+      const { data: p } = targetId
         ? await supabase.from("parties").select("*").eq("id", targetId).maybeSingle()
         : await supabase.from("parties").select("*").limit(1).maybeSingle();
 
@@ -80,7 +109,12 @@ function TavernPage() {
 
       const full = await refreshPartyScaled(p.id);
       setParty(full);
-      const { data: msgs } = await supabase.from("chat_messages").select("*").eq("party_id", p.id).order("created_at", { ascending: true }).limit(100);
+      const { data: msgs } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("party_id", p.id)
+        .order("created_at", { ascending: true })
+        .limit(100);
       setMessages((msgs ?? []) as ChatMsg[]);
       if (invite) toast.success("Joined the party!");
       setLoading(false);
@@ -92,15 +126,30 @@ function TavernPage() {
     if (!party) return;
     const channel = supabase
       .channel(`tavern:${party.id}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages", filter: `party_id=eq.${party.id}` },
-        (payload) => setMessages((m) => [...m, payload.new as ChatMsg]))
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "parties", filter: `id=eq.${party.id}` },
-        (payload) => setParty(payload.new as Party))
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_messages",
+          filter: `party_id=eq.${party.id}`,
+        },
+        (payload) => setMessages((m) => [...m, payload.new as ChatMsg]),
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "parties", filter: `id=eq.${party.id}` },
+        (payload) => setParty(payload.new as Party),
+      )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [party?.id]);
 
-  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }); }, [messages]);
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [messages]);
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,7 +157,10 @@ function TavernPage() {
     const text = input.trim();
     setInput("");
     const { error } = await supabase.from("chat_messages").insert({
-      party_id: party.id, user_id: user.id, display_name: profile.display_name, content: text,
+      party_id: party.id,
+      user_id: user.id,
+      display_name: profile.display_name,
+      content: text,
     });
     if (error) toast.error(error.message);
   };
@@ -132,7 +184,12 @@ function TavernPage() {
 
     setParty((prev) =>
       prev
-        ? { ...prev, boss_hp: r.boss_hp, boss_max_hp: r.boss_max_hp }
+        ? {
+            ...prev,
+            boss_hp: r.boss_hp,
+            boss_max_hp: r.boss_max_hp,
+            boss_rage: typeof r.boss_rage_after === "number" ? r.boss_rage_after : prev.boss_rage,
+          }
         : prev,
     );
     await qc.invalidateQueries({ queryKey: ["profile", user?.id] });
@@ -148,20 +205,79 @@ function TavernPage() {
     }
   };
 
-  const createParty = async () => {
-    if (!user) return;
-    // Use an RPC that creates the party AND joins the creator atomically (bypasses RLS chicken-and-egg)
-    const { data: partyId, error } = await supabase.rpc("create_party", {
-      p_name: "The Tavern",
-      p_boss_name: "Shadow Wyrm",
-      p_boss_hp: 1000,
+  const joinWithCode = async () => {
+    if (!user || !joinCode.trim()) return;
+    setLoading(true);
+    const { data, error } = await supabase.rpc("join_party_by_invite_code", {
+      p_code: joinCode.trim(),
     });
-    if (error) { toast.error(error.message); return; }
-    if (!partyId) return;
-    const p = await refreshPartyScaled(typeof partyId === "string" ? partyId : String(partyId));
+    if (error) {
+      toast.error(error.message);
+      setLoading(false);
+      return;
+    }
+    const pid = (data as { party_id?: string })?.party_id;
+    if (!pid) {
+      setLoading(false);
+      return;
+    }
+    const full = await refreshPartyScaled(pid);
+    setParty(full);
+    setJoinCode("");
+    setLoading(false);
+    toast.success("Joined party!");
+  };
+
+  const createNewParty = async () => {
+    if (!user) return;
+    setCreating(true);
+    const { data, error } = await supabase.rpc("create_party", {
+      p_name: "New Fellowship",
+      p_boss_name: "Shadow Wyrm",
+      p_kind: "party",
+    });
+    setCreating(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    const res = data as { party_id?: string; invite_code?: string };
+    if (!res?.party_id) return;
+    const p = await refreshPartyScaled(res.party_id);
     if (p) {
       setParty(p);
-      toast.success("The Tavern is open!");
+      toast.success(`Party created! Invite code: ${res.invite_code ?? "—"}`);
+    }
+  };
+
+  const copyInviteCode = async () => {
+    if (!party?.invite_code) return;
+    await navigator.clipboard.writeText(party.invite_code);
+    toast.success("Invite code copied!");
+  };
+
+  const setPressureMode = async (mode: "support" | "hardcore") => {
+    if (!party || profile?.id !== party.leader_id) return;
+    const { error } = await supabase
+      .from("parties")
+      .update({ shadow_pressure_mode: mode })
+      .eq("id", party.id);
+    if (error) toast.error(error.message);
+    else {
+      setParty((prev) => (prev ? { ...prev, shadow_pressure_mode: mode } : prev));
+      toast.success(`Shadow mode: ${mode}`);
+    }
+  };
+
+  const invokeSkill = async (key: "warden" | "scholar" | "strider" | "keeper") => {
+    try {
+      if (key === "warden") await focusWard.mutateAsync();
+      if (key === "scholar" && party) await partyMend.mutateAsync(party.id);
+      if (key === "strider") await shadowStrike.mutateAsync();
+      if (key === "keeper") await secondWind.mutateAsync();
+      toast.success("Skill invoked!");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Skill failed");
     }
   };
 
@@ -169,7 +285,9 @@ function TavernPage() {
     if (!party || !inviteEmail.trim()) return;
     const link = `${window.location.origin}/tavern?invite=${party.id}`;
     const subject = encodeURIComponent("Join my party on Aura Sanctuary!");
-    const body = encodeURIComponent(`Hey! Come join my party on Aura Sanctuary.\n\nClick this link to join:\n${link}`);
+    const body = encodeURIComponent(
+      `Hey! Come join my party on Aura Sanctuary.\n\nClick this link to join:\n${link}`,
+    );
     window.open(`mailto:${inviteEmail.trim()}?subject=${subject}&body=${body}`);
     setInviteEmail("");
     setShowEmailInvite(false);
@@ -189,19 +307,46 @@ function TavernPage() {
 
   if (!party) {
     return (
-      <div className="p-6 max-w-xl mx-auto">
+      <div className="p-6 max-w-xl mx-auto space-y-4">
         <div className="pixel-panel p-6 text-center space-y-4">
-          <h1 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>THE TAVERN</h1>
-          <p className="text-sm text-muted-foreground">No active party. The hall is empty.</p>
+          <h1 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+            THE TAVERN
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Join a fellowship with a code, or forge a new party.
+          </p>
+          <div className="flex gap-2">
+            <input
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              placeholder="INVITE CODE"
+              className="flex-1 px-2 py-2 bg-input border-2 border-border text-sm uppercase"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            />
+            <button
+              type="button"
+              onClick={() => void joinWithCode()}
+              disabled={loading || !joinCode.trim()}
+              className="px-4 py-2 bg-primary text-primary-foreground disabled:opacity-50"
+              style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+            >
+              JOIN
+            </button>
+          </div>
           <button
-            onClick={createParty}
-            className="px-4 py-2 bg-primary text-primary-foreground hover:opacity-90"
+            type="button"
+            onClick={() => void createNewParty()}
+            disabled={creating}
+            className="px-4 py-2 border-2 border-border hover:border-primary disabled:opacity-50"
             style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
           >
-            + OPEN THE TAVERN
+            {creating ? "CREATING..." : "+ CREATE PARTY"}
           </button>
-          <p className="text-[10px] text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
-            Or ask a friend to share their invite link.
+          <p
+            className="text-[10px] text-muted-foreground"
+            style={{ fontFamily: "var(--font-pixel)" }}
+          >
+            Or ask a friend to share their invite link (`/tavern?invite=` plus party id).
           </p>
         </div>
       </div>
@@ -217,11 +362,18 @@ function TavernPage() {
           {/* Boss */}
           <div className="pixel-panel p-4">
             <div className="flex items-center gap-3 mb-2">
-              <h2 className="text-sm text-destructive flex-1" style={{ fontFamily: "var(--font-pixel)" }}>
+              <h2
+                className="text-sm text-destructive flex-1"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
                 {party.boss_name}
               </h2>
-              <button onClick={attackBoss} disabled={!profile || profile.stamina < ATTACK_STAMINA_COST} className="px-3 py-2 bg-destructive text-destructive-foreground flex items-center gap-1 disabled:opacity-50"
-                style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}>
+              <button
+                onClick={attackBoss}
+                disabled={!profile || profile.stamina < ATTACK_STAMINA_COST}
+                className="px-3 py-2 bg-destructive text-destructive-foreground flex items-center gap-1 disabled:opacity-50"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
+              >
                 <Swords size={12} /> ATTACK
               </button>
             </div>
@@ -233,25 +385,49 @@ function TavernPage() {
                 transition={{ type: "spring", stiffness: 80, damping: 15 }}
               />
             </div>
-            <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: "var(--font-pixel)" }}>
-              {party.boss_hp} / {party.boss_max_hp} HP
+            <p
+              className="text-xs text-muted-foreground mt-1"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              {party.boss_hp} / {party.boss_max_hp} HP · Shadow rage {party.boss_rage ?? 0}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-1" style={{ fontFamily: "var(--font-display)" }}>
-              Toughness rises with the combined levels of everyone in this party (refreshes when you enter the Tavern).
-              On a kill you get bonus gold and a random drop (gear in your bag).
+            {party.invite_code && (
+              <p
+                className="text-[10px] text-accent mt-1 flex flex-wrap items-center gap-2"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                Code: {party.invite_code}
+                <button type="button" onClick={() => void copyInviteCode()} className="underline">
+                  copy
+                </button>
+              </p>
+            )}
+            <p
+              className="text-[10px] text-muted-foreground mt-1"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Toughness rises with the combined levels of everyone in this party (refreshes when you
+              enter the Tavern). On a kill you get bonus gold and a random drop (gear in your bag).
             </p>
           </div>
 
           {/* Chat */}
           <div className="pixel-panel p-3 flex-1 flex flex-col min-h-0">
-            <h3 className="text-sm text-primary mb-2" style={{ fontFamily: "var(--font-pixel)" }}>TAVERN CHAT</h3>
+            <h3 className="text-sm text-primary mb-2" style={{ fontFamily: "var(--font-pixel)" }}>
+              TAVERN CHAT
+            </h3>
             <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-1 pr-1">
               {messages.length === 0 && (
-                <p className="text-sm text-muted-foreground italic">The hall is quiet... break the silence.</p>
+                <p className="text-sm text-muted-foreground italic">
+                  The hall is quiet... break the silence.
+                </p>
               )}
               {messages.map((m) => (
                 <div key={m.id} className="text-sm">
-                  <span className={m.user_id === user?.id ? "text-primary" : "text-accent"} style={{ fontFamily: "var(--font-pixel)", fontSize: 12 }}>
+                  <span
+                    className={m.user_id === user?.id ? "text-primary" : "text-accent"}
+                    style={{ fontFamily: "var(--font-pixel)", fontSize: 12 }}
+                  >
                     {m.display_name}:
                   </span>{" "}
                   <span style={{ fontFamily: "var(--font-display)" }}>{m.content}</span>
@@ -265,7 +441,9 @@ function TavernPage() {
                 placeholder="Speak..."
                 className="flex-1 bg-input border-2 border-border px-2 py-1.5 text-sm focus:border-primary outline-none"
               />
-              <button className="px-3 bg-primary text-primary-foreground"><Send size={14} /></button>
+              <button className="px-3 bg-primary text-primary-foreground">
+                <Send size={14} />
+              </button>
             </form>
           </div>
         </div>
@@ -273,7 +451,9 @@ function TavernPage() {
         {/* Party */}
         <div className="pixel-panel p-3">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>PARTY</h3>
+            <h3 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+              PARTY
+            </h3>
             <div className="flex gap-1">
               <button
                 onClick={() => setShowEmailInvite((v) => !v)}
@@ -316,10 +496,85 @@ function TavernPage() {
             </div>
           )}
 
+          {profile && party.leader_id === profile.id && (
+            <div className="mb-3 text-[10px] space-y-1" style={{ fontFamily: "var(--font-pixel)" }}>
+              <div className="text-muted-foreground">Shadow pressure (party)</div>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => void setPressureMode("support")}
+                  className={`flex-1 py-1 border ${party.shadow_pressure_mode !== "hardcore" ? "border-primary bg-primary/10" : "border-border"}`}
+                >
+                  Support
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void setPressureMode("hardcore")}
+                  className={`flex-1 py-1 border ${party.shadow_pressure_mode === "hardcore" ? "border-destructive bg-destructive/10" : "border-border"}`}
+                >
+                  Hardcore
+                </button>
+              </div>
+            </div>
+          )}
+
+          {profile?.aura_path && (
+            <div className="mb-3 space-y-1">
+              <div
+                className="text-[10px] text-muted-foreground"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                PATH SKILL
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {profile.aura_path === "warden" && (
+                  <button
+                    type="button"
+                    className="px-2 py-1 border border-border text-[10px]"
+                    onClick={() => void invokeSkill("warden")}
+                  >
+                    Focus Ward
+                  </button>
+                )}
+                {profile.aura_path === "scholar" && (
+                  <button
+                    type="button"
+                    className="px-2 py-1 border border-border text-[10px]"
+                    onClick={() => void invokeSkill("scholar")}
+                  >
+                    Party Mend
+                  </button>
+                )}
+                {profile.aura_path === "strider" && (
+                  <button
+                    type="button"
+                    className="px-2 py-1 border border-border text-[10px]"
+                    onClick={() => void invokeSkill("strider")}
+                  >
+                    Shadow Strike
+                  </button>
+                )}
+                {profile.aura_path === "keeper" && (
+                  <button
+                    type="button"
+                    className="px-2 py-1 border border-border text-[10px]"
+                    onClick={() => void invokeSkill("keeper")}
+                  >
+                    Second Wind
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {profile && (
             <div className="border-2 border-primary p-2">
-              <div className="text-sm" style={{ fontFamily: "var(--font-pixel)" }}>{profile.display_name}</div>
-              <div className="text-xs text-muted-foreground">LV {profile.level} · {profile.gold}g · {profile.stamina}/{profile.max_stamina} STA</div>
+              <div className="text-sm" style={{ fontFamily: "var(--font-pixel)" }}>
+                {profile.display_name}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                LV {profile.level} · {profile.gold}g · {profile.stamina}/{profile.max_stamina} STA
+              </div>
             </div>
           )}
 

@@ -1,11 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Play, Pause, RotateCcw, Music, SkipForward, ListMusic, Volume2, VolumeX } from "lucide-react";
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  Music,
+  SkipForward,
+  ListMusic,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
 import { PetSprite } from "@/components/aura/PetSprite";
 import { useProfile } from "@/hooks/useProfile";
 import { useEquippedPetGear } from "@/hooks/useShop";
+import { useUserCompanions } from "@/hooks/useCompanions";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
@@ -19,7 +30,9 @@ export const Route = createFileRoute("/")({
 });
 
 function fmt(s: number) {
-  const m = Math.floor(s / 60).toString().padStart(2, "0");
+  const m = Math.floor(s / 60)
+    .toString()
+    .padStart(2, "0");
   const sec = (s % 60).toString().padStart(2, "0");
   return `${m}:${sec}`;
 }
@@ -52,6 +65,9 @@ function SanctuaryPage() {
   const { running, mode, secondsLeft, start, pause, reset, petState } = usePomodoro();
   const { data: profile } = useProfile();
   const petGear = useEquippedPetGear();
+  const { data: companions = [] } = useUserCompanions();
+  const equippedPet = companions.find((c) => c.equipped_as === "pet");
+  const companionSpriteKey = equippedPet?.companions?.sprite_key;
   const [muted, setMuted] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -126,6 +142,11 @@ function SanctuaryPage() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!profile?.id) return;
+    void supabase.rpc("ensure_quest_arc_started", { p_arc_slug: "shadow-cleansing" });
+  }, [profile?.id]);
+
   const stopGenerated = () => {
     stopGeneratedRef.current?.();
     stopGeneratedRef.current = null;
@@ -185,13 +206,20 @@ function SanctuaryPage() {
         const now = ctx.currentTime;
         gain.gain.cancelScheduledValues(now);
         gain.gain.setValueAtTime(0.1 + Math.random() * 0.08, now);
-        gain.gain.exponentialRampToValueAtTime(0.03 + Math.random() * 0.05, now + 0.09 + Math.random() * 0.12);
+        gain.gain.exponentialRampToValueAtTime(
+          0.03 + Math.random() * 0.05,
+          now + 0.09 + Math.random() * 0.12,
+        );
       }, 110);
     }
 
     stopGeneratedRef.current = () => {
       if (crackleTimer) window.clearInterval(crackleTimer);
-      try { src.stop(); } catch { /* no-op */ }
+      try {
+        src.stop();
+      } catch {
+        /* no-op */
+      }
       src.disconnect();
       filterA.disconnect();
       filterB.disconnect();
@@ -288,7 +316,9 @@ function SanctuaryPage() {
     setTrackLabel("youtube");
     const embed = `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&modestbranding=1&rel=0&playsinline=1`;
     setYoutubeEmbedUrl(embed);
-    window.dispatchEvent(new CustomEvent("aura:set-youtube-audio", { detail: { embedUrl: embed } }));
+    window.dispatchEvent(
+      new CustomEvent("aura:set-youtube-audio", { detail: { embedUrl: embed } }),
+    );
     toast.success("YouTube track loaded.");
   };
 
@@ -297,7 +327,8 @@ function SanctuaryPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* The Sanctuary room */}
         <div className="lg:col-span-2">
-          <div className="relative aspect-[16/10] pixel-panel overflow-hidden scanlines"
+          <div
+            className="relative aspect-[16/10] pixel-panel overflow-hidden scanlines"
             style={{
               background: focused
                 ? "linear-gradient(180deg, color-mix(in oklab, var(--sanctuary-wall) 70%, var(--color-primary)) 0%, color-mix(in oklab, var(--sanctuary-wall) 88%, black) 60%, color-mix(in oklab, var(--sanctuary-wall) 75%, var(--sanctuary-floor)) 100%)"
@@ -306,7 +337,8 @@ function SanctuaryPage() {
             }}
           >
             {/* rainy outside ambience */}
-            <div className="absolute inset-0 opacity-30"
+            <div
+              className="absolute inset-0 opacity-30"
               style={{
                 background: focused
                   ? "linear-gradient(180deg, color-mix(in oklab, var(--color-background) 10%, transparent), color-mix(in oklab, var(--sanctuary-wall) 35%, transparent))"
@@ -316,7 +348,8 @@ function SanctuaryPage() {
             <div
               className="absolute inset-0 pointer-events-none opacity-25"
               style={{
-                background: "repeating-linear-gradient(105deg, transparent 0 10px, color-mix(in oklab, var(--color-foreground) 20%, transparent) 10px 12px)",
+                background:
+                  "repeating-linear-gradient(105deg, transparent 0 10px, color-mix(in oklab, var(--color-foreground) 20%, transparent) 10px 12px)",
               }}
             />
 
@@ -350,7 +383,8 @@ function SanctuaryPage() {
             <div
               className="absolute left-[39%] top-[64%] w-[22%] h-[11%] border-2 border-border/70"
               style={{
-                background: "color-mix(in oklab, var(--sanctuary-floor) 85%, var(--color-background))",
+                background:
+                  "color-mix(in oklab, var(--sanctuary-floor) 85%, var(--color-background))",
                 clipPath: "polygon(10% 0%, 92% 0%, 100% 25%, 8% 25%)",
               }}
             />
@@ -388,9 +422,18 @@ function SanctuaryPage() {
 
             {/* pet center stage */}
             <div className="absolute bottom-[21%] left-1/2 -translate-x-1/2">
-              <PetSprite state={petState} size={140} gear={petGear} />
-              <p className="text-center mt-2 text-primary" style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}>
-                {profile?.pet_name ?? "Sprig"} · <span className="text-muted-foreground">{petState}</span>
+              <PetSprite
+                state={petState}
+                size={140}
+                gear={petGear}
+                companionSpriteKey={companionSpriteKey}
+              />
+              <p
+                className="text-center mt-2 text-primary"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
+              >
+                {profile?.pet_name ?? "Sprig"} ·{" "}
+                <span className="text-muted-foreground">{petState}</span>
               </p>
             </div>
           </div>
@@ -399,26 +442,44 @@ function SanctuaryPage() {
         {/* Pomodoro */}
         <div className="space-y-4">
           <div className="pixel-panel p-6 text-center">
-            <p className="text-xs text-muted-foreground mb-2" style={{ fontFamily: "var(--font-pixel)" }}>
+            <p
+              className="text-xs text-muted-foreground mb-2"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
               {mode === "focus" ? "FOCUS" : "BREAK"}
             </p>
-            <div className="text-5xl my-4" style={{ fontFamily: "var(--font-pixel)", color: focused ? "var(--color-focus)" : "var(--color-primary)" }}>
+            <div
+              className="text-5xl my-4"
+              style={{
+                fontFamily: "var(--font-pixel)",
+                color: focused ? "var(--color-focus)" : "var(--color-primary)",
+              }}
+            >
               {fmt(secondsLeft)}
             </div>
             <div className="flex justify-center gap-2 mt-4">
               {!running ? (
-                <button onClick={start} className="px-4 py-2 bg-primary text-primary-foreground flex items-center gap-2"
-                  style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
+                <button
+                  onClick={start}
+                  className="px-4 py-2 bg-primary text-primary-foreground flex items-center gap-2"
+                  style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+                >
                   <Play size={14} /> START
                 </button>
               ) : (
-                <button onClick={pause} className="px-4 py-2 bg-secondary border-2 border-border flex items-center gap-2"
-                  style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
+                <button
+                  onClick={pause}
+                  className="px-4 py-2 bg-secondary border-2 border-border flex items-center gap-2"
+                  style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+                >
                   <Pause size={14} /> PAUSE
                 </button>
               )}
-              <button onClick={reset} className="px-4 py-2 bg-secondary border-2 border-border"
-                style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
+              <button
+                onClick={reset}
+                className="px-4 py-2 bg-secondary border-2 border-border"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+              >
                 <RotateCcw size={14} />
               </button>
             </div>
@@ -428,7 +489,9 @@ function SanctuaryPage() {
           <div className="pixel-panel p-4 relative">
             <div className="flex items-center gap-2 mb-2">
               <Music size={14} className="text-primary" />
-              <span className="text-sm" style={{ fontFamily: "var(--font-pixel)" }}>Lo-fi Tavern</span>
+              <span className="text-sm" style={{ fontFamily: "var(--font-pixel)" }}>
+                Lo-fi Tavern
+              </span>
               <button
                 onClick={() => setMenuOpen((v) => !v)}
                 className="ml-auto text-muted-foreground hover:text-primary"
@@ -454,7 +517,9 @@ function SanctuaryPage() {
                     key={track.label}
                     onClick={() => selectTrack(idx)}
                     className={`w-full text-left px-2 py-1.5 text-xs border ${
-                      idx === trackIdx ? "border-primary text-primary" : "border-border hover:border-primary"
+                      idx === trackIdx
+                        ? "border-primary text-primary"
+                        : "border-border hover:border-primary"
                     }`}
                     style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
                   >
@@ -463,7 +528,10 @@ function SanctuaryPage() {
                 ))}
               </div>
             )}
-            <p className="text-sm text-muted-foreground" style={{ fontFamily: "var(--font-display)" }}>
+            <p
+              className="text-sm text-muted-foreground"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
               {muted ? "Silence." : `♪ ${trackLabel}`}
             </p>
             <div className="mt-2 space-y-2">
@@ -483,7 +551,10 @@ function SanctuaryPage() {
                 </button>
               </div>
               {youtubeEmbedUrl && (
-                <div id="aura-youtube-slot" className="w-full h-40 border-2 border-border bg-black/60" />
+                <div
+                  id="aura-youtube-slot"
+                  className="w-full h-40 border-2 border-border bg-black/60"
+                />
               )}
             </div>
             <div className="mt-2 h-7 flex items-start gap-1 w-full overflow-hidden">
@@ -492,7 +563,12 @@ function SanctuaryPage() {
                   key={i}
                   className="flex-1 h-full bg-primary origin-top"
                   animate={{ scaleY: muted ? 0.2 : [0.25, 0.9 - (i % 5) * 0.08, 0.35, 0.8, 0.25] }}
-                  transition={{ duration: 1.2 + (i % 4) * 0.15, repeat: Infinity, ease: "easeInOut", delay: i * 0.03 }}
+                  transition={{
+                    duration: 1.2 + (i % 4) * 0.15,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    delay: i * 0.03,
+                  }}
                 />
               ))}
             </div>

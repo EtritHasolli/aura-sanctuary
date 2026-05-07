@@ -25,15 +25,27 @@ export function useProfile() {
     queryKey: ["profile", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      let { data, error } = await supabase.from("profiles").select("*").eq("id", user!.id).maybeSingle();
+      const { data: initialData, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user!.id)
+        .maybeSingle();
       if (error) throw error;
+      let data = initialData;
       if (!data) return null as Profile | null;
       const canonical = canonicalMaxHpForLevel(data.level);
       if (data.max_hp < canonical) {
         const hp = Math.min(canonical, data.hp);
-        const { error: upErr } = await supabase.from("profiles").update({ max_hp: canonical, hp }).eq("id", user!.id);
+        const { error: upErr } = await supabase
+          .from("profiles")
+          .update({ max_hp: canonical, hp })
+          .eq("id", user!.id);
         if (!upErr) {
-          const again = await supabase.from("profiles").select("*").eq("id", user!.id).maybeSingle();
+          const again = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", user!.id)
+            .maybeSingle();
           if (!again.error && again.data) data = again.data;
         }
       }
@@ -47,7 +59,12 @@ export function useUpdateProfile() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async (patch: Partial<Profile>) => {
-      const { data, error } = await supabase.from("profiles").update(patch).eq("id", user!.id).select().single();
+      const { data, error } = await supabase
+        .from("profiles")
+        .update(patch)
+        .eq("id", user!.id)
+        .select()
+        .single();
       if (error) throw error;
       return data;
     },
@@ -56,7 +73,10 @@ export function useUpdateProfile() {
 }
 
 export interface RewardDelta {
-  xp?: number; gold?: number; hp?: number; stamina?: number;
+  xp?: number;
+  gold?: number;
+  hp?: number;
+  stamina?: number;
   stat?: "strength" | "intelligence" | "constitution";
 }
 
@@ -65,12 +85,30 @@ export function useApplyReward() {
   const { user } = useAuth();
   return useMutation({
     mutationFn: async (delta: RewardDelta) => {
-      const { data: prof } = await supabase.from("profiles").select("*").eq("id", user!.id).single();
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user!.id)
+        .single();
       if (!prof) throw new Error("no profile");
       const p = prof as Profile;
 
       const effMaxSta = effectiveMaxStamina(p);
-      const xpDelta = withXpEquipBonus(delta.xp ?? 0, p);
+      let xpGain = delta.xp ?? 0;
+      if (xpGain > 0) {
+        const { data: buff } = await supabase
+          .from("profile_buffs")
+          .select("meta")
+          .eq("user_id", user!.id)
+          .eq("buff_key", "xp_focus_bonus")
+          .gt("expires_at", new Date().toISOString())
+          .maybeSingle();
+        const meta = buff?.meta as { pct?: number } | null | undefined;
+        const pct = meta && typeof meta.pct === "number" ? meta.pct : 0;
+        if (pct > 0) xpGain = Math.round(xpGain * (1 + pct / 100));
+      }
+
+      const xpDelta = withXpEquipBonus(xpGain, p);
       const goldDelta = withGoldEquipBonus(delta.gold ?? 0, p);
       let xp = p.xp + xpDelta;
       let level = p.level;
@@ -100,12 +138,18 @@ export function useApplyReward() {
       hp = Math.min(max_hp, hp);
 
       const patch: Partial<Profile> = { xp, level, max_hp, hp, stamina, gold };
-      if (delta.stat) (patch as any)[delta.stat] = (p as any)[delta.stat] + 1;
+      if (delta.stat === "strength") patch.strength = p.strength + 1;
+      else if (delta.stat === "intelligence") patch.intelligence = p.intelligence + 1;
+      else if (delta.stat === "constitution") patch.constitution = p.constitution + 1;
 
       const { error } = await supabase.from("profiles").update(patch).eq("id", user!.id);
       if (error) throw error;
+      await supabase.rpc("try_unlock_achievements").catch(() => undefined);
       return patch;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["profile"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["achievements"] });
+    },
   });
 }

@@ -1,11 +1,23 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, Swords, BookOpen, Beer, ShoppingBag, Shirt, Hammer, Settings, LogOut } from "lucide-react";
+import {
+  Home,
+  Swords,
+  BookOpen,
+  Trophy,
+  Beer,
+  ShoppingBag,
+  Shirt,
+  Hammer,
+  Settings,
+  LogOut,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const items = [
   { to: "/", icon: Home, label: "Sanctuary" },
   { to: "/quests", icon: Swords, label: "Quests" },
   { to: "/archives", icon: BookOpen, label: "Archives" },
+  { to: "/challenges", icon: Trophy, label: "Challenges" },
   { to: "/shop", icon: ShoppingBag, label: "Shop" },
   { to: "/equipment", icon: Shirt, label: "Gear" },
   { to: "/forge", icon: Hammer, label: "Forge" },
@@ -18,8 +30,15 @@ export function SideNav() {
   return (
     <nav className="w-20 lg:w-44 bg-card border-r-2 border-border flex flex-col py-4 gap-1 shrink-0">
       <div className="px-3 mb-4 hidden lg:block">
-        <h1 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>AURA</h1>
-        <p className="text-[10px] text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>Sanctuary</p>
+        <h1 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+          AURA
+        </h1>
+        <p
+          className="text-[10px] text-muted-foreground"
+          style={{ fontFamily: "var(--font-pixel)" }}
+        >
+          Sanctuary
+        </p>
       </div>
       {items.map((it) => {
         const active = path === it.to;

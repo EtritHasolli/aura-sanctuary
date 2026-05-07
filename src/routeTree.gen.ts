@@ -15,6 +15,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as QuestsRouteImport } from './routes/quests'
 import { Route as ForgeRouteImport } from './routes/forge'
 import { Route as EquipmentRouteImport } from './routes/equipment'
+import { Route as ChallengesRouteImport } from './routes/challenges'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ArchivesRouteImport } from './routes/archives'
 import { Route as IndexRouteImport } from './routes/index'
@@ -49,6 +50,11 @@ const EquipmentRoute = EquipmentRouteImport.update({
   path: '/equipment',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChallengesRoute = ChallengesRouteImport.update({
+  id: '/challenges',
+  path: '/challenges',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -69,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/archives': typeof ArchivesRoute
   '/auth': typeof AuthRoute
+  '/challenges': typeof ChallengesRoute
   '/equipment': typeof EquipmentRoute
   '/forge': typeof ForgeRoute
   '/quests': typeof QuestsRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/archives': typeof ArchivesRoute
   '/auth': typeof AuthRoute
+  '/challenges': typeof ChallengesRoute
   '/equipment': typeof EquipmentRoute
   '/forge': typeof ForgeRoute
   '/quests': typeof QuestsRoute
@@ -92,6 +100,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/archives': typeof ArchivesRoute
   '/auth': typeof AuthRoute
+  '/challenges': typeof ChallengesRoute
   '/equipment': typeof EquipmentRoute
   '/forge': typeof ForgeRoute
   '/quests': typeof QuestsRoute
@@ -105,6 +114,7 @@ export interface FileRouteTypes {
     | '/'
     | '/archives'
     | '/auth'
+    | '/challenges'
     | '/equipment'
     | '/forge'
     | '/quests'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/'
     | '/archives'
     | '/auth'
+    | '/challenges'
     | '/equipment'
     | '/forge'
     | '/quests'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/'
     | '/archives'
     | '/auth'
+    | '/challenges'
     | '/equipment'
     | '/forge'
     | '/quests'
@@ -139,6 +151,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ArchivesRoute: typeof ArchivesRoute
   AuthRoute: typeof AuthRoute
+  ChallengesRoute: typeof ChallengesRoute
   EquipmentRoute: typeof EquipmentRoute
   ForgeRoute: typeof ForgeRoute
   QuestsRoute: typeof QuestsRoute
@@ -191,6 +204,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EquipmentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/challenges': {
+      id: '/challenges'
+      path: '/challenges'
+      fullPath: '/challenges'
+      preLoaderRoute: typeof ChallengesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -219,6 +239,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ArchivesRoute: ArchivesRoute,
   AuthRoute: AuthRoute,
+  ChallengesRoute: ChallengesRoute,
   EquipmentRoute: EquipmentRoute,
   ForgeRoute: ForgeRoute,
   QuestsRoute: QuestsRoute,

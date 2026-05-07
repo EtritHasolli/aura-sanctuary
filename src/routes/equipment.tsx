@@ -9,6 +9,11 @@ import {
   useUserItems,
 } from "@/hooks/useShop";
 import {
+  useHatchCompanionEgg,
+  useSetCompanionEquip,
+  useUserCompanions,
+} from "@/hooks/useCompanions";
+import {
   clampBonusPct,
   effectiveConstitution,
   effectiveIntelligence,
@@ -47,6 +52,9 @@ function EquipmentPage() {
   const { data: items = [], isLoading } = useUserItems();
   const equip = useEquipUserItem();
   const unequip = useUnequipUserItem();
+  const { data: companions = [] } = useUserCompanions();
+  const hatch = useHatchCompanionEgg();
+  const setCompanionEquip = useSetCompanionEquip();
 
   const gear = items.filter((u) => u.shop_items?.category === "equipment");
   const equipped = gear.filter((u) => u.equipped);
@@ -79,7 +87,10 @@ function EquipmentPage() {
             <h1 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
               EQUIPMENT
             </h1>
-            <p className="text-xs text-muted-foreground" style={{ fontFamily: "var(--font-display)" }}>
+            <p
+              className="text-xs text-muted-foreground"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
               Zen Shop gear augments your stats, stamina cap, and task rewards.
             </p>
           </div>
@@ -100,7 +111,10 @@ function EquipmentPage() {
               <h2 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
                 LOADOUT TOTALS
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs" style={{ fontFamily: "var(--font-pixel)" }}>
+              <div
+                className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
                 <div>STR {effectiveStrength(profile)}</div>
                 <div>INT {effectiveIntelligence(profile)}</div>
                 <div>CON {effectiveConstitution(profile)}</div>
@@ -109,26 +123,39 @@ function EquipmentPage() {
                   <span className="text-muted-foreground"> (base {profile.max_stamina})</span>
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  Task XP +{clampBonusPct(profile.equip_xp_bonus_pct)}% · Gold +{clampBonusPct(profile.equip_gold_bonus_pct)}%
+                  Task XP +{clampBonusPct(profile.equip_xp_bonus_pct)}% · Gold +
+                  {clampBonusPct(profile.equip_gold_bonus_pct)}%
                 </div>
               </div>
             </div>
           ) : (
-            <div className="flex-1 sm:order-1 text-xs text-muted-foreground" style={{ fontFamily: "var(--font-display)" }}>
+            <div
+              className="flex-1 sm:order-1 text-xs text-muted-foreground"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
               Loading profile…
             </div>
           )}
           <div className="shrink-0 flex flex-col items-center justify-start sm:border-l-2 sm:border-border sm:pl-6 sm:order-2 pb-2 sm:pb-0">
-            <h2 className="text-sm text-primary mb-3 self-stretch text-center sm:text-left" style={{ fontFamily: "var(--font-pixel)" }}>
+            <h2
+              className="text-sm text-primary mb-3 self-stretch text-center sm:text-left"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
               PET PREVIEW
             </h2>
             <div className="px-6 py-4 bg-secondary/40 border-2 border-border">
               <PetSprite state="idle" size={112} gear={petGear} />
             </div>
-            <p className="mt-2 text-[10px] text-muted-foreground text-center" style={{ fontFamily: "var(--font-pixel)" }}>
+            <p
+              className="mt-2 text-[10px] text-muted-foreground text-center"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
               {profile?.pet_name ?? "Companion"} · idle
             </p>
-            <p className="mt-1 text-[9px] text-muted-foreground text-center max-w-[200px]" style={{ fontFamily: "var(--font-display)" }}>
+            <p
+              className="mt-1 text-[9px] text-muted-foreground text-center max-w-[200px]"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
               Reflects currently equipped gear. Changes when you equip or unequip.
             </p>
           </div>
@@ -141,23 +168,36 @@ function EquipmentPage() {
         </h2>
         {isLoading && <p className="text-xs text-muted-foreground">Loading...</p>}
         {!isLoading && equipped.length === 0 && (
-          <p className="text-xs text-muted-foreground italic">Nothing equipped yet. Buy gear from the Shop → Equipment tab.</p>
+          <p className="text-xs text-muted-foreground italic">
+            Nothing equipped yet. Buy gear from the Shop → Equipment tab.
+          </p>
         )}
         <ul className="space-y-2">
           {equipped.map((row) => {
             const meta = row.shop_items?.metadata ?? {};
             const bonuses = bonusSummary(meta as Record<string, unknown>);
             return (
-              <li key={row.id} className="pixel-panel p-3 flex flex-wrap gap-3 justify-between items-start">
+              <li
+                key={row.id}
+                className="pixel-panel p-3 flex flex-wrap gap-3 justify-between items-start"
+              >
                 <div className="min-w-0">
                   <div className="flex flex-wrap gap-2 items-center">
-                    <span style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>{row.shop_items.name}</span>
-                    <span className="text-[10px] uppercase text-accent" style={{ fontFamily: "var(--font-pixel)" }}>
+                    <span style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
+                      {row.shop_items.name}
+                    </span>
+                    <span
+                      className="text-[10px] uppercase text-accent"
+                      style={{ fontFamily: "var(--font-pixel)" }}
+                    >
                       {slotLabel(meta as Record<string, unknown>)}
                     </span>
                   </div>
                   {bonuses && (
-                    <p className="text-[10px] text-primary mt-1" style={{ fontFamily: "var(--font-display)" }}>
+                    <p
+                      className="text-[10px] text-primary mt-1"
+                      style={{ fontFamily: "var(--font-display)" }}
+                    >
                       {bonuses}
                     </p>
                   )}
@@ -189,19 +229,33 @@ function EquipmentPage() {
             const meta = row.shop_items?.metadata ?? {};
             const bonuses = bonusSummary(meta as Record<string, unknown>);
             return (
-              <li key={row.id} className="pixel-panel p-3 flex flex-wrap gap-3 justify-between items-start">
+              <li
+                key={row.id}
+                className="pixel-panel p-3 flex flex-wrap gap-3 justify-between items-start"
+              >
                 <div className="min-w-0">
                   <div className="flex flex-wrap gap-2 items-center">
-                    <span style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>{row.shop_items.name}</span>
-                    <span className="text-[10px] uppercase text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
+                    <span style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
+                      {row.shop_items.name}
+                    </span>
+                    <span
+                      className="text-[10px] uppercase text-muted-foreground"
+                      style={{ fontFamily: "var(--font-pixel)" }}
+                    >
                       ×{row.quantity}
                     </span>
-                    <span className="text-[10px] uppercase text-accent" style={{ fontFamily: "var(--font-pixel)" }}>
+                    <span
+                      className="text-[10px] uppercase text-accent"
+                      style={{ fontFamily: "var(--font-pixel)" }}
+                    >
                       {slotLabel(meta as Record<string, unknown>)}
                     </span>
                   </div>
                   {bonuses && (
-                    <p className="text-[10px] text-muted-foreground mt-1" style={{ fontFamily: "var(--font-display)" }}>
+                    <p
+                      className="text-[10px] text-muted-foreground mt-1"
+                      style={{ fontFamily: "var(--font-display)" }}
+                    >
                       {bonuses}
                     </p>
                   )}
@@ -218,6 +272,87 @@ function EquipmentPage() {
               </li>
             );
           })}
+        </ul>
+      </section>
+
+      <section className="space-y-3 mt-8">
+        <h2 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+          COMPANIONS
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Hatch mystery eggs from your bag. Equip one as your sanctuary pet or mount (cosmetic
+          tints).
+        </p>
+        {items.some((u) => u.shop_items?.slug === "companion-egg" && u.quantity > 0) && (
+          <button
+            type="button"
+            disabled={hatch.isPending}
+            onClick={async () => {
+              try {
+                const r = await hatch.mutateAsync();
+                toast.success(
+                  r.duplicate ? `Duplicate — +${r.bond_bonus ?? 0} bond` : `Hatched: ${r.name}`,
+                );
+              } catch (e: unknown) {
+                toast.error(e instanceof Error ? e.message : "Hatch failed");
+              }
+            }}
+            className="px-3 py-2 bg-accent text-accent-foreground text-[10px]"
+            style={{ fontFamily: "var(--font-pixel)" }}
+          >
+            {hatch.isPending ? "HATCHING..." : "HATCH COMPANION EGG"}
+          </button>
+        )}
+        <ul className="space-y-2">
+          {companions.map((c) => (
+            <li
+              key={c.id}
+              className="pixel-panel p-3 flex flex-wrap gap-2 justify-between items-center"
+            >
+              <div>
+                <div className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+                  {c.companions.name}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  Bond {c.bond_xp} · {c.equipped_as}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  className="px-2 py-1 border border-border text-[10px]"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                  onClick={() =>
+                    void setCompanionEquip.mutateAsync({ id: c.id, equipped_as: "pet" })
+                  }
+                >
+                  PET
+                </button>
+                {c.companions.can_mount && (
+                  <button
+                    type="button"
+                    className="px-2 py-1 border border-border text-[10px]"
+                    style={{ fontFamily: "var(--font-pixel)" }}
+                    onClick={() =>
+                      void setCompanionEquip.mutateAsync({ id: c.id, equipped_as: "mount" })
+                    }
+                  >
+                    MOUNT
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="px-2 py-1 border border-border text-[10px]"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                  onClick={() =>
+                    void setCompanionEquip.mutateAsync({ id: c.id, equipped_as: "none" })
+                  }
+                >
+                  STOW
+                </button>
+              </div>
+            </li>
+          ))}
         </ul>
       </section>
     </div>

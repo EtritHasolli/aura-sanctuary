@@ -1,4 +1,5 @@
 import { useProfile } from "@/hooks/useProfile";
+import { useAchievements } from "@/hooks/useAchievements";
 import {
   effectiveConstitution,
   effectiveIntelligence,
@@ -9,8 +10,9 @@ import { usePomodoro } from "./PomodoroContext";
 import { useNotifications } from "./NotificationsContext";
 import { PetSprite } from "./PetSprite";
 import { useEquippedPetGear } from "@/hooks/useShop";
+import { useUserCompanions } from "@/hooks/useCompanions";
 import { xpForLevel } from "@/lib/aura/types";
-import { Coins, Swords, Brain, Heart, Bell, Sun, Moon } from "lucide-react";
+import { Coins, Swords, Brain, Heart, Bell, Sun, Moon, Sparkles, Trophy } from "lucide-react";
 import { useState, useEffect } from "react";
 
 function useTheme() {
@@ -27,7 +29,9 @@ function useTheme() {
 
   useEffect(() => {
     const saved = localStorage.getItem("theme");
-    const isDark = saved ? saved === "dark" : !window.matchMedia("(prefers-color-scheme: light)").matches;
+    const isDark = saved
+      ? saved === "dark"
+      : !window.matchMedia("(prefers-color-scheme: light)").matches;
     setDark(isDark);
     document.documentElement.classList.toggle("light", !isDark);
   }, []);
@@ -48,16 +52,34 @@ function ThemeToggle() {
   );
 }
 
-function Bar({ value, max, color, label }: { value: number; max: number; color: string; label: string }) {
+function Bar({
+  value,
+  max,
+  color,
+  label,
+}: {
+  value: number;
+  max: number;
+  color: string;
+  label: string;
+}) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   return (
     <div className="w-full">
-      <div className="flex justify-between text-[10px] mb-0.5" style={{ fontFamily: "var(--font-pixel)" }}>
+      <div
+        className="flex justify-between text-[10px] mb-0.5"
+        style={{ fontFamily: "var(--font-pixel)" }}
+      >
         <span className="text-muted-foreground">{label}</span>
-        <span>{value}/{max}</span>
+        <span>
+          {value}/{max}
+        </span>
       </div>
       <div className="h-3 w-full bg-muted border-2 border-border relative overflow-hidden">
-        <div className="h-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+        <div
+          className="h-full transition-all"
+          style={{ width: `${pct}%`, backgroundColor: color }}
+        />
       </div>
     </div>
   );
@@ -93,7 +115,9 @@ function NotificationsBell() {
       {open && (
         <div className="absolute right-0 top-10 z-50 w-72 pixel-panel p-2 shadow-xl">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[9px] text-primary" style={{ fontFamily: "var(--font-pixel)" }}>NOTIFICATIONS</span>
+            <span className="text-[9px] text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+              NOTIFICATIONS
+            </span>
             {notifications.length > 0 && (
               <button
                 onClick={clear}
@@ -105,16 +129,20 @@ function NotificationsBell() {
             )}
           </div>
           {notifications.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic text-center py-3">No notifications.</p>
+            <p className="text-xs text-muted-foreground italic text-center py-3">
+              No notifications.
+            </p>
           ) : (
             <div className="space-y-1 max-h-60 overflow-y-auto">
               {notifications.map((n) => (
                 <div
                   key={n.id}
                   className={`px-2 py-1.5 border-l-2 text-xs ${
-                    n.type === "success" ? "border-primary text-primary" :
-                    n.type === "warning" ? "border-[color:var(--color-gold)] text-[color:var(--color-gold)]" :
-                    "border-accent text-foreground"
+                    n.type === "success"
+                      ? "border-primary text-primary"
+                      : n.type === "warning"
+                        ? "border-[color:var(--color-gold)] text-[color:var(--color-gold)]"
+                        : "border-accent text-foreground"
                   }`}
                   style={{ fontFamily: "var(--font-display)" }}
                 >
@@ -134,8 +162,12 @@ function NotificationsBell() {
 
 export function HUD() {
   const { data: profile } = useProfile();
+  const { data: ach = [] } = useAchievements();
   const { petState } = usePomodoro();
   const petGear = useEquippedPetGear();
+  const { data: companions = [] } = useUserCompanions();
+  const companionSpriteKey = companions.find((c) => c.equipped_as === "pet")?.companions
+    ?.sprite_key;
   if (!profile) return null;
   const xpMax = xpForLevel(profile.level);
   const staCap = effectiveMaxStamina(profile);
@@ -154,15 +186,25 @@ export function HUD() {
             </span>
           </div>
           <div className="w-14 h-14 flex items-center justify-center">
-            <PetSprite state={petState} size={56} gear={petGear} />
+            <PetSprite
+              state={petState}
+              size={56}
+              gear={petGear}
+              companionSpriteKey={companionSpriteKey}
+            />
           </div>
         </div>
 
         {/* Identity + Bars */}
         <div className="flex-1 min-w-[280px]">
           <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-sm" style={{ fontFamily: "var(--font-pixel)" }}>{profile.display_name}</h2>
-            <span className="text-xs px-1.5 py-0.5 bg-primary text-primary-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
+            <h2 className="text-sm" style={{ fontFamily: "var(--font-pixel)" }}>
+              {profile.display_name}
+            </h2>
+            <span
+              className="text-xs px-1.5 py-0.5 bg-primary text-primary-foreground"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
               LV {profile.level}
             </span>
           </div>
@@ -174,10 +216,19 @@ export function HUD() {
         </div>
 
         {/* Stats + Gold + Notifications */}
-        <div className="flex items-center gap-3 text-lg" style={{ fontFamily: "var(--font-display)" }}>
+        <div
+          className="flex items-center gap-3 text-lg"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
           <NotificationsBell />
           <div className="flex items-center gap-1 text-[color:var(--color-gold)]">
             <Coins size={16} /> <span className="text-base">{profile.gold}</span>
+          </div>
+          <div className="flex items-center gap-1 text-accent" title="Moonshards">
+            <Sparkles size={15} /> <span className="text-base">{profile.moonshards ?? 0}</span>
+          </div>
+          <div className="flex items-center gap-1 text-muted-foreground" title="Achievements">
+            <Trophy size={15} /> <span className="text-base">{ach.length}</span>
           </div>
           <div className="h-8 w-px bg-border" />
           <div className="flex items-center gap-2" title="Strength (gear included)">

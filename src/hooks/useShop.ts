@@ -14,6 +14,8 @@ export interface ShopItemRow {
   price: number;
   is_active: boolean;
   forge_exclusive?: boolean;
+  season_slug?: string | null;
+  currency_type?: "gold" | "moonshard";
   metadata: Record<string, unknown>;
   created_at: string;
 }
@@ -34,6 +36,7 @@ export interface PurchaseResult {
   quantity_purchased: number;
   new_quantity: number;
   gold_left: number;
+  moonshards_left?: number;
 }
 
 export interface ConsumeResult {
@@ -88,7 +91,15 @@ export function usePurchaseShopItem() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
-    mutationFn: async ({ slug, quantity = 1 }: { slug: string; quantity?: number }) => {
+    mutationFn: async ({
+      slug,
+      quantity = 1,
+      goldSpentForArc = 0,
+    }: {
+      slug: string;
+      quantity?: number;
+      goldSpentForArc?: number;
+    }) => {
       const { data, error } = await supabase.rpc("purchase_shop_item", {
         p_item_slug: slug,
         p_quantity: quantity,
@@ -97,6 +108,11 @@ export function usePurchaseShopItem() {
       const rows = Array.isArray(data) ? data : data != null ? [data] : [];
       const row = rows[0] as PurchaseResult | undefined;
       if (!row) throw new Error("Purchase returned no row");
+      if (goldSpentForArc > 0) {
+        await supabase
+          .rpc("record_quest_arc_event", { p_kind: "spend_gold", p_amount: goldSpentForArc })
+          .catch(() => undefined);
+      }
       return row;
     },
     onSuccess: () => {
@@ -139,7 +155,8 @@ export function useForgeThreeEquipment() {
         p_user_item_id_c: ids[2],
       });
       if (error) throw error;
-      const row = typeof data === "object" && data !== null ? (data as Record<string, unknown>) : null;
+      const row =
+        typeof data === "object" && data !== null ? (data as Record<string, unknown>) : null;
       if (!row || typeof row.slug !== "string") throw new Error("Forge returned no result");
       return {
         slug: row.slug,

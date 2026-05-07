@@ -1,6 +1,7 @@
 export type TaskType = "habit" | "daily" | "todo";
 export type Difficulty = "trivial" | "easy" | "medium" | "hard";
 export type PetState = "idle" | "working" | "sleeping";
+export type AuraPath = "warden" | "scholar" | "strider" | "keeper";
 
 export interface Profile {
   id: string;
@@ -12,9 +13,14 @@ export interface Profile {
   stamina: number;
   max_stamina: number;
   gold: number;
+  moonshards?: number;
   strength: number;
   intelligence: number;
   constitution: number;
+  /** IANA timezone for dailies / streaks. */
+  timezone?: string;
+  aura_path?: AuraPath | null;
+  skill_cooldowns?: Record<string, string>;
   /** Cached sum from equipped gear (server-maintained). */
   equip_str_bonus?: number;
   equip_int_bonus?: number;
@@ -24,6 +30,22 @@ export interface Profile {
   equip_gold_bonus_pct?: number;
   pet_name: string;
   pet_state: PetState;
+}
+
+export interface Tag {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface TaskChecklistItem {
+  id: string;
+  task_id: string;
+  title: string;
+  done: boolean;
+  position: number;
+  created_at: string;
 }
 
 export interface Task {
@@ -38,6 +60,16 @@ export interface Task {
   negative_count: number;
   source_note_id: string | null;
   created_at: string;
+  last_completed_at?: string | null;
+  /** Bitmask Sun=1<<0 .. Sat=1<<6; 127 = every day. */
+  sacred_days?: number;
+  streak_current?: number;
+  streak_best?: number;
+  last_completed_local_date?: string | null;
+  challenge_run_id?: string | null;
+  /** Joined client-side (see `useTasks`). */
+  checklist?: TaskChecklistItem[];
+  tags?: Pick<Tag, "id" | "name">[];
 }
 
 export interface Note {
@@ -51,13 +83,22 @@ export interface Note {
 }
 
 export const DIFFICULTY_XP: Record<Difficulty, number> = {
-  trivial: 2, easy: 5, medium: 10, hard: 20,
+  trivial: 2,
+  easy: 5,
+  medium: 10,
+  hard: 20,
 };
 export const DIFFICULTY_GOLD: Record<Difficulty, number> = {
-  trivial: 1, easy: 3, medium: 7, hard: 15,
+  trivial: 1,
+  easy: 3,
+  medium: 7,
+  hard: 15,
 };
 export const DIFFICULTY_HP_LOSS: Record<Difficulty, number> = {
-  trivial: 2, easy: 5, medium: 10, hard: 18,
+  trivial: 2,
+  easy: 5,
+  medium: 10,
+  hard: 18,
 };
 
 /**

@@ -4,7 +4,7 @@ import { Bell, Clock3, Save, ShieldCheck, UserRound } from "lucide-react";
 import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
 import { useNotifications } from "@/components/aura/NotificationsContext";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
-import { xpForLevel } from "@/lib/aura/types";
+import { xpForLevel, type AuraPath } from "@/lib/aura/types";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/settings")({
@@ -23,6 +23,8 @@ function SettingsPage() {
 
   const [displayName, setDisplayName] = useState("");
   const [petName, setPetName] = useState("");
+  const [timezone, setTimezone] = useState("UTC");
+  const [auraPath, setAuraPath] = useState<string>("");
   const [desktopNotifs, setDesktopNotifs] = useState(false);
   const [soundNotifs, setSoundNotifs] = useState(true);
   const [nextFocusMinutes, setNextFocusMinutes] = useState(focusMinutes);
@@ -32,6 +34,8 @@ function SettingsPage() {
     if (!profile) return;
     setDisplayName(profile.display_name);
     setPetName(profile.pet_name);
+    setTimezone(profile.timezone || "UTC");
+    setAuraPath(profile.aura_path || "");
   }, [profile?.display_name, profile?.pet_name]);
 
   useEffect(() => {
@@ -65,6 +69,8 @@ function SettingsPage() {
     await updateProfile.mutateAsync({
       display_name: nextDisplayName,
       pet_name: nextPetName,
+      timezone: timezone.trim() || "UTC",
+      aura_path: auraPath ? (auraPath as AuraPath) : null,
     });
     toast.success("Profile updated.");
   };
@@ -112,6 +118,25 @@ function SettingsPage() {
             className="w-full px-3 py-2 bg-input border-2 border-border focus:border-primary outline-none text-base"
             placeholder="Your companion name"
           />
+          <label className="block text-sm text-muted-foreground">Timezone (IANA)</label>
+          <input
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+            className="w-full px-3 py-2 bg-input border-2 border-border focus:border-primary outline-none text-base"
+            placeholder="e.g. America/New_York"
+          />
+          <label className="block text-sm text-muted-foreground">Aura path (class)</label>
+          <select
+            value={auraPath}
+            onChange={(e) => setAuraPath(e.target.value)}
+            className="w-full px-3 py-2 bg-input border-2 border-border focus:border-primary outline-none text-base"
+          >
+            <option value="">Not chosen</option>
+            <option value="warden">Warden — Focus Ward</option>
+            <option value="scholar">Scholar — Party Mend</option>
+            <option value="strider">Strider — Shadow Strike</option>
+            <option value="keeper">Keeper — Second Wind</option>
+          </select>
           <button
             onClick={saveProfile}
             disabled={updateProfile.isPending}

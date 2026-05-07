@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Coins, Shirt, ShoppingBag } from "lucide-react";
+import { Coins, Shirt, ShoppingBag, Sparkles } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useShopItems, usePurchaseShopItem } from "@/hooks/useShop";
 import { InventoryBag } from "@/components/aura/InventoryBag";
@@ -31,32 +31,59 @@ const MAX_PURCHASE_BATCH = 99;
 
 function ShopPage() {
   const [tab, setTab] = useState<"general" | "equipment">("general");
+  const [season, setSeason] = useState<"all" | "solstice">("all");
   const { data: profile } = useProfile();
   const { data: catalog, isLoading: loadingCatalog } = useShopItems();
   const purchase = usePurchaseShopItem();
 
   const listed =
-    catalog?.filter((item) =>
-      tab === "equipment" ? item.category === "equipment" : item.category !== "equipment",
-    ) ?? [];
+    catalog?.filter((item) => {
+      const tabOk =
+        tab === "equipment" ? item.category === "equipment" : item.category !== "equipment";
+      const seasonOk = season === "all" || !item.season_slug || item.season_slug === season;
+      return tabOk && seasonOk;
+    }) ?? [];
 
-  const buy = async (slug: string, price: number) => {
+  const buy = async (slug: string, price: number, currency: "gold" | "moonshard" = "gold") => {
     if (!profile) return;
-    if (profile.gold < price) {
+    if (currency === "moonshard") {
+      if ((profile.moonshards ?? 0) < price) {
+        toast.error("Not enough Moonshards.");
+        return;
+      }
+    } else if (profile.gold < price) {
       toast.error("Not enough gold.");
       return;
     }
     try {
-      const r = await purchase.mutateAsync({ slug, quantity: 1 });
-      toast.success(`Bought · ${r.new_quantity} in bag · ${r.gold_left}g left`);
+      const r = await purchase.mutateAsync({
+        slug,
+        quantity: 1,
+        goldSpentForArc: currency === "gold" ? price : 0,
+      });
+      const shard = r.moonshards_left ?? profile.moonshards ?? 0;
+      toast.success(
+        currency === "moonshard"
+          ? `Bought · ${r.new_quantity} in bag · ${shard} Moonshards left`
+          : `Bought · ${r.new_quantity} in bag · ${r.gold_left}g left`,
+      );
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Purchase failed";
       toast.error(msg);
     }
   };
 
-  const buyAll = async (slug: string, name: string, price: number) => {
+  const buyAll = async (
+    slug: string,
+    name: string,
+    price: number,
+    currency: "gold" | "moonshard" = "gold",
+  ) => {
     if (!profile) return;
+    if (currency === "moonshard") {
+      toast.error("Use single buy for Moonshard items.");
+      return;
+    }
     if (price <= 0) {
       toast.error("Invalid price.");
       return;
@@ -75,7 +102,11 @@ function ShopPage() {
         guard++;
         const batch = Math.min(MAX_PURCHASE_BATCH, Math.floor(goldLeft / price));
         if (batch < 1) break;
-        const r = await purchase.mutateAsync({ slug, quantity: batch });
+        const r = await purchase.mutateAsync({
+          slug,
+          quantity: batch,
+          goldSpentForArc: price * batch,
+        });
         goldLeft = r.gold_left;
         totalBought += r.quantity_purchased;
         lastNewQty = r.new_quantity;
@@ -96,19 +127,32 @@ function ShopPage() {
             <h1 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
               ZEN SHOP
             </h1>
-            <p className="text-xs text-muted-foreground" style={{ fontFamily: "var(--font-display)" }}>
+            <p
+              className="text-xs text-muted-foreground"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
               Spend Zen Gold — general wares or stat-boosting equipment.
             </p>
           </div>
         </div>
         {profile && (
-          <div
-            className="flex items-center gap-2 px-3 py-2 border-2 border-border bg-card"
-            style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
-          >
-            <Coins size={14} className="text-[color:var(--color-gold)]" />
-            <span>{profile.gold}</span>
-            <span className="text-muted-foreground">g</span>
+          <div className="flex flex-wrap gap-2">
+            <div
+              className="flex items-center gap-2 px-3 py-2 border-2 border-border bg-card"
+              style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+            >
+              <Coins size={14} className="text-[color:var(--color-gold)]" />
+              <span>{profile.gold}</span>
+              <span className="text-muted-foreground">g</span>
+            </div>
+            <div
+              className="flex items-center gap-2 px-3 py-2 border-2 border-border bg-card"
+              style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+            >
+              <Sparkles size={14} className="text-accent" />
+              <span>{profile.moonshards ?? 0}</span>
+              <span className="text-muted-foreground">Moonshards</span>
+            </div>
           </div>
         )}
       </div>
@@ -119,21 +163,45 @@ function ShopPage() {
             <h2 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
               CATALOG
             </h2>
-            <div className="flex border-2 border-border" style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}>
-              <button
-                type="button"
-                onClick={() => setTab("general")}
-                className={`px-3 py-1.5 flex items-center gap-1 ${tab === "general" ? "bg-primary text-primary-foreground" : "bg-card"}`}
+            <div className="flex flex-wrap gap-2 items-center justify-end">
+              <div
+                className="flex border-2 border-border"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
               >
-                <ShoppingBag size={12} /> General
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab("equipment")}
-                className={`px-3 py-1.5 flex items-center gap-1 border-l-2 border-border ${tab === "equipment" ? "bg-primary text-primary-foreground" : "bg-card"}`}
+                <button
+                  type="button"
+                  onClick={() => setSeason("all")}
+                  className={`px-3 py-1.5 ${season === "all" ? "bg-primary text-primary-foreground" : "bg-card"}`}
+                >
+                  All seasons
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSeason("solstice")}
+                  className={`px-3 py-1.5 border-l-2 border-border ${season === "solstice" ? "bg-primary text-primary-foreground" : "bg-card"}`}
+                >
+                  Solstice
+                </button>
+              </div>
+              <div
+                className="flex border-2 border-border"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
               >
-                <Shirt size={12} /> Equipment
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("general")}
+                  className={`px-3 py-1.5 flex items-center gap-1 ${tab === "general" ? "bg-primary text-primary-foreground" : "bg-card"}`}
+                >
+                  <ShoppingBag size={12} /> General
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("equipment")}
+                  className={`px-3 py-1.5 flex items-center gap-1 border-l-2 border-border ${tab === "equipment" ? "bg-primary text-primary-foreground" : "bg-card"}`}
+                >
+                  <Shirt size={12} /> Equipment
+                </button>
+              </div>
             </div>
           </div>
           {loadingCatalog && <p className="text-sm text-muted-foreground">Loading wares...</p>}
@@ -142,39 +210,77 @@ function ShopPage() {
           )}
           <ul className="space-y-2">
             {listed.map((item) => {
-              const canAfford = profile ? profile.gold >= item.price : false;
+              const currency = item.currency_type === "moonshard" ? "moonshard" : "gold";
+              const canAfford =
+                profile &&
+                (currency === "moonshard"
+                  ? (profile.moonshards ?? 0) >= item.price
+                  : profile.gold >= item.price);
               const maxAffordable =
-                profile && item.price > 0 ? Math.floor(profile.gold / item.price) : 0;
+                profile && item.price > 0 && currency === "gold"
+                  ? Math.floor(profile.gold / item.price)
+                  : currency === "moonshard"
+                    ? (profile?.moonshards ?? 0) >= item.price
+                      ? 1
+                      : 0
+                    : 0;
               return (
-                <li key={item.id} className="pixel-panel p-3 flex flex-wrap items-start gap-3 justify-between">
+                <li
+                  key={item.id}
+                  className="pixel-panel p-3 flex flex-wrap items-start gap-3 justify-between"
+                >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>{item.name}</span>
-                      <span className={`text-[10px] uppercase ${rarityClass(item.rarity)}`} style={{ fontFamily: "var(--font-pixel)" }}>
+                      <span style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
+                        {item.name}
+                      </span>
+                      <span
+                        className={`text-[10px] uppercase ${rarityClass(item.rarity)}`}
+                        style={{ fontFamily: "var(--font-pixel)" }}
+                      >
                         {item.rarity}
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: "var(--font-display)" }}>
+                    <p
+                      className="text-xs text-muted-foreground mt-1"
+                      style={{ fontFamily: "var(--font-display)" }}
+                    >
                       {item.description}
                     </p>
-                    <p className="text-[10px] text-muted-foreground mt-1" style={{ fontFamily: "var(--font-pixel)" }}>
+                    <p
+                      className="text-[10px] text-muted-foreground mt-1"
+                      style={{ fontFamily: "var(--font-pixel)" }}
+                    >
                       {item.category}
+                      {item.season_slug ? ` · ${item.season_slug}` : ""}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    <span className="text-sm text-[color:var(--color-gold)]" style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
-                      {item.price}g
-                      {canAfford ? (
-                        <span className="text-muted-foreground font-normal ml-1">
-                          · max {maxAffordable} with your gold
-                        </span>
-                      ) : null}
+                    <span
+                      className="text-sm text-[color:var(--color-gold)]"
+                      style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+                    >
+                      {currency === "moonshard" ? (
+                        <>
+                          <Sparkles size={10} className="inline mr-0.5 text-accent" />
+                          {item.price} Moonshards
+                        </>
+                      ) : (
+                        <>
+                          {item.price}g
+                          {canAfford ? (
+                            <span className="text-muted-foreground font-normal ml-1">
+                              · max {maxAffordable} with your gold
+                            </span>
+                          ) : null}
+                        </>
+                      )}
                     </span>
                     <div className="flex flex-wrap justify-end gap-1">
                       <button
                         type="button"
                         disabled={!canAfford || purchase.isPending}
-                        onClick={() => buy(item.slug, item.price)}
+                        onClick={() => buy(item.slug, item.price, currency)}
                         className="px-3 py-2 bg-primary text-primary-foreground disabled:opacity-40"
                         style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
                       >
@@ -182,13 +288,13 @@ function ShopPage() {
                       </button>
                       <button
                         type="button"
-                        disabled={!canAfford || purchase.isPending}
+                        disabled={!canAfford || purchase.isPending || currency === "moonshard"}
                         title={
-                          profile
+                          profile && currency === "gold"
                             ? `Buy ${maxAffordable} (uses ${Math.min(maxAffordable * item.price, profile.gold)}g)`
                             : ""
                         }
-                        onClick={() => buyAll(item.slug, item.name, item.price)}
+                        onClick={() => buyAll(item.slug, item.name, item.price, currency)}
                         className="px-3 py-2 border-2 border-[color:var(--color-gold)] text-foreground bg-card hover:bg-secondary disabled:opacity-40"
                         style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
                       >
