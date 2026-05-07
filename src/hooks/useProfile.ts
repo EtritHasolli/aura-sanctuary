@@ -14,9 +14,17 @@ const MAX_HP_PER_LEVEL_UP = 10;
 const HP_REGEN_PER_LEVEL_UP = 10;
 /** Must match profiles.max_hp default for level 1 in the database. */
 const BASE_MAX_HP = 50;
+const CON_HP_BONUS_DIVISOR = 5;
+const PATH_LEVEL_GROWTH = {
+  swordsman: { strength: 2, constitution: 1, intelligence: 0, dexterity: 0 },
+  mage: { strength: 0, constitution: 0, intelligence: 2, dexterity: 1 },
+  tank: { strength: 1, constitution: 2, intelligence: 0, dexterity: 0 },
+  rogue: { strength: 0, constitution: 0, intelligence: 1, dexterity: 2 },
+} as const;
 
-export function canonicalMaxHpForLevel(level: number) {
-  return BASE_MAX_HP + (level - 1) * MAX_HP_PER_LEVEL_UP;
+export function canonicalMaxHpForLevel(level: number, constitution = 0) {
+  const conBonus = Math.max(0, Math.floor(constitution / CON_HP_BONUS_DIVISOR));
+  return BASE_MAX_HP + (level - 1) * MAX_HP_PER_LEVEL_UP + conBonus;
 }
 
 export function useProfile() {
@@ -33,7 +41,7 @@ export function useProfile() {
       if (error) throw error;
       let data = initialData;
       if (!data) return null as Profile | null;
-      const canonical = canonicalMaxHpForLevel(data.level);
+      const canonical = canonicalMaxHpForLevel(data.level, data.constitution);
       if (data.max_hp < canonical) {
         const hp = Math.min(canonical, data.hp);
         const { error: upErr } = await supabase
@@ -77,7 +85,7 @@ export interface RewardDelta {
   gold?: number;
   hp?: number;
   stamina?: number;
-  stat?: "strength" | "intelligence" | "constitution";
+  stat?: "strength" | "intelligence" | "constitution" | "dexterity";
   statAmount?: number;
 }
 
@@ -105,6 +113,8 @@ export function useApplyReward() {
         next.intelligence = Math.max(0, prev.intelligence + statAmount);
       else if (delta.stat === "constitution")
         next.constitution = Math.max(0, prev.constitution + statAmount);
+      else if (delta.stat === "dexterity")
+        next.dexterity = Math.max(0, prev.dexterity + statAmount);
       // Keep optimistic preview bounded when this is not a level-up flow.
       if ((delta.xp ?? 0) <= 0) next.stamina = Math.min(effMaxSta, next.stamina);
       qc.setQueryData(key, next);
@@ -138,11 +148,15 @@ export function useApplyReward() {
       const goldDelta = withGoldEquipBonus(delta.gold ?? 0, p);
       let xp = Math.max(0, p.xp + xpDelta);
       let level = p.level;
-      let max_hp = Math.max(p.max_hp, canonicalMaxHpForLevel(p.level));
+      let max_hp = Math.max(p.max_hp, canonicalMaxHpForLevel(p.level, p.constitution));
       let hp = Math.min(max_hp, p.hp + (delta.hp ?? 0));
       let stamina = Math.max(0, p.stamina + (delta.stamina ?? 0));
       let gold = Math.max(0, p.gold + goldDelta);
       let leveledUp = false;
+      let strength = p.strength;
+      let intelligence = p.intelligence;
+      let constitution = p.constitution;
+      let dexterity = p.dexterity;
 
       // Level up
       while (xp >= xpForLevel(level)) {
@@ -152,6 +166,12 @@ export function useApplyReward() {
         hp += HP_REGEN_PER_LEVEL_UP;
         // Intentional level-up overflow: make level moments impactful.
         stamina += STAMINA_ON_LEVEL_UP;
+        const growth =
+          (p.aura_path && PATH_LEVEL_GROWTH[p.aura_path]) ?? PATH_LEVEL_GROWTH.swordsman;
+        strength += growth.strength;
+        intelligence += growth.intelligence;
+        constitution += growth.constitution;
+        dexterity += growth.dexterity;
       }
 
       // Death loop
@@ -177,19 +197,32 @@ export function useApplyReward() {
         });
       }
 
-      max_hp = Math.max(max_hp, canonicalMaxHpForLevel(level));
+      max_hp = Math.max(max_hp, canonicalMaxHpForLevel(level, constitution));
       hp = Math.min(max_hp, hp);
       stamina = Math.max(0, stamina);
       // Overflow should only happen during level-up moments.
       if (!leveledUp) stamina = Math.min(effMaxSta, stamina);
 
-      const patch: Partial<Profile> = { xp, level, max_hp, hp, stamina, gold };
+      const patch: Partial<Profile> = {
+        xp,
+        level,
+        max_hp,
+        hp,
+        stamina,
+        gold,
+        strength,
+        intelligence,
+        constitution,
+        dexterity,
+      };
       const statAmount = delta.statAmount ?? 1;
-      if (delta.stat === "strength") patch.strength = Math.max(0, p.strength + statAmount);
+      if (delta.stat === "strength") patch.strength = Math.max(0, strength + statAmount);
       else if (delta.stat === "intelligence")
-        patch.intelligence = Math.max(0, p.intelligence + statAmount);
+        patch.intelligence = Math.max(0, intelligence + statAmount);
       else if (delta.stat === "constitution")
-        patch.constitution = Math.max(0, p.constitution + statAmount);
+        patch.constitution = Math.max(0, constitution + statAmount);
+      else if (delta.stat === "dexterity")
+        patch.dexterity = Math.max(0, dexterity + statAmount);
 
       const { error } = await supabase.from("profiles").update(patch).eq("id", user!.id);
       if (error) throw error;

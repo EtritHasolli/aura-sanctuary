@@ -81,6 +81,7 @@ function SanctuaryPage() {
   const [trackLabel, setTrackLabel] = useState("chillhop stream");
   const [trackIdx, setTrackIdx] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuContainerRef = useRef<HTMLDivElement | null>(null);
   const [youtubeUrlInput, setYoutubeUrlInput] = useState("");
   const [youtubeEmbedUrl, setYoutubeEmbedUrl] = useState<string | null>(null);
   const trackSources = [
@@ -151,6 +152,23 @@ function SanctuaryPage() {
     if (!profile?.id) return;
     void supabase.rpc("ensure_quest_arc_started", { p_arc_slug: "shadow-cleansing" });
   }, [profile?.id]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (!menuContainerRef.current?.contains(target)) {
+        setMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [menuOpen]);
 
   const stopGenerated = () => {
     stopGeneratedRef.current?.();
@@ -546,7 +564,7 @@ function SanctuaryPage() {
           </div>
 
           {/* Lo-fi music */}
-          <div className="pixel-panel p-4 relative">
+          <div ref={menuContainerRef} className="pixel-panel p-4 relative">
             <div className="flex items-center gap-2 mb-2">
               <Music size={14} className="text-primary" />
               <span className="text-sm" style={{ fontFamily: "var(--font-pixel)" }}>

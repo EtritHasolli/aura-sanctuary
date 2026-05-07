@@ -119,7 +119,7 @@ Core app areas:
 
 Mechanics highlights:
 - Habits, dailies, and todos grant XP/gold by difficulty.
-- Stats: STR, INT, CON. Paths: warden, scholar, strider, keeper.
+- Stats: STR, INT, CON, DEX. Paths: swordsman, mage, paladin, rogue.
 - Skills use cooldowns and temporary buffs.
 - Dailies are timezone-aware with sacred day bitmask.
 - Party boss uses stamina and strength-driven damage; rage reduces effective damage.

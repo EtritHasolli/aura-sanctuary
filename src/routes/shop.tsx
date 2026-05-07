@@ -41,7 +41,14 @@ function ShopPage() {
       const tabOk =
         tab === "equipment" ? item.category === "equipment" : item.category !== "equipment";
       const seasonOk = season === "all" || !item.season_slug || item.season_slug === season;
-      return tabOk && seasonOk;
+      if (!tabOk || !seasonOk) return false;
+      if (item.category !== "equipment") return true;
+      const allowedPaths = Array.isArray(item.metadata?.allowed_paths)
+        ? (item.metadata.allowed_paths as string[])
+        : [];
+      if (!allowedPaths.length) return true;
+      if (!profile?.aura_path) return false;
+      return allowedPaths.includes(profile.aura_path);
     }) ?? [];
 
   const buy = async (slug: string, price: number, currency: "gold" | "moonshard" = "gold") => {

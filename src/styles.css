@@ -137,6 +137,28 @@
 @layer base {
   * { border-color: var(--color-border); }
   html, body, #root { height: 100%; }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--primary) 70%, var(--border)) var(--secondary);
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: var(--secondary);
+    border: 1px solid var(--border);
+  }
+  *::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--primary) 72%, var(--border));
+    border: 1px solid var(--border);
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--primary);
+  }
+  *::-webkit-scrollbar-corner {
+    background: var(--secondary);
+  }
   .custom-cursor-active,
   .custom-cursor-active *,
   .custom-cursor-active *::before,

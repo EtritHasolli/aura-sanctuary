@@ -3,6 +3,7 @@ import { Hammer, Shirt, X, Info } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useUserItems, useForgeThreeEquipment } from "@/hooks/useShop";
 import type { UserItemRow } from "@/hooks/useShop";
+import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/forge")({
@@ -13,14 +14,23 @@ export const Route = createFileRoute("/forge")({
 const RARITY_LADDER = "common → uncommon → rare → epic → legendary. Legendary cannot be forged.";
 
 function ForgePage() {
+  const { data: profile } = useProfile();
   const { data: items = [], isLoading } = useUserItems();
   const forge = useForgeThreeEquipment();
   const [basket, setBasket] = useState<string[]>([]);
   const [showInfo, setShowInfo] = useState(false);
 
   const gearRows = useMemo(
-    () => items.filter((r) => r.shop_items?.category === "equipment" && r.quantity > 0),
-    [items],
+    () =>
+      items.filter((r) => {
+        if (r.shop_items?.category !== "equipment" || r.quantity <= 0) return false;
+        const allowedPaths = Array.isArray(r.shop_items?.metadata?.allowed_paths)
+          ? (r.shop_items.metadata.allowed_paths as string[])
+          : [];
+        if (!allowedPaths.length) return true;
+        return !!profile?.aura_path && allowedPaths.includes(profile.aura_path);
+      }),
+    [items, profile?.aura_path],
   );
 
   const basketRarity = useMemo(() => {

@@ -16,6 +16,7 @@ import {
 import {
   clampBonusPct,
   effectiveConstitution,
+  effectiveDexterity,
   effectiveIntelligence,
   effectiveMaxStamina,
   effectiveStrength,
@@ -41,6 +42,7 @@ function bonusSummary(meta: Record<string, unknown>): string {
   if (b.strength) parts.push(`STR +${b.strength}`);
   if (b.intelligence) parts.push(`INT +${b.intelligence}`);
   if (b.constitution) parts.push(`CON +${b.constitution}`);
+  if (b.dexterity) parts.push(`DEX +${b.dexterity}`);
   if (b.max_stamina) parts.push(`max STA +${b.max_stamina}`);
   if (b.xp_bonus_pct) parts.push(`XP +${b.xp_bonus_pct}%`);
   if (b.gold_bonus_pct) parts.push(`gold +${b.gold_bonus_pct}%`);
@@ -130,6 +132,7 @@ function EquipmentPage() {
                 <div>STR {effectiveStrength(profile)}</div>
                 <div>INT {effectiveIntelligence(profile)}</div>
                 <div>CON {effectiveConstitution(profile)}</div>
+                <div>DEX {effectiveDexterity(profile)}</div>
                 <div>
                   STA max {effectiveMaxStamina(profile)}
                   <span className="text-muted-foreground"> (base {profile.max_stamina})</span>
@@ -213,6 +216,13 @@ function EquipmentPage() {
                       {bonuses}
                     </p>
                   )}
+                  {Array.isArray((meta as Record<string, unknown>).allowed_paths) && (
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Path:
+                      {" "}
+                      {((meta as Record<string, unknown>).allowed_paths as string[]).join(", ")}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -269,6 +279,13 @@ function EquipmentPage() {
                       style={{ fontFamily: "var(--font-display)" }}
                     >
                       {bonuses}
+                    </p>
+                  )}
+                  {Array.isArray((meta as Record<string, unknown>).allowed_paths) && (
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Path:
+                      {" "}
+                      {((meta as Record<string, unknown>).allowed_paths as string[]).join(", ")}
                     </p>
                   )}
                 </div>

@@ -4,7 +4,7 @@ import { Bell, Clock3, Save, ShieldCheck, UserRound } from "lucide-react";
 import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
 import { useNotifications } from "@/components/aura/NotificationsContext";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
-import { xpForLevel, type AuraPath } from "@/lib/aura/types";
+import { AURA_PATHS, xpForLevel, type AuraPath } from "@/lib/aura/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -91,9 +91,11 @@ function SettingsPage() {
   const [displayName, setDisplayName] = useState("");
   const [petName, setPetName] = useState("");
   const [timezone, setTimezone] = useState("UTC");
-  const [auraPath, setAuraPath] = useState<string>("");
+  const [auraPath, setAuraPath] = useState<AuraPath | "">("");
   const [desktopNotifs, setDesktopNotifs] = useState(false);
   const [soundNotifs, setSoundNotifs] = useState(true);
+  const [pathTestingOverride, setPathTestingOverride] = useState(false);
+  const [pathModalOpen, setPathModalOpen] = useState(false);
   const [nextFocusMinutes, setNextFocusMinutes] = useState(focusMinutes);
   const [nextBreakMinutes, setNextBreakMinutes] = useState(breakMinutes);
   const [avatarDraft, setAvatarDraft] = useState<string | null>(null);
@@ -119,8 +121,14 @@ function SettingsPage() {
     setDisplayName(profile.display_name);
     setPetName(profile.pet_name);
     setTimezone(profile.timezone || "UTC");
-    setAuraPath(profile.aura_path || "");
-  }, [profile?.display_name, profile?.pet_name]);
+    setAuraPath(profile.aura_path ?? "");
+    setPathTestingOverride(!!profile.path_testing_override);
+  }, [profile]);
+
+  useEffect(() => {
+    if (!profile) return;
+    if (!profile.aura_path) setPathModalOpen(true);
+  }, [profile?.aura_path, profile?.id]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -167,6 +175,10 @@ function SettingsPage() {
       avatarUrlToSave = `${pub.data.publicUrl}?v=${Date.now()}`;
     }
 
+    if (!profile.aura_path && !auraPath) {
+      toast.error("Choose a path before saving.");
+      return;
+    }
     await updateProfile.mutateAsync({
       display_name: nextDisplayName,
       pet_name: nextPetName,
@@ -174,7 +186,8 @@ function SettingsPage() {
         timezone === SYSTEM_TIMEZONE_VALUE
           ? Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
           : timezone.trim() || "UTC",
-      aura_path: auraPath ? (auraPath as AuraPath) : null,
+      ...(profile.aura_path && !pathTestingOverride ? {} : { aura_path: auraPath as AuraPath }),
+      path_testing_override: pathTestingOverride,
       avatar_url: avatarUrlToSave,
     });
     setAvatarBlob(null);
@@ -370,6 +383,18 @@ function SettingsPage() {
   if (!profile) {
     return <div className="p-6 text-muted-foreground">Loading settings...</div>;
   }
+  const pathLocked = !!profile.aura_path && !pathTestingOverride;
+  const activePath = AURA_PATHS.find((p) => p.id === (auraPath || profile.aura_path || ""));
+  const selectedPathId = (auraPath || profile.aura_path || "") as AuraPath | "";
+  const dramaticByPath: Record<AuraPath, string> = {
+    swordsman:
+      "Steel sings in your hands. You break enemy lines and turn discipline into momentum.",
+    mage:
+      "Arcane equations bend in your favor. You mend the party and outthink the battlefield.",
+    tank: "You are the wall that does not fall. Threat shatters on your guard and resolve.",
+    rogue:
+      "You strike from the blind angle. Precision, pace, and timing become your true weapons.",
+  };
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-5">
@@ -455,18 +480,50 @@ function SettingsPage() {
               </option>
             ))}
           </select>
-          <label className="block text-sm text-muted-foreground">Aura path (class)</label>
-          <select
-            value={auraPath}
-            onChange={(e) => setAuraPath(e.target.value)}
-            className="w-full px-3 py-2 bg-input border-2 border-border focus:border-primary outline-none text-base"
-          >
-            <option value="">Not chosen</option>
-            <option value="warden">Warden — Focus Ward</option>
-            <option value="scholar">Scholar — Party Mend</option>
-            <option value="strider">Strider — Shadow Strike</option>
-            <option value="keeper">Keeper — Second Wind</option>
-          </select>
+          <label className="block text-sm text-muted-foreground">Path (class)</label>
+          {activePath && (
+            <button
+              type="button"
+              onClick={() => {
+                if (pathTestingOverride || !profile.aura_path) setPathModalOpen(true);
+              }}
+              className={`w-full border-2 border-border bg-secondary/40 p-3 text-sm space-y-1 text-left ${
+                pathTestingOverride || !profile.aura_path
+                  ? "hover:border-primary hover:shadow-[0_0_14px_rgba(217,150,48,0.35)]"
+                  : "cursor-default"
+              }`}
+            >
+              <div className="text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+                {activePath.label}
+              </div>
+              <p className="text-muted-foreground">{activePath.fantasy}</p>
+              <p className="text-accent">{activePath.growth}</p>
+              <p className="text-muted-foreground">Skill: {activePath.skill}</p>
+              <p className="text-sm text-foreground/90 italic">{dramaticByPath[activePath.id]}</p>
+            </button>
+          )}
+          {!activePath && (
+            <button
+              type="button"
+              onClick={() => setPathModalOpen(true)}
+              className="w-full border-2 border-border bg-secondary/40 p-3 text-sm text-left hover:border-primary"
+            >
+              Choose your path
+            </button>
+          )}
+          {pathLocked && (
+            <p className="text-xs text-muted-foreground">
+              Path is locked after your first choice.
+            </p>
+          )}
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={pathTestingOverride}
+              onChange={(e) => setPathTestingOverride(e.target.checked)}
+            />
+            Testing override: allow changing path
+          </label>
           <button
             onClick={saveProfile}
             disabled={updateProfile.isPending}
@@ -503,18 +560,18 @@ function SettingsPage() {
           <div className="text-sm text-muted-foreground">
             {notifications.length} total notifications, {unread} unread.
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center justify-between gap-2 flex-nowrap">
+            <div className="flex items-center gap-2 flex-nowrap">
               <button
                 onClick={markAllRead}
-                className="px-3 py-2.5 border-2 border-border hover:border-primary text-sm"
+                className="px-2.5 py-2 border-2 border-border hover:border-primary text-sm whitespace-nowrap"
                 style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
               >
                 MARK ALL READ
               </button>
               <button
                 onClick={clear}
-                className="px-3 py-2.5 border-2 border-border hover:border-destructive text-sm"
+                className="px-2.5 py-2 border-2 border-border hover:border-destructive text-sm whitespace-nowrap"
                 style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
               >
                 CLEAR ALL
@@ -522,10 +579,10 @@ function SettingsPage() {
             </div>
             <button
               onClick={saveNotificationPrefs}
-              className="px-3 py-2.5 bg-primary text-primary-foreground text-sm"
+              className="px-4 py-2 bg-primary text-primary-foreground text-sm whitespace-nowrap shrink-0"
               style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
             >
-              SAVE PREFS
+              SAVE
             </button>
           </div>
         </section>
@@ -546,7 +603,21 @@ function SettingsPage() {
             <Stat label="Strength" value={profile.strength} />
             <Stat label="Intelligence" value={profile.intelligence} />
             <Stat label="Constitution" value={profile.constitution} />
+            <Stat label="Dexterity" value={profile.dexterity} />
             <Stat label="XP to next level" value={xpToNextLevel} />
+          </div>
+          <div className="border-2 border-border bg-secondary/30 p-3 space-y-2">
+            <h3 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+              HOW STATS WORK
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              STR boosts strike power, INT improves arcane utility and cooldown scaling, CON
+              strengthens survival and recovery behavior, and DEX powers precision/rogue tempo.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              HP/STA are your combat resources, XP/Level drive growth, and Gold/Moonshards fuel gear
+              progression that further modifies effective stats.
+            </p>
           </div>
         </section>
 
@@ -663,6 +734,80 @@ function SettingsPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={pathModalOpen}
+        onOpenChange={(next) => {
+          if (!profile.aura_path && !next) return;
+          setPathModalOpen(next);
+        }}
+      >
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle style={{ fontFamily: "var(--font-pixel)" }}>Choose Your Path</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {profile.aura_path
+              ? "Reshape your role for testing. Pick a path card, then save."
+              : "You must choose one path to continue. This choice is permanent unless testing override is enabled."}
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            {AURA_PATHS.map((path) => (
+              <button
+                key={path.id}
+                type="button"
+                onClick={() => setAuraPath(path.id)}
+                aria-pressed={selectedPathId === path.id}
+                className={`relative text-left pixel-panel p-3 border-2 transition-all duration-150 ${
+                  selectedPathId === path.id
+                    ? "!border-primary !bg-primary/10 shadow-[0_0_0_2px_rgba(217,150,48,0.9),0_0_24px_rgba(217,150,48,0.55)]"
+                    : "border-border hover:!border-primary hover:shadow-[0_0_16px_rgba(217,150,48,0.45)]"
+                }`}
+              >
+                {selectedPathId === path.id && (
+                  <span
+                    className="absolute top-2 right-2 px-1.5 py-0.5 text-[9px] bg-primary text-primary-foreground"
+                    style={{ fontFamily: "var(--font-pixel)" }}
+                  >
+                    SELECTED
+                  </span>
+                )}
+                <div className="w-full aspect-square border-2 border-border bg-secondary/40 mb-3 flex items-center justify-center">
+                  <span className="text-[10px] text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
+                    CHARACTER
+                  </span>
+                </div>
+                <div className="text-primary mb-2" style={{ fontFamily: "var(--font-pixel)" }}>
+                  {path.label}
+                </div>
+                <p className="text-sm text-muted-foreground">{path.fantasy}</p>
+                <p className="text-sm text-accent mt-1">{path.growth}</p>
+                <p className="text-sm text-muted-foreground mt-1">Skill: {path.skill}</p>
+                <p className="text-sm text-foreground/90 italic mt-2">{dramaticByPath[path.id]}</p>
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2">
+            {profile.aura_path && (
+              <button
+                type="button"
+                onClick={() => setPathModalOpen(false)}
+                className="px-3 py-1.5 border-2 border-border"
+              >
+                Close
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => void saveProfile()}
+              disabled={!auraPath || updateProfile.isPending}
+              className="px-4 py-2.5 bg-primary text-primary-foreground disabled:opacity-60"
+              style={{ fontFamily: "var(--font-pixel)", fontSize: 14 }}
+            >
+              {updateProfile.isPending ? "BINDING PATH..." : "CONFIRM PATH"}
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

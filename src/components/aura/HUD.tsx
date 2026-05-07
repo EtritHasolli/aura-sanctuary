@@ -3,6 +3,7 @@ import { useAchievements } from "@/hooks/useAchievements";
 import { useNavigate } from "@tanstack/react-router";
 import {
   effectiveConstitution,
+  effectiveDexterity,
   effectiveIntelligence,
   effectiveMaxStamina,
   effectiveStrength,
@@ -13,7 +14,19 @@ import { PetSprite } from "./PetSprite";
 import { useEquippedPetGear } from "@/hooks/useShop";
 import { useUserCompanions } from "@/hooks/useCompanions";
 import { xpForLevel } from "@/lib/aura/types";
-import { Coins, Swords, Brain, Heart, Bell, Sun, Moon, Sparkles, Trophy, X } from "lucide-react";
+import {
+  Coins,
+  Swords,
+  Brain,
+  Heart,
+  Bell,
+  Sun,
+  Moon,
+  Sparkles,
+  Trophy,
+  X,
+  Footprints,
+} from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useRef, useState, useEffect } from "react";
 
@@ -88,16 +101,13 @@ function Bar({
 }
 
 function NotificationsBell() {
-  const { notifications, unread, markAllRead, deleteOne, clear } = useNotifications();
+  const { notifications, unread, deleteOne, clear } = useNotifications();
   const [open, setOpen] = useState(false);
   const [allOpen, setAllOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  const toggle = () => {
-    if (!open) markAllRead();
-    setOpen((o) => !o);
-  };
+  const toggle = () => setOpen((o) => !o);
 
   const targetForMessage = (
     message: string,
@@ -313,6 +323,7 @@ export function HUD() {
   const effStr = effectiveStrength(profile);
   const effInt = effectiveIntelligence(profile);
   const effCon = effectiveConstitution(profile);
+  const effDex = effectiveDexterity(profile);
 
   return (
     <header className="relative z-[110] border-b-2 border-border bg-card/80 backdrop-blur px-4 py-3">
@@ -386,6 +397,9 @@ export function HUD() {
           </div>
           <div className="flex items-center gap-2" title="Constitution (gear included)">
             <Heart size={18} className="text-primary" /> {effCon}
+          </div>
+          <div className="flex items-center gap-2" title="Dexterity (gear included)">
+            <Footprints size={18} className="text-[color:var(--color-focus)]" /> {effDex}
           </div>
           <ThemeToggle />
         </div>

@@ -36,10 +36,15 @@ export function effectiveConstitution(p: Profile): number {
   return p.constitution + (p.equip_con_bonus ?? 0);
 }
 
+export function effectiveDexterity(p: Profile): number {
+  return p.dexterity + (p.equip_dex_bonus ?? 0);
+}
+
 export interface ParsedBonuses {
   strength?: number;
   intelligence?: number;
   constitution?: number;
+  dexterity?: number;
   max_stamina?: number;
   xp_bonus_pct?: number;
   gold_bonus_pct?: number;
@@ -58,12 +63,14 @@ export function parseItemBonuses(metadata: Record<string, unknown> | null | unde
   const s = n("strength");
   const i = n("intelligence");
   const c = n("constitution");
+  const d = n("dexterity");
   const m = n("max_stamina");
   const xp = n("xp_bonus_pct");
   const g = n("gold_bonus_pct");
   if (s !== undefined) out.strength = s;
   if (i !== undefined) out.intelligence = i;
   if (c !== undefined) out.constitution = c;
+  if (d !== undefined) out.dexterity = d;
   if (m !== undefined) out.max_stamina = m;
   if (xp !== undefined) out.xp_bonus_pct = xp;
   if (g !== undefined) out.gold_bonus_pct = g;

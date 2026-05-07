@@ -38,9 +38,11 @@ export interface FriendDetail {
     | "strength"
     | "intelligence"
     | "constitution"
+    | "dexterity"
     | "equip_str_bonus"
     | "equip_int_bonus"
     | "equip_con_bonus"
+    | "equip_dex_bonus"
     | "aura_path"
   >;
   equippedItems: Array<{ id: string; name: string; category: string; rarity: string }>;
@@ -231,7 +233,7 @@ export function useFriendDetail(friendId: string | null) {
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
         .select(
-          "id, display_name, level, hp, max_hp, xp, stamina, max_stamina, avatar_url, pet_state, strength, intelligence, constitution, equip_str_bonus, equip_int_bonus, equip_con_bonus, aura_path",
+          "id, display_name, level, hp, max_hp, xp, stamina, max_stamina, avatar_url, pet_state, strength, intelligence, constitution, dexterity, equip_str_bonus, equip_int_bonus, equip_con_bonus, equip_dex_bonus, aura_path",
         )
         .eq("id", friendId!)
         .maybeSingle();

@@ -2,7 +2,44 @@ export type TaskType = "habit" | "daily" | "todo";
 export type Difficulty = "trivial" | "easy" | "medium" | "hard";
 export type RepeatUnit = "day" | "week" | "month" | "year";
 export type PetState = "idle" | "working" | "sleeping";
-export type AuraPath = "warden" | "scholar" | "strider" | "keeper";
+export type AuraPath = "swordsman" | "mage" | "tank" | "rogue";
+
+export const AURA_PATHS: Array<{
+  id: AuraPath;
+  label: string;
+  fantasy: string;
+  skill: string;
+  growth: string;
+}> = [
+  {
+    id: "swordsman",
+    label: "Swordsman",
+    fantasy: "Frontline duelist who sharpens body and will.",
+    skill: "Battle Focus",
+    growth: "Per level: STR +2, CON +1",
+  },
+  {
+    id: "mage",
+    label: "Mage",
+    fantasy: "Arcane tactician weaving precision and intellect.",
+    skill: "Arcane Mend",
+    growth: "Per level: INT +2, DEX +1",
+  },
+  {
+    id: "tank",
+    label: "Paladin",
+    fantasy: "Holy bulwark guardian shielding the party from chaos.",
+    skill: "Iron Guard",
+    growth: "Per level: CON +2, STR +1",
+  },
+  {
+    id: "rogue",
+    label: "Rogue",
+    fantasy: "Shadow skirmisher striking where foes are weakest.",
+    skill: "Shadow Strike",
+    growth: "Per level: DEX +2, INT +1",
+  },
+];
 
 export interface Profile {
   id: string;
@@ -18,14 +55,17 @@ export interface Profile {
   strength: number;
   intelligence: number;
   constitution: number;
+  dexterity: number;
   /** IANA timezone for dailies / streaks. */
   timezone?: string;
   aura_path?: AuraPath | null;
+  path_testing_override?: boolean;
   skill_cooldowns?: Record<string, string>;
   /** Cached sum from equipped gear (server-maintained). */
   equip_str_bonus?: number;
   equip_int_bonus?: number;
   equip_con_bonus?: number;
+  equip_dex_bonus?: number;
   equip_max_stamina_bonus?: number;
   equip_xp_bonus_pct?: number;
   equip_gold_bonus_pct?: number;

@@ -80,10 +80,12 @@ interface PartyPlayer {
   strength: number;
   intelligence: number;
   constitution: number;
+  dexterity: number;
   avatar_url?: string | null;
   equip_str_bonus?: number;
   equip_int_bonus?: number;
   equip_con_bonus?: number;
+  equip_dex_bonus?: number;
 }
 async function refreshPartyScaled(partyId: string) {
   const { error: syncErr } = await supabase.rpc("sync_party_boss_scaling", { p_party_id: partyId });
@@ -158,6 +160,7 @@ function TavernPage() {
   const [playersOpen, setPlayersOpen] = useState(false);
   const [partyPlayers, setPartyPlayers] = useState<PartyPlayer[]>([]);
   const [playersLoading, setPlayersLoading] = useState(false);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
@@ -269,7 +272,7 @@ function TavernPage() {
     const { data: profileRows, error: profileErr } = await supabase
       .from("profiles")
       .select(
-        "id, display_name, level, hp, max_hp, xp, stamina, max_stamina, strength, intelligence, constitution, avatar_url, equip_str_bonus, equip_int_bonus, equip_con_bonus",
+        "id, display_name, level, hp, max_hp, xp, stamina, max_stamina, strength, intelligence, constitution, dexterity, avatar_url, equip_str_bonus, equip_int_bonus, equip_con_bonus, equip_dex_bonus",
       )
       .in("id", ids)
       .order("display_name");
@@ -338,6 +341,18 @@ function TavernPage() {
       behavior: "smooth",
     });
   }, [messageSearchId, messages]);
+
+  useEffect(() => {
+    if (!messageSearchId) {
+      setHighlightedMessageId(null);
+      return;
+    }
+    setHighlightedMessageId(messageSearchId);
+    const timer = window.setTimeout(() => {
+      setHighlightedMessageId((current) => (current === messageSearchId ? null : current));
+    }, 2000);
+    return () => window.clearTimeout(timer);
+  }, [messageSearchId]);
 
   useEffect(() => {
     if (!party?.id) return;
@@ -537,12 +552,12 @@ function TavernPage() {
     toast.success("Adventure started.");
   };
 
-  const invokeSkill = async (key: "warden" | "scholar" | "strider" | "keeper") => {
+  const invokeSkill = async (key: "swordsman" | "mage" | "rogue" | "tank") => {
     try {
-      if (key === "warden") await focusWard.mutateAsync();
-      if (key === "scholar" && party) await partyMend.mutateAsync(party.id);
-      if (key === "strider") await shadowStrike.mutateAsync();
-      if (key === "keeper") await secondWind.mutateAsync();
+      if (key === "swordsman") await focusWard.mutateAsync();
+      if (key === "mage" && party) await partyMend.mutateAsync(party.id);
+      if (key === "rogue") await shadowStrike.mutateAsync();
+      if (key === "tank") await secondWind.mutateAsync();
       toast.success("Skill invoked!");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Skill failed");
@@ -675,21 +690,24 @@ function TavernPage() {
   const bossPct = (shownBossHp / shownBossMaxHp) * 100;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto h-full relative">
-      <button
-        type="button"
-        onClick={() => {
-          setParty(null);
-          setMessages([]);
-          setAdventure(null);
-        }}
-        className="absolute -left-6 top-6 z-10 px-2 py-1 border-2 border-border hover:border-primary text-xs bg-background"
-        style={{ fontFamily: "var(--font-pixel)" }}
-        title="Back to party list"
-      >
-        <ArrowLeft size={14} />
-      </button>
+    <div className="p-6 max-w-6xl mx-auto h-full">
       <div className="space-y-4 h-full">
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => {
+              setParty(null);
+              setMessages([]);
+              setAdventure(null);
+            }}
+            className="inline-flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-xs bg-background"
+            style={{ fontFamily: "var(--font-pixel)" }}
+            title="Back to party list"
+          >
+            <ArrowLeft size={14} />
+            <span>PARTIES</span>
+          </button>
+        </div>
         <div className="pixel-panel p-3 flex flex-col lg:flex-row lg:items-start gap-3">
           <div className="flex-1 min-w-0">
             <div className="w-full border border-primary bg-primary/10 text-xs">
@@ -801,7 +819,7 @@ function TavernPage() {
                         >
                           LV {player.level}
                         </div>
-                        <div className="grid grid-cols-3 gap-1 mt-2 text-[10px]">
+                        <div className="grid grid-cols-4 gap-1 mt-2 text-[10px]">
                           <span className="border border-border px-1 py-0.5">
                             STR {playerStat(player.strength, player.equip_str_bonus)}
                           </span>
@@ -810,6 +828,9 @@ function TavernPage() {
                           </span>
                           <span className="border border-border px-1 py-0.5">
                             CON {playerStat(player.constitution, player.equip_con_bonus)}
+                          </span>
+                          <span className="border border-border px-1 py-0.5">
+                            DEX {playerStat(player.dexterity, player.equip_dex_bonus)}
                           </span>
                         </div>
                       </div>
@@ -859,7 +880,7 @@ function TavernPage() {
                     key={m.id}
                     id={`tavern-message-${m.id}`}
                     className={`text-sm px-2 py-0.5 ${
-                      messageSearchId === m.id ? "bg-primary/10 border border-primary" : ""
+                      highlightedMessageId === m.id ? "bg-primary/10 border border-primary" : ""
                     }`}
                   >
                     <span
@@ -999,40 +1020,40 @@ function TavernPage() {
                   PATH SKILL
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {profile.aura_path === "warden" && (
+                  {profile.aura_path === "swordsman" && (
                     <button
                       type="button"
                       className="px-2 py-1 border border-border text-[10px]"
-                      onClick={() => void invokeSkill("warden")}
+                      onClick={() => void invokeSkill("swordsman")}
                     >
-                      Focus Ward
+                      Battle Focus
                     </button>
                   )}
-                  {profile.aura_path === "scholar" && (
+                  {profile.aura_path === "mage" && (
                     <button
                       type="button"
                       className="px-2 py-1 border border-border text-[10px]"
-                      onClick={() => void invokeSkill("scholar")}
+                      onClick={() => void invokeSkill("mage")}
                     >
-                      Party Mend
+                      Arcane Mend
                     </button>
                   )}
-                  {profile.aura_path === "strider" && (
+                  {profile.aura_path === "rogue" && (
                     <button
                       type="button"
                       className="px-2 py-1 border border-border text-[10px]"
-                      onClick={() => void invokeSkill("strider")}
+                      onClick={() => void invokeSkill("rogue")}
                     >
                       Shadow Strike
                     </button>
                   )}
-                  {profile.aura_path === "keeper" && (
+                  {profile.aura_path === "tank" && (
                     <button
                       type="button"
                       className="px-2 py-1 border border-border text-[10px]"
-                      onClick={() => void invokeSkill("keeper")}
+                      onClick={() => void invokeSkill("tank")}
                     >
-                      Second Wind
+                      Iron Guard
                     </button>
                   )}
                 </div>

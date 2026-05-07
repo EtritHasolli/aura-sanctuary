@@ -1,6 +1,6 @@
 # Aura Sanctuary — rewards, stats, and combat
 
-This document describes how **XP, gold, HP, stamina, stats (STR / INT / CON)**, **quest completion**, **dailies**, and **party boss damage** are calculated in the current codebase. Values match the TypeScript tables in `src/lib/aura/types.ts` and the SQL in the listed migrations unless noted.
+This document describes how **XP, gold, HP, stamina, stats (STR / INT / CON / DEX)**, **quest completion**, **dailies**, **paths**, and **party boss damage** are calculated in the current codebase. Values match the TypeScript tables in `src/lib/aura/types.ts` and the SQL in the listed migrations unless noted.
 
 ---
 
@@ -8,7 +8,7 @@ This document describes how **XP, gold, HP, stamina, stats (STR / INT / CON)**, 
 
 ### Base attributes
 
-Each profile has integer **strength**, **intelligence**, and **constitution**. They are raised in fixed increments when certain actions complete (see §4).
+Each profile has integer **strength**, **intelligence**, **constitution**, and **dexterity**. They are raised in fixed increments when certain actions complete (see §4).
 
 ### Equipment modifiers
 
@@ -16,7 +16,7 @@ Equipped items contribute cached sums on `profiles`:
 
 | Field | Effect |
 | --- | --- |
-| `equip_str_bonus`, `equip_int_bonus`, `equip_con_bonus` | Added to the matching base stat where the game uses “effective” values. |
+| `equip_str_bonus`, `equip_int_bonus`, `equip_con_bonus`, `equip_dex_bonus` | Added to the matching base stat where the game uses “effective” values. |
 | `equip_max_stamina_bonus` | Added to `max_stamina` for caps and regen (see §6). |
 | `equip_xp_bonus_pct`, `equip_gold_bonus_pct` | Percent bonuses on **positive** XP and gold from `useApplyReward` (clamped 0–100, integer floor on the multiplier). |
 
@@ -25,7 +25,7 @@ Client helpers live in `src/lib/aura/equipmentBonuses.ts`:
 - **Effective max stamina:** `max_stamina + max(0, equip_max_stamina_bonus)`.
 - **XP after gear:** `floor(baseXp * (1 + clamp(equip_xp_bonus_pct) / 100))` when `baseXp > 0`.
 - **Gold after gear:** same pattern for `baseGold > 0`.
-- **Effective STR / INT / CON:** base + matching `equip_*_bonus` (used for display and any client-side previews; boss strike uses DB-side equivalents).
+- **Effective STR / INT / CON / DEX:** base + matching `equip_*_bonus` (used for display and any client-side previews; boss strike uses DB-side equivalents).
 
 Item metadata can define bonuses under `metadata.bonuses` (parsed in the same file); the database keeps profile aggregates in sync when gear changes (see equipment migrations).
 
@@ -69,7 +69,7 @@ Stat gains are **+1 per qualifying action**, chosen by the route—not by a form
 | **Habit** positive complete | **Strength** |
 | **Daily** complete | **Constitution** |
 | **To-do** complete | **Intelligence** |
-| **Focus session complete** (Pomodoro) | **Intelligence** (+10 XP, +3 gold, +15 stamina; `src/routes/__root.tsx`) |
+| **Focus session complete** (Pomodoro) | **Path-based:** Swordsman→STR, Mage→INT, Paladin→CON, Rogue→DEX (+10 XP, +3 gold, +15 stamina; `src/routes/__root.tsx`) |
 | **Party boss strike** (each strike, not only kills) | **Strength** (+XP equal to damage dealt that strike, +2 gold; `src/routes/tavern.tsx`) |
 
 The mutation `useApplyReward` in `src/hooks/useProfile.ts` applies at most **one** stat increment per call, via `delta.stat`.
@@ -90,10 +90,16 @@ All of the above flows converge on **`useApplyReward`**, which:
    - Increments `level`.
    - Adds **+10 HP** (regen on level-up) and caps HP by current `max_hp`.
    - Adds **+50 stamina** (overflow is allowed during level-up moments).
+   - Applies **path growth per level-up**:
+     - Swordsman: `+2 STR`, `+1 CON`
+     - Mage: `+2 INT`, `+1 DEX`
+     - Paladin: `+2 CON`, `+1 STR`
+     - Rogue: `+2 DEX`, `+1 INT`
 5. Applies direct **HP** and **stamina** deltas from the request.
 6. If no level-up occurred in this reward call, stamina is clamped to effective max. If level-up occurred, temporary overflow is preserved.
 7. **Death handling:** if after all changes `hp <= 0`, the profile is penalized: `level = max(1, level - 1)`, `gold = floor(gold * 0.8)`, `hp = max_hp`, `xp = 0`.
-8. Recomputes **`max_hp`** at least to **`canonicalMaxHpForLevel(level)`** = `50 + (level - 1) * 10` (must match DB default at level 1).
+8. Recomputes **`max_hp`** at least to **`canonicalMaxHpForLevel(level, constitution)`** =
+   `50 + (level - 1) * 10 + floor(constitution / 5)` (small CON-to-HP bonus).
 9. Writes the patch; then calls **`try_unlock_achievements`** (best-effort).
 
 Constants in `useProfile.ts`: `STAMINA_ON_LEVEL_UP = 50`, `HP_REGEN_PER_LEVEL_UP = 10`, `BASE_MAX_HP = 50`, `MAX_HP_PER_LEVEL_UP = 10`.
@@ -114,7 +120,7 @@ So early levels are gentle; later levels grow faster than linearly (quadratic te
 
 ---
 
-## 6. Stamina: regen, daily reset, boss strikes, Keeper skill
+## 6. Stamina: regen, daily reset, boss strikes, Paladin skill
 
 ### Passive regen (`apply_stamina_regen`)
 
@@ -128,9 +134,9 @@ The client polls this RPC about every hour (`StaminaRecoveryLoop` in `src/routes
 
 `strike_party_boss` spends **10 stamina** per strike (server-enforced).
 
-### Keeper — Second Wind
+### Paladin — Iron Guard (`use_skill_second_wind`)
 
-`use_skill_second_wind` adds **22** stamina capped at **`max_stamina`** (base column, not the equipment-extended cap in that RPC—worth knowing if you rely on huge equip bonuses).
+`use_skill_second_wind` adds **28** stamina capped at **effective** max stamina (`max_stamina + equip_max_stamina_bonus`).
 
 ---
 
@@ -201,7 +207,7 @@ Authoritative math is **server-side** in `20260507125200_strike_buffs_rage_shado
 
 **Client reward after strike:** XP = **`r.dmg`** (the post-rage damage number returned), gold **+2**, **+1 STR** — independent of the server’s kill bonus gold (that gold is applied inside the RPC).
 
-**Scholar — Party Mend:** heals party **`boss_hp` by +18** (cap at max), 45m cooldown; does not use the strike formula.
+**Mage — Arcane Mend:** heals party **`boss_hp` by +18** (cap at max), 45m cooldown; does not use the strike formula.
 
 ---
 
@@ -209,12 +215,12 @@ Authoritative math is **server-side** in `20260507125200_strike_buffs_rage_shado
 
 | Path | Skill | Effect (high level) |
 | --- | --- | --- |
-| Warden | Focus Ward | `xp_focus_bonus` buff, **+25%** XP for ~2h; 30m cooldown |
-| Scholar | Party Mend | **+18** boss HP; 45m cooldown |
-| Strider | Shadow Strike | `boss_dmg_bonus` **+35%** on next strike(s) until buff expires (~20m); 40m cooldown |
-| Keeper | Second Wind | **+22** stamina; 60m cooldown |
+| Swordsman | Battle Focus (`use_skill_focus_ward`) | `xp_focus_bonus` buff, **+25%** XP for ~2h; base 30m cooldown (INT-scaled) |
+| Mage | Arcane Mend (`use_skill_party_mend`) | **+18** boss HP heal; base 45m cooldown (INT-scaled) |
+| Rogue | Shadow Strike (`use_skill_shadow_strike`) | `boss_dmg_bonus` **+35%** for ~20m; base 40m cooldown (**DEX**-scaled) |
+| Paladin | Iron Guard (`use_skill_second_wind`) | **+28** stamina (effective cap); base 60m cooldown (**CON**-scaled) |
 
-Definitions: `supabase/migrations/20260507121000_paths_skills_buffs.sql`.
+Definitions and current overrides: `supabase/migrations/20260507220000_rpg_paths_progression.sql`.
 
 ---
 
@@ -236,14 +242,17 @@ The following updates were applied after the initial mechanics rollout.
 
 ### STR meta reduction and stat parity
 
-- **INT now reduces path skill cooldowns** server-side in all 4 skill RPCs.
-- Effective INT is `intelligence + equip_int_bonus`.
-- Cooldown reduction formula: `reduction_pct = floor(effective_int / 2)`, clamped to 40%.
+- Cooldown reduction formula pattern is still `reduction_pct = floor(effective_stat / 2)`, clamped to 40%.
 - Final cooldown is `floor(base_minutes * (100 - reduction_pct) / 100)` with per-skill minimums:
   - Focus Ward: min 10m
   - Party Mend: min 15m
   - Shadow Strike: min 15m
   - Second Wind: min 20m
+- Effective stat by skill:
+  - Focus Ward: `effective_int`
+  - Party Mend: `effective_int`
+  - Shadow Strike: `effective_dex`
+  - Second Wind: `effective_con`
 
 ### CON-based death penalty scaling
 
@@ -309,9 +318,17 @@ Level-up stamina can overflow effective max:
 
 - if any party member has active `xp_focus_bonus` (Focus Ward), Party Mend heal gets **+10%**.
 
-### Keeper skill cap fix
+### Paladin skill cap fix
 
 `use_skill_second_wind` now caps stamina at **effective** max (`max_stamina + equip_max_stamina_bonus`), not base max.
+
+### Path switching during testing
+
+- Path choice is immutable by default once selected.
+- A testing-only override exists via `profiles.path_testing_override`:
+  - when true, path can be changed for testing
+  - when false, path remains locked after initial pick
+- Changing path should **not reset earned stats**; it only changes path-dependent systems (future level-up growth direction and path skill availability).
 
 ### About generic buff support
 

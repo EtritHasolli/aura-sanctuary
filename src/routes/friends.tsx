@@ -15,6 +15,7 @@ import { PetSprite } from "@/components/aura/PetSprite";
 import { xpForLevel } from "@/lib/aura/types";
 import {
   effectiveConstitution,
+  effectiveDexterity,
   effectiveIntelligence,
   effectiveStrength,
 } from "@/lib/aura/equipmentBonuses";
@@ -502,6 +503,7 @@ function FriendsPage() {
                 <StatChip label="STR" value={effectiveStrength(selectedDetail.profile)} />
                 <StatChip label="INT" value={effectiveIntelligence(selectedDetail.profile)} />
                 <StatChip label="CON" value={effectiveConstitution(selectedDetail.profile)} />
+                <StatChip label="DEX" value={effectiveDexterity(selectedDetail.profile)} />
               </div>
 
               <div>

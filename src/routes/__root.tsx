@@ -329,6 +329,7 @@ function PersistentYouTubeAudio() {
 
 function AppGate() {
   const { user, loading } = useAuth();
+  const { data: profile, isLoading: profileLoading } = useProfile();
   const { push } = useNotifications();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();
@@ -338,6 +339,14 @@ function AppGate() {
     if (!user && path !== "/auth") router.navigate({ to: "/auth" });
     if (user && path === "/auth") router.navigate({ to: "/" });
   }, [user, loading, path, router]);
+
+  useEffect(() => {
+    if (loading || !user || profileLoading) return;
+    if (!profile) return;
+    if (!profile.aura_path && path !== "/settings") {
+      router.navigate({ to: "/settings" });
+    }
+  }, [loading, user, profileLoading, profile, path, router]);
 
   useEffect(() => {
     const shieldDefaultPaths = new Set(["/friends", "/forge", "/equipment"]);
@@ -362,9 +371,17 @@ function AppGate() {
   return (
     <PomodoroProvider
       onFocusComplete={() => {
-        toast.success("+10 INT — focus complete!");
+        const focusStatLabel =
+          profile?.aura_path === "swordsman"
+            ? "STR"
+            : profile?.aura_path === "tank"
+              ? "CON"
+              : profile?.aura_path === "rogue"
+                ? "DEX"
+                : "INT";
+        toast.success(`+10 ${focusStatLabel} — focus complete!`);
         push(
-          `Focus session complete! +10 INT +3 gold +${FOCUS_STAMINA_RESTORE} stamina`,
+          `Focus session complete! +10 ${focusStatLabel} +3 gold +${FOCUS_STAMINA_RESTORE} stamina`,
           "success",
         );
       }}
@@ -396,14 +413,23 @@ function AppGate() {
 // Awards INT + XP whenever a focus cycle completes
 function FocusReward() {
   const reward = useApplyReward();
+  const { data: profile } = useProfile();
   // capture function via state-less effect: re-mount provider would call onFocusComplete prop;
   // simpler: subscribe via a tiny event
   useEffect(() => {
+    const statByPath =
+      profile?.aura_path === "swordsman"
+        ? "strength"
+        : profile?.aura_path === "tank"
+          ? "constitution"
+          : profile?.aura_path === "rogue"
+            ? "dexterity"
+            : "intelligence";
     const handler = () =>
-      reward.mutate({ xp: 10, gold: 3, stamina: FOCUS_STAMINA_RESTORE, stat: "intelligence" });
+      reward.mutate({ xp: 10, gold: 3, stamina: FOCUS_STAMINA_RESTORE, stat: statByPath });
     window.addEventListener("aura:focus-complete", handler);
     return () => window.removeEventListener("aura:focus-complete", handler);
-  }, [reward]);
+  }, [reward, profile?.aura_path]);
   return null;
 }
 
