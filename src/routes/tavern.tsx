@@ -179,6 +179,11 @@ function TavernPage() {
     return acc;
   }, {});
 
+  useEffect(() => {
+    if (!party?.id) return;
+    markTavernPartyRead(party.id);
+  }, [markTavernPartyRead, notifications, party?.id]);
+
   const loadAdventure = async (partyId: string) => {
     const { data: adv } = await supabase
       .from("party_adventures")

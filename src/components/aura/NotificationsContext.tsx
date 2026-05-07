@@ -116,7 +116,17 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const markMatchingRead = useCallback(
     async (matcher: (message: string) => boolean, dbPattern: string) => {
       if (!userId) return;
-      setNotifications((prev) => prev.map((n) => (matcher(n.message) ? { ...n, read: true } : n)));
+      setNotifications((prev) => {
+        let changed = false;
+        const next = prev.map((n) => {
+          if (!n.read && matcher(n.message)) {
+            changed = true;
+            return { ...n, read: true };
+          }
+          return n;
+        });
+        return changed ? next : prev;
+      });
       await supabase
         .from(notificationsTable)
         .update({ read: true } as never)
