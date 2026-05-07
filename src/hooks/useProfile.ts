@@ -84,6 +84,28 @@ export function useApplyReward() {
   const qc = useQueryClient();
   const { user } = useAuth();
   return useMutation({
+    onMutate: async (delta: RewardDelta) => {
+      const key = ["profile", user?.id] as const;
+      await qc.cancelQueries({ queryKey: ["profile"] });
+      const prev = qc.getQueryData<Profile | null>(key);
+      if (!prev) return { prev };
+
+      const effMaxSta = effectiveMaxStamina(prev);
+      const next: Profile = {
+        ...prev,
+        hp: Math.max(0, Math.min(prev.max_hp, prev.hp + (delta.hp ?? 0))),
+        stamina: Math.max(0, prev.stamina + (delta.stamina ?? 0)),
+        xp: prev.xp + (delta.xp ?? 0),
+        gold: Math.max(0, prev.gold + (delta.gold ?? 0)),
+      };
+      if (delta.stat === "strength") next.strength = prev.strength + 1;
+      else if (delta.stat === "intelligence") next.intelligence = prev.intelligence + 1;
+      else if (delta.stat === "constitution") next.constitution = prev.constitution + 1;
+      // Keep optimistic preview bounded when this is not a level-up flow.
+      if ((delta.xp ?? 0) <= 0) next.stamina = Math.min(effMaxSta, next.stamina);
+      qc.setQueryData(key, next);
+      return { prev };
+    },
     mutationFn: async (delta: RewardDelta) => {
       const { data: prof } = await supabase
         .from("profiles")
@@ -116,9 +138,11 @@ export function useApplyReward() {
       let hp = Math.min(max_hp, p.hp + (delta.hp ?? 0));
       let stamina = Math.max(0, p.stamina + (delta.stamina ?? 0));
       let gold = Math.max(0, p.gold + goldDelta);
+      let leveledUp = false;
 
       // Level up
       while (xp >= xpForLevel(level)) {
+        leveledUp = true;
         xp -= xpForLevel(level);
         level += 1;
         hp += HP_REGEN_PER_LEVEL_UP;
@@ -152,6 +176,8 @@ export function useApplyReward() {
       max_hp = Math.max(max_hp, canonicalMaxHpForLevel(level));
       hp = Math.min(max_hp, hp);
       stamina = Math.max(0, stamina);
+      // Overflow should only happen during level-up moments.
+      if (!leveledUp) stamina = Math.min(effMaxSta, stamina);
 
       const patch: Partial<Profile> = { xp, level, max_hp, hp, stamina, gold };
       if (delta.stat === "strength") patch.strength = p.strength + 1;
@@ -160,11 +186,21 @@ export function useApplyReward() {
 
       const { error } = await supabase.from("profiles").update(patch).eq("id", user!.id);
       if (error) throw error;
-      await supabase.rpc("try_unlock_achievements").catch(() => undefined);
+      try {
+        await supabase.rpc("try_unlock_achievements");
+      } catch {
+        // non-blocking side effect; ignore unlock check errors here
+      }
       return patch;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["profile"] });
+    onError: (_err, _delta, ctx) => {
+      if (ctx?.prev !== undefined) {
+        qc.setQueryData(["profile", user?.id], ctx.prev);
+      }
+    },
+    onSuccess: (patch) => {
+      const key = ["profile", user?.id] as const;
+      qc.setQueryData<Profile | null>(key, (prev) => (prev ? { ...prev, ...patch } : prev));
       qc.invalidateQueries({ queryKey: ["achievements"] });
     },
   });

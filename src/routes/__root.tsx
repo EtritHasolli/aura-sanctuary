@@ -229,6 +229,14 @@ function AppGate() {
     if (user && path === "/auth") router.navigate({ to: "/" });
   }, [user, loading, path, router]);
 
+  useEffect(() => {
+    const shieldDefaultPaths = new Set(["/friends", "/forge", "/equipment"]);
+    document.body.dataset.cursorDefault = shieldDefaultPaths.has(path) ? "shield" : "sword";
+    return () => {
+      delete document.body.dataset.cursorDefault;
+    };
+  }, [path]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -307,11 +315,14 @@ function StaminaRecoveryLoop() {
     };
 
     void tick();
-    const timer = window.setInterval(() => {
-      void tick();
-    }, 60_000);
+    const timer = window.setInterval(
+      () => {
+        void tick();
+      },
+      60 * 60 * 1000,
+    );
     return () => window.clearInterval(timer);
-  }, [user?.id, qc]);
+  }, [user, qc]);
 
   return null;
 }

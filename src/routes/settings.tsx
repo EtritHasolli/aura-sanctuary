@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell, Clock3, Save, ShieldCheck, UserRound } from "lucide-react";
 import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
 import { useNotifications } from "@/components/aura/NotificationsContext";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
 import { xpForLevel, type AuraPath } from "@/lib/aura/types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/settings")({
@@ -14,6 +16,71 @@ export const Route = createFileRoute("/settings")({
 
 const DESKTOP_NOTIF_KEY = "aura:desktop-notifications";
 const SOUND_NOTIF_KEY = "aura:sound-notifications";
+const SYSTEM_TIMEZONE_VALUE = "__SYSTEM__";
+const FALLBACK_TIMEZONES = [
+  "UTC",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "Europe/Athens",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Sao_Paulo",
+  "Asia/Dubai",
+  "Asia/Kolkata",
+  "Asia/Bangkok",
+  "Asia/Singapore",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+];
+
+async function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(new Error("Could not read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function cropAvatarToDataUrl(
+  imageUrl: string,
+  crop: { x: number; y: number; size: number },
+  imageRect: { x: number; y: number; width: number; height: number },
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const size = 256;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas not supported"));
+      const sx = ((crop.x - imageRect.x) / imageRect.width) * img.width;
+      const sy = ((crop.y - imageRect.y) / imageRect.height) * img.height;
+      const sw = (crop.size / imageRect.width) * img.width;
+      const sh = (crop.size / imageRect.height) * img.height;
+      ctx.imageSmoothingQuality = "high";
+      ctx.clearRect(0, 0, size, size);
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, size, size);
+      resolve(canvas.toDataURL("image/jpeg", 0.9));
+    };
+    img.onerror = () => reject(new Error("Could not load image"));
+    img.src = imageUrl;
+  });
+}
+
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [meta, b64] = dataUrl.split(",");
+  const mime = /data:(.*?);base64/.exec(meta)?.[1] || "image/jpeg";
+  const bytes = atob(b64);
+  const arr = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i += 1) arr[i] = bytes.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
 
 function SettingsPage() {
   const { data: profile } = useProfile();
@@ -29,6 +96,23 @@ function SettingsPage() {
   const [soundNotifs, setSoundNotifs] = useState(true);
   const [nextFocusMinutes, setNextFocusMinutes] = useState(focusMinutes);
   const [nextBreakMinutes, setNextBreakMinutes] = useState(breakMinutes);
+  const [avatarDraft, setAvatarDraft] = useState<string | null>(null);
+  const [avatarBlob, setAvatarBlob] = useState<Blob | null>(null);
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const [imageOffset, setImageOffset] = useState<{ x: number; y: number }>({
+    x: 0,
+    y: 0,
+  });
+  const [cropZoom, setCropZoom] = useState(1);
+  const [imageNatural, setImageNatural] = useState<{ width: number; height: number } | null>(null);
+  const previewRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const dragRef = useRef<{
+    startX: number;
+    startY: number;
+    imageX: number;
+    imageY: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -54,25 +138,218 @@ function SettingsPage() {
     if (!profile) return 0;
     return Math.max(0, xpForLevel(profile.level) - profile.xp);
   }, [profile?.level, profile?.xp]);
-
-  if (!profile) {
-    return <div className="p-6 text-muted-foreground">Loading settings...</div>;
-  }
+  const timezoneOptions = useMemo(() => FALLBACK_TIMEZONES, []);
 
   const saveProfile = async () => {
+    if (!profile) return;
     const nextDisplayName = displayName.trim();
     const nextPetName = petName.trim();
     if (!nextDisplayName || !nextPetName) {
       toast.error("Display name and pet name cannot be empty.");
       return;
     }
+    let avatarUrlToSave = avatarDraft ?? profile.avatar_url ?? null;
+    if (avatarBlob) {
+      const ext = avatarBlob.type.includes("png")
+        ? "png"
+        : avatarBlob.type.includes("webp")
+          ? "webp"
+          : "jpg";
+      const path = `${profile.id}/avatar.${ext}`;
+      const upload = await supabase.storage
+        .from("avatars")
+        .upload(path, avatarBlob, { upsert: true, contentType: avatarBlob.type });
+      if (upload.error) {
+        toast.error(upload.error.message);
+        return;
+      }
+      const pub = supabase.storage.from("avatars").getPublicUrl(path);
+      avatarUrlToSave = `${pub.data.publicUrl}?v=${Date.now()}`;
+    }
+
     await updateProfile.mutateAsync({
       display_name: nextDisplayName,
       pet_name: nextPetName,
-      timezone: timezone.trim() || "UTC",
+      timezone:
+        timezone === SYSTEM_TIMEZONE_VALUE
+          ? Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+          : timezone.trim() || "UTC",
       aura_path: auraPath ? (auraPath as AuraPath) : null,
+      avatar_url: avatarUrlToSave,
     });
+    setAvatarBlob(null);
     toast.success("Profile updated.");
+  };
+
+  const onPickAvatar = async (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file.");
+      return;
+    }
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setAvatarDraft(dataUrl);
+      setAvatarModalOpen(true);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Could not load image.");
+    }
+  };
+
+  const renderedImage = useMemo(() => {
+    const box = previewRef.current?.getBoundingClientRect();
+    if (!box || !imageNatural) {
+      return {
+        viewportWidth: 0,
+        viewportHeight: 0,
+        width: 0,
+        height: 0,
+        cropX: 0,
+        cropY: 0,
+        cropSize: 0,
+      };
+    }
+    const baseScale = Math.min(box.width / imageNatural.width, box.height / imageNatural.height);
+    const width = imageNatural.width * baseScale * cropZoom;
+    const height = imageNatural.height * baseScale * cropZoom;
+    const cropSize = Math.min(box.width, box.height) * 0.72;
+    const cropX = (box.width - cropSize) / 2;
+    const cropY = (box.height - cropSize) / 2;
+    return {
+      viewportWidth: box.width,
+      viewportHeight: box.height,
+      width,
+      height,
+      cropX,
+      cropY,
+      cropSize,
+    };
+  }, [imageNatural, cropZoom]);
+
+  const clampOffsetForDims = useCallback(
+    (nextX: number, nextY: number, width: number, height: number) => {
+      const minX = renderedImage.cropX + renderedImage.cropSize - width;
+      const maxX = renderedImage.cropX;
+      const minY = renderedImage.cropY + renderedImage.cropSize - height;
+      const maxY = renderedImage.cropY;
+      return {
+        x: Math.min(maxX, Math.max(minX, nextX)),
+        y: Math.min(maxY, Math.max(minY, nextY)),
+      };
+    },
+    [renderedImage.cropSize, renderedImage.cropX, renderedImage.cropY],
+  );
+
+  const clampImageOffset = useCallback(
+    (nextX: number, nextY: number) =>
+      clampOffsetForDims(nextX, nextY, renderedImage.width, renderedImage.height),
+    [clampOffsetForDims, renderedImage.height, renderedImage.width],
+  );
+
+  useEffect(() => {
+    if (!avatarDraft || !avatarModalOpen) return;
+    const img = new Image();
+    img.onload = () => {
+      setImageNatural({ width: img.width, height: img.height });
+      const box = previewRef.current?.getBoundingClientRect();
+      if (!box) return;
+      const scale = Math.min(box.width / img.width, box.height / img.height);
+      const width = img.width * scale;
+      const height = img.height * scale;
+      const cropSize = Math.min(box.width, box.height) * 0.72;
+      const cropX = (box.width - cropSize) / 2;
+      const cropY = (box.height - cropSize) / 2;
+      setCropZoom(1);
+      setImageOffset({
+        x: cropX + (cropSize - width) / 2,
+        y: cropY + (cropSize - height) / 2,
+      });
+    };
+    img.src = avatarDraft;
+  }, [avatarDraft, avatarModalOpen]);
+
+  useEffect(() => {
+    setImageOffset((prev) => clampImageOffset(prev.x, prev.y));
+  }, [clampImageOffset, renderedImage.height, renderedImage.width]);
+
+  useEffect(() => {
+    const move = (e: PointerEvent) => {
+      if (!dragRef.current) return;
+      const nx = dragRef.current.imageX + (e.clientX - dragRef.current.startX);
+      const ny = dragRef.current.imageY + (e.clientY - dragRef.current.startY);
+      setImageOffset(clampImageOffset(nx, ny));
+    };
+    const up = () => {
+      dragRef.current = null;
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, [clampImageOffset, renderedImage.height, renderedImage.width]);
+
+  const startCropDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || !imageNatural) return;
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      imageX: imageOffset.x,
+      imageY: imageOffset.y,
+    };
+    e.preventDefault();
+  };
+
+  const onApplyCrop = async () => {
+    if (!avatarDraft) return;
+    try {
+      const cropped = await cropAvatarToDataUrl(
+        avatarDraft,
+        {
+          x: renderedImage.cropX,
+          y: renderedImage.cropY,
+          size: renderedImage.cropSize,
+        },
+        {
+          x: imageOffset.x,
+          y: imageOffset.y,
+          width: renderedImage.width,
+          height: renderedImage.height,
+        },
+      );
+      if (!cropped) return;
+      setAvatarDraft(cropped);
+      setAvatarBlob(dataUrlToBlob(cropped));
+      setAvatarModalOpen(false);
+      toast.success("Avatar crop applied. Save profile to persist.");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Could not crop image.");
+    }
+  };
+
+  const onZoomChange = (value: number) => {
+    const nextZoom = Math.max(1, Math.min(3, value));
+    if (!imageNatural || renderedImage.width <= 0 || renderedImage.height <= 0) {
+      setCropZoom(nextZoom);
+      return;
+    }
+    const prevZoom = cropZoom;
+    const nextWidth = (renderedImage.width / prevZoom) * nextZoom;
+    const nextHeight = (renderedImage.height / prevZoom) * nextZoom;
+    const centerX = renderedImage.cropX + renderedImage.cropSize / 2;
+    const centerY = renderedImage.cropY + renderedImage.cropSize / 2;
+
+    setImageOffset((prev) => {
+      const relX = (centerX - prev.x) / renderedImage.width;
+      const relY = (centerY - prev.y) / renderedImage.height;
+      const next = {
+        x: centerX - relX * nextWidth,
+        y: centerY - relY * nextHeight,
+      };
+      return clampOffsetForDims(next.x, next.y, nextWidth, nextHeight);
+    });
+    setCropZoom(nextZoom);
   };
 
   const saveNotificationPrefs = () => {
@@ -90,6 +367,10 @@ function SettingsPage() {
     toast.success("Pomodoro settings updated.");
   };
 
+  if (!profile) {
+    return <div className="p-6 text-muted-foreground">Loading settings...</div>;
+  }
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-5">
       <h1 className="text-2xl text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
@@ -105,6 +386,49 @@ function SettingsPage() {
             </h2>
           </div>
           <label className="block text-sm text-muted-foreground">Display name</label>
+          <div className="flex items-center gap-3">
+            <div className="w-16 h-16 pixel-panel overflow-hidden bg-secondary flex items-center justify-center">
+              {avatarDraft || profile.avatar_url ? (
+                <img
+                  src={avatarDraft ?? profile.avatar_url ?? ""}
+                  alt="Avatar preview"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-primary text-lg" style={{ fontFamily: "var(--font-pixel)" }}>
+                  {profile.display_name[0]?.toUpperCase()}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3 py-1.5 border-2 border-border hover:border-primary text-xs"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                CHOOSE AVATAR
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAvatarDraft(null);
+                  setAvatarBlob(null);
+                }}
+                className="px-3 py-1.5 border-2 border-border hover:border-destructive text-xs"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                CLEAR AVATAR
+              </button>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => void onPickAvatar(e.target.files?.[0] ?? null)}
+            />
+          </div>
           <input
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
@@ -118,13 +442,19 @@ function SettingsPage() {
             className="w-full px-3 py-2 bg-input border-2 border-border focus:border-primary outline-none text-base"
             placeholder="Your companion name"
           />
-          <label className="block text-sm text-muted-foreground">Timezone (IANA)</label>
-          <input
-            value={timezone}
+          <label className="block text-sm text-muted-foreground">Timezone</label>
+          <select
+            value={timezoneOptions.includes(timezone) ? timezone : SYSTEM_TIMEZONE_VALUE}
             onChange={(e) => setTimezone(e.target.value)}
             className="w-full px-3 py-2 bg-input border-2 border-border focus:border-primary outline-none text-base"
-            placeholder="e.g. America/New_York"
-          />
+          >
+            <option value={SYSTEM_TIMEZONE_VALUE}>System default (browser)</option>
+            {timezoneOptions.map((zone) => (
+              <option key={zone} value={zone}>
+                {zone}
+              </option>
+            ))}
+          </select>
           <label className="block text-sm text-muted-foreground">Aura path (class)</label>
           <select
             value={auraPath}
@@ -259,6 +589,82 @@ function SettingsPage() {
           </button>
         </section>
       </div>
+
+      <Dialog open={avatarModalOpen} onOpenChange={setAvatarModalOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle style={{ fontFamily: "var(--font-pixel)" }}>
+              Crop Profile Picture
+            </DialogTitle>
+          </DialogHeader>
+          {avatarDraft && (
+            <div className="space-y-3">
+              <div
+                ref={previewRef}
+                className="w-full h-96 mx-auto border-2 border-border bg-secondary/20 relative overflow-hidden"
+                onPointerDown={startCropDrag}
+              >
+                {imageNatural && (
+                  <>
+                    <img
+                      src={avatarDraft}
+                      alt="Avatar source"
+                      className="absolute select-none cursor-move"
+                      style={{
+                        left: imageOffset.x,
+                        top: imageOffset.y,
+                        width: renderedImage.width,
+                        height: renderedImage.height,
+                      }}
+                      draggable={false}
+                    />
+                    <div
+                      className="absolute border-2 border-primary bg-primary/10 pointer-events-none"
+                      style={{
+                        left: renderedImage.cropX,
+                        top: renderedImage.cropY,
+                        width: renderedImage.cropSize,
+                        height: renderedImage.cropSize,
+                      }}
+                    />
+                  </>
+                )}
+              </div>
+              <label className="block text-xs text-muted-foreground">
+                Zoom
+                <input
+                  type="range"
+                  min={1}
+                  max={3}
+                  step={0.01}
+                  value={cropZoom}
+                  onChange={(e) => onZoomChange(Number(e.target.value))}
+                  className="w-full"
+                />
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Drag the image to position it inside the selection square.
+              </p>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAvatarModalOpen(false)}
+                  className="px-3 py-1.5 border-2 border-border"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onApplyCrop()}
+                  className="px-3 py-1.5 bg-primary text-primary-foreground"
+                >
+                  Apply Crop
+                </button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

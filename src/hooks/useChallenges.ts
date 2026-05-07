@@ -10,6 +10,16 @@ export interface ChallengeTemplate {
   task_blueprint: unknown;
 }
 
+export interface CustomChallengeInput {
+  name: string;
+  description: string;
+  duration_days: number;
+  type: "habit" | "daily" | "todo";
+  title: string;
+  difficulty: "trivial" | "easy" | "medium" | "hard";
+  sacred_days?: number;
+}
+
 export function useChallengeTemplates() {
   return useQuery({
     queryKey: ["challengeTemplates"],
@@ -34,6 +44,38 @@ export function useStartChallengeRun() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tasks", user?.id] });
+    },
+  });
+}
+
+export function useCreateChallengeTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CustomChallengeInput) => {
+      const blueprint = [
+        {
+          type: input.type,
+          title: input.title,
+          difficulty: input.difficulty,
+          notes: "*Custom challenge quest*",
+          sacred_days: input.type === "daily" ? (input.sacred_days ?? 127) : 127,
+        },
+      ];
+      const { data, error } = await supabase
+        .from("challenge_templates")
+        .insert({
+          name: input.name.trim(),
+          description: input.description.trim(),
+          duration_days: input.duration_days,
+          task_blueprint: blueprint,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as ChallengeTemplate;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["challengeTemplates"] });
     },
   });
 }

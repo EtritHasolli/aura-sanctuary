@@ -13,6 +13,7 @@ import { Route as TavernRouteImport } from './routes/tavern'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as QuestsRouteImport } from './routes/quests'
+import { Route as FriendsRouteImport } from './routes/friends'
 import { Route as ForgeRouteImport } from './routes/forge'
 import { Route as EquipmentRouteImport } from './routes/equipment'
 import { Route as ChallengesRouteImport } from './routes/challenges'
@@ -38,6 +39,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const QuestsRoute = QuestsRouteImport.update({
   id: '/quests',
   path: '/quests',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FriendsRoute = FriendsRouteImport.update({
+  id: '/friends',
+  path: '/friends',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ForgeRoute = ForgeRouteImport.update({
@@ -78,6 +84,7 @@ export interface FileRoutesByFullPath {
   '/challenges': typeof ChallengesRoute
   '/equipment': typeof EquipmentRoute
   '/forge': typeof ForgeRoute
+  '/friends': typeof FriendsRoute
   '/quests': typeof QuestsRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/challenges': typeof ChallengesRoute
   '/equipment': typeof EquipmentRoute
   '/forge': typeof ForgeRoute
+  '/friends': typeof FriendsRoute
   '/quests': typeof QuestsRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/challenges': typeof ChallengesRoute
   '/equipment': typeof EquipmentRoute
   '/forge': typeof ForgeRoute
+  '/friends': typeof FriendsRoute
   '/quests': typeof QuestsRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/challenges'
     | '/equipment'
     | '/forge'
+    | '/friends'
     | '/quests'
     | '/settings'
     | '/shop'
@@ -129,6 +139,7 @@ export interface FileRouteTypes {
     | '/challenges'
     | '/equipment'
     | '/forge'
+    | '/friends'
     | '/quests'
     | '/settings'
     | '/shop'
@@ -141,6 +152,7 @@ export interface FileRouteTypes {
     | '/challenges'
     | '/equipment'
     | '/forge'
+    | '/friends'
     | '/quests'
     | '/settings'
     | '/shop'
@@ -154,6 +166,7 @@ export interface RootRouteChildren {
   ChallengesRoute: typeof ChallengesRoute
   EquipmentRoute: typeof EquipmentRoute
   ForgeRoute: typeof ForgeRoute
+  FriendsRoute: typeof FriendsRoute
   QuestsRoute: typeof QuestsRoute
   SettingsRoute: typeof SettingsRoute
   ShopRoute: typeof ShopRoute
@@ -188,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/quests'
       fullPath: '/quests'
       preLoaderRoute: typeof QuestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/friends': {
+      id: '/friends'
+      path: '/friends'
+      fullPath: '/friends'
+      preLoaderRoute: typeof FriendsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/forge': {
@@ -242,6 +262,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChallengesRoute: ChallengesRoute,
   EquipmentRoute: EquipmentRoute,
   ForgeRoute: ForgeRoute,
+  FriendsRoute: FriendsRoute,
   QuestsRoute: QuestsRoute,
   SettingsRoute: SettingsRoute,
   ShopRoute: ShopRoute,

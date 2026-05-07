@@ -16,6 +16,7 @@ import { PetSprite } from "@/components/aura/PetSprite";
 import { useProfile } from "@/hooks/useProfile";
 import { useEquippedPetGear } from "@/hooks/useShop";
 import { useUserCompanions } from "@/hooks/useCompanions";
+import { useTasks, useUpdateTask, useUpdateChecklistItem } from "@/hooks/useTasks";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -64,6 +65,9 @@ function getYouTubeVideoId(raw: string) {
 function SanctuaryPage() {
   const { running, mode, secondsLeft, start, pause, reset, petState } = usePomodoro();
   const { data: profile } = useProfile();
+  const { data: tasks = [] } = useTasks();
+  const updateTask = useUpdateTask();
+  const updateChecklist = useUpdateChecklistItem();
   const petGear = useEquippedPetGear();
   const { data: companions = [] } = useUserCompanions();
   const equippedPet = companions.find((c) => c.equipped_as === "pet");
@@ -116,6 +120,7 @@ function SanctuaryPage() {
       generator: "fire" as const,
     },
   ] as const;
+  const todos = tasks.filter((t) => t.type === "todo").slice(0, 8);
 
   useEffect(() => {
     const audio = new Audio(trackSources[0].url);
@@ -483,6 +488,61 @@ function SanctuaryPage() {
                 <RotateCcw size={14} />
               </button>
             </div>
+          </div>
+
+          <div className="pixel-panel p-4">
+            <h3 className="text-sm text-primary mb-2" style={{ fontFamily: "var(--font-pixel)" }}>
+              TO-DO LIST
+            </h3>
+            {todos.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic">No to-dos right now.</p>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {todos.map((t) => (
+                  <div key={t.id} className="border border-border p-2">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={t.completed}
+                        onChange={(e) =>
+                          updateTask.mutate({
+                            id: t.id,
+                            patch: {
+                              completed: e.target.checked,
+                              last_completed_at: new Date().toISOString(),
+                            },
+                          })
+                        }
+                      />
+                      <span className={t.completed ? "line-through text-muted-foreground" : ""}>
+                        {t.title}
+                      </span>
+                    </label>
+                    {(t.checklist ?? []).length > 0 && (
+                      <div className="mt-1 pl-5 space-y-1">
+                        {(t.checklist ?? []).map((c) => (
+                          <label key={c.id} className="flex items-center gap-2 text-xs">
+                            <input
+                              type="checkbox"
+                              checked={c.done}
+                              onChange={(e) =>
+                                updateChecklist.mutate({
+                                  id: c.id,
+                                  patch: { done: e.target.checked },
+                                })
+                              }
+                            />
+                            <span className={c.done ? "line-through text-muted-foreground" : ""}>
+                              {c.title}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Lo-fi music */}

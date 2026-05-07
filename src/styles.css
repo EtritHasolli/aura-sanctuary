@@ -137,6 +137,22 @@
   * { border-color: var(--color-border); }
   html, body, #root { height: 100%; }
   body {
+    cursor: auto;
+  }
+  button,
+  a,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  select,
+  label[for] {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-display), "Courier New", monospace;

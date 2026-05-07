@@ -12,6 +12,99 @@ interface ChatbotRequestBody {
   messages?: Array<{ role?: string; content?: string }>;
 }
 
+type TavernWsEnvelope =
+  | { type: "join"; partyId?: string }
+  | { type: "leave"; partyId?: string }
+  | { type: "chat"; partyId?: string; message?: unknown };
+
+const tavernRooms = new Map<string, Set<WebSocket>>();
+const tavernSocketParty = new WeakMap<WebSocket, string | null>();
+
+function leaveTavernRoom(socket: WebSocket) {
+  const prevPartyId = tavernSocketParty.get(socket);
+  if (!prevPartyId) return;
+  const room = tavernRooms.get(prevPartyId);
+  if (!room) return;
+  room.delete(socket);
+  if (room.size === 0) tavernRooms.delete(prevPartyId);
+  tavernSocketParty.set(socket, null);
+}
+
+function joinTavernRoom(socket: WebSocket, partyId: string) {
+  leaveTavernRoom(socket);
+  const room = tavernRooms.get(partyId) ?? new Set<WebSocket>();
+  room.add(socket);
+  tavernRooms.set(partyId, room);
+  tavernSocketParty.set(socket, partyId);
+}
+
+function broadcastTavernMessage(partyId: string, payload: unknown) {
+  const room = tavernRooms.get(partyId);
+  if (!room || room.size === 0) return;
+  const raw = JSON.stringify(payload);
+  for (const client of room) {
+    try {
+      client.send(raw);
+    } catch {
+      // Ignore broken sockets; close handler will prune references.
+    }
+  }
+}
+
+function handleTavernSocket(serverSocket: WebSocket) {
+  tavernSocketParty.set(serverSocket, null);
+
+  serverSocket.addEventListener("message", (event) => {
+    try {
+      const env = JSON.parse(String(event.data ?? "")) as TavernWsEnvelope;
+      if (env.type === "join") {
+        const partyId = typeof env.partyId === "string" ? env.partyId.trim() : "";
+        if (!partyId) return;
+        joinTavernRoom(serverSocket, partyId);
+        return;
+      }
+      if (env.type === "leave") {
+        leaveTavernRoom(serverSocket);
+        return;
+      }
+      if (env.type === "chat") {
+        const partyId = typeof env.partyId === "string" ? env.partyId.trim() : "";
+        const activeParty = tavernSocketParty.get(serverSocket);
+        if (!partyId || activeParty !== partyId) return;
+        if (!env.message || typeof env.message !== "object") return;
+        broadcastTavernMessage(partyId, { type: "chat", message: env.message });
+      }
+    } catch {
+      // Ignore malformed websocket payloads.
+    }
+  });
+
+  const cleanup = () => leaveTavernRoom(serverSocket);
+  serverSocket.addEventListener("close", cleanup);
+  serverSocket.addEventListener("error", cleanup);
+}
+
+function maybeHandleTavernWsUpgrade(request: Request): Response | null {
+  const url = new URL(request.url);
+  if (url.pathname !== "/ws/tavern") return null;
+
+  if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") {
+    return new Response("Expected WebSocket upgrade", { status: 426 });
+  }
+  if (typeof (globalThis as { WebSocketPair?: unknown }).WebSocketPair !== "function") {
+    return new Response("WebSocketPair not supported in this runtime", { status: 501 });
+  }
+
+  const PairCtor = (globalThis as { WebSocketPair: new () => { 0: WebSocket; 1: WebSocket } })
+    .WebSocketPair;
+  const pair = new PairCtor();
+  const clientSocket = pair[0];
+  const serverSocket = pair[1];
+  serverSocket.accept();
+  handleTavernSocket(serverSocket);
+  return new Response(null, { status: 101, webSocket: clientSocket } as ResponseInit & { webSocket: WebSocket });
+}
+
 const AURA_APP_CONTEXT = `
 You are Aura Guide for Aura Sanctuary, a productivity RPG app.
 
@@ -36,6 +129,9 @@ Assistant goals:
 - Give step-by-step instructions in Aura UI terms.
 - Be concise, friendly, and accurate to the app behavior.
 - If unsure, state uncertainty rather than inventing facts.
+- Speak in the voice of an old wise mage: archaic but clear, warm, and helpful.
+- Use light flavor (e.g., "adventurer", "arcane", "sanctuary"), but do not overdo roleplay.
+- Keep formatting readable with short paragraphs and bullets where useful.
 `;
 
 function getGroqApiKey(env: unknown): string | null {
@@ -178,6 +274,8 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     const url = new URL(request.url);
+    const wsResponse = maybeHandleTavernWsUpgrade(request);
+    if (wsResponse) return wsResponse;
     if (url.pathname === "/api/chatbot") {
       try {
         return await handleChatbotRequest(request, env);

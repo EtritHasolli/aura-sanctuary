@@ -39,3 +39,33 @@ export function isSacredToday(
   const dow = jsDayOfWeekInTimeZone(timeZone, instant);
   return ((sacredDaysMask >> dow) & 1) === 1;
 }
+
+export function isDailyDueByRepeat(
+  todayLocalDate: string,
+  repeatEvery: number,
+  repeatUnit: "day" | "week" | "month" | "year",
+  anchorDate: string | null | undefined,
+): boolean {
+  const every = Math.max(1, Number.isFinite(repeatEvery) ? Math.floor(repeatEvery) : 1);
+  const anchor = anchorDate && /^\d{4}-\d{2}-\d{2}$/.test(anchorDate) ? anchorDate : todayLocalDate;
+  const [ay, am, ad] = anchor.split("-").map(Number);
+  const [ty, tm, td] = todayLocalDate.split("-").map(Number);
+  const aUtc = Date.UTC(ay, am - 1, ad);
+  const tUtc = Date.UTC(ty, tm - 1, td);
+  if (tUtc < aUtc) return false;
+
+  if (repeatUnit === "day") {
+    const days = Math.floor((tUtc - aUtc) / 86400000);
+    return days % every === 0;
+  }
+  if (repeatUnit === "week") {
+    const days = Math.floor((tUtc - aUtc) / 86400000);
+    return days % (every * 7) === 0;
+  }
+  if (repeatUnit === "month") {
+    const months = (ty - ay) * 12 + (tm - am);
+    return months >= 0 && months % every === 0 && td === ad;
+  }
+  const years = ty - ay;
+  return years >= 0 && years % every === 0 && tm === am && td === ad;
+}

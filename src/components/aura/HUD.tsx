@@ -1,5 +1,6 @@
 import { useProfile } from "@/hooks/useProfile";
 import { useAchievements } from "@/hooks/useAchievements";
+import { useNavigate } from "@tanstack/react-router";
 import {
   effectiveConstitution,
   effectiveIntelligence,
@@ -44,10 +45,10 @@ function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      className="w-8 h-8 flex items-center justify-center border-2 border-border hover:border-primary transition-colors"
+      className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
       title={dark ? "Switch to light mode" : "Switch to dark mode"}
     >
-      {dark ? <Sun size={14} /> : <Moon size={14} />}
+      {dark ? <Sun size={18} /> : <Moon size={18} />}
     </button>
   );
 }
@@ -88,20 +89,45 @@ function Bar({
 function NotificationsBell() {
   const { notifications, unread, markAllRead, clear } = useNotifications();
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
 
   const toggle = () => {
     if (!open) markAllRead();
     setOpen((o) => !o);
   };
 
+  const targetForMessage = (
+    message: string,
+  ): { to: string; search?: Record<string, string> } | null => {
+    const lower = message.toLowerCase();
+    const inviteMatch = message.match(/\/tavern\?invite=([0-9a-f-]{36})/i);
+    if (inviteMatch) {
+      return { to: "/tavern", search: { invite: inviteMatch[1] } };
+    }
+    if (lower.includes("friend request") || lower.includes("accepted your friend request")) {
+      return { to: "/friends" };
+    }
+    if (lower.includes("party")) {
+      return { to: "/tavern" };
+    }
+    return null;
+  };
+
+  const onNotificationClick = (message: string) => {
+    const target = targetForMessage(message);
+    if (!target) return;
+    setOpen(false);
+    void navigate({ to: target.to, search: target.search });
+  };
+
   return (
     <div className="relative">
       <button
         onClick={toggle}
-        className="relative w-8 h-8 flex items-center justify-center border-2 border-border hover:border-primary transition-colors"
+        className="relative w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
         title="Notifications"
       >
-        <Bell size={14} />
+        <Bell size={18} />
         {unread > 0 && (
           <span
             className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 bg-destructive text-destructive-foreground flex items-center justify-center text-[9px]"
@@ -137,14 +163,16 @@ function NotificationsBell() {
               {notifications.map((n) => (
                 <div
                   key={n.id}
-                  className={`px-2 py-1.5 border-l-2 text-xs ${
+                  className={`px-2 py-1.5 border-l-2 text-xs transition-colors ${
                     n.type === "success"
                       ? "border-primary text-primary"
                       : n.type === "warning"
                         ? "border-[color:var(--color-gold)] text-[color:var(--color-gold)]"
                         : "border-accent text-foreground"
-                  }`}
+                  } ${targetForMessage(n.message) ? "cursor-pointer hover:bg-secondary/50" : ""}`}
                   style={{ fontFamily: "var(--font-display)" }}
+                  onClick={() => onNotificationClick(n.message)}
+                  title={targetForMessage(n.message) ? "Open related page" : undefined}
                 >
                   {n.message}
                   <div className="text-[10px] text-muted-foreground mt-0.5">
@@ -180,10 +208,18 @@ export function HUD() {
       <div className="flex items-center gap-4 flex-wrap">
         {/* Avatar + Pet */}
         <div className="flex items-center gap-3">
-          <div className="w-14 h-14 pixel-panel flex items-center justify-center bg-secondary">
-            <span style={{ fontFamily: "var(--font-pixel)" }} className="text-primary text-lg">
-              {profile.display_name[0]?.toUpperCase()}
-            </span>
+          <div className="w-14 h-14 pixel-panel flex items-center justify-center bg-secondary overflow-hidden">
+            {profile.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                alt="Profile avatar"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span style={{ fontFamily: "var(--font-pixel)" }} className="text-primary text-lg">
+                {profile.display_name[0]?.toUpperCase()}
+              </span>
+            )}
           </div>
           <div className="w-14 h-14 flex items-center justify-center">
             <PetSprite

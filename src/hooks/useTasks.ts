@@ -1,12 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Task, TaskType, Difficulty, TaskChecklistItem, Tag } from "@/lib/aura/types";
+import type {
+  Task,
+  TaskType,
+  Difficulty,
+  RepeatUnit,
+  TaskChecklistItem,
+  Tag,
+} from "@/lib/aura/types";
 import { useAuth } from "./useAuth";
+import { toast } from "sonner";
 
 function mergeTasks(
   tasks: Task[],
   checklistRows: TaskChecklistItem[],
-  tagRows: { task_id: string; tags: Pick<Tag, "id" | "name"> | null }[],
+  tagRows: { task_id: string; tag_id: string }[],
+  tagsById: Map<string, Pick<Tag, "id" | "name">>,
 ): Task[] {
   const clMap = new Map<string, TaskChecklistItem[]>();
   for (const row of checklistRows) {
@@ -18,9 +27,10 @@ function mergeTasks(
 
   const tagMap = new Map<string, Pick<Tag, "id" | "name">[]>();
   for (const row of tagRows) {
-    if (!row.tags) continue;
+    const tag = tagsById.get(row.tag_id);
+    if (!tag) continue;
     const arr = tagMap.get(row.task_id) ?? [];
-    arr.push(row.tags);
+    arr.push(tag);
     tagMap.set(row.task_id, arr);
   }
 
@@ -40,33 +50,63 @@ export function useTasks() {
     queryKey: ["tasks", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      await supabase.rpc("refresh_user_dailies");
-      await supabase.rpc("apply_party_shadow_from_missed_dailies").catch(() => undefined);
+      // Keep task rendering resilient even when daily-maintenance RPC fails.
+      try {
+        await supabase.rpc("refresh_user_dailies");
+      } catch {
+        // no-op
+      }
+      try {
+        await supabase.rpc("apply_party_shadow_from_missed_dailies");
+      } catch {
+        // no-op
+      }
+      try {
+        await supabase.rpc("apply_due_party_adventure_damage_for_user");
+      } catch {
+        // no-op
+      }
 
       const { data: tasks, error } = await supabase
         .from("tasks")
         .select("*")
-        .eq("user_id", user!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       const base = (tasks ?? []) as Task[];
       const ids = base.map((t) => t.id);
       if (ids.length === 0) return base;
 
-      const [{ data: checklistRows, error: clErr }, { data: tagJoin, error: tagErr }] =
-        await Promise.all([
-          supabase.from("task_checklist_items").select("*").in("task_id", ids).order("position"),
-          supabase.from("task_tags").select("task_id, tags(id, name)").in("task_id", ids),
-        ]);
-      if (clErr) throw clErr;
-      if (tagErr) throw tagErr;
+      const checklistReq = supabase
+        .from("task_checklist_items")
+        .select("*")
+        .in("task_id", ids)
+        .order("position");
+      const tagJoinReq = supabase.from("task_tags").select("task_id, tag_id").in("task_id", ids);
 
-      const tagsFlat = (tagJoin ?? []) as unknown as {
-        task_id: string;
-        tags: Pick<Tag, "id" | "name"> | null;
-      }[];
+      const [{ data: checklistRows, error: clErr }, { data: taskTagRows, error: ttErr }] =
+        await Promise.all([checklistReq, tagJoinReq]);
 
-      return mergeTasks(base, (checklistRows ?? []) as TaskChecklistItem[], tagsFlat);
+      // Never block rendering core tasks due to optional relationships.
+      const safeChecklist = clErr ? [] : ((checklistRows ?? []) as TaskChecklistItem[]);
+      const safeTaskTags = ttErr
+        ? []
+        : ((taskTagRows ?? []) as { task_id: string; tag_id: string }[]);
+      const tagIds = Array.from(new Set(safeTaskTags.map((r) => r.tag_id)));
+
+      let tagsById = new Map<string, Pick<Tag, "id" | "name">>();
+      if (tagIds.length > 0) {
+        const { data: tagRows, error: tagsErr } = await supabase
+          .from("tags")
+          .select("id, name")
+          .in("id", tagIds);
+        if (!tagsErr) {
+          tagsById = new Map(
+            (tagRows ?? []).map((t) => [t.id as string, { id: t.id, name: t.name }]),
+          );
+        }
+      }
+
+      return mergeTasks(base, safeChecklist, safeTaskTags, tagsById);
     },
   });
 }
@@ -82,6 +122,8 @@ export function useCreateTask() {
       difficulty?: Difficulty;
       source_note_id?: string;
       sacred_days?: number;
+      repeat_every?: number;
+      repeat_unit?: RepeatUnit;
     }) => {
       const { data, error } = await supabase
         .from("tasks")
@@ -93,6 +135,8 @@ export function useCreateTask() {
           difficulty: input.difficulty ?? "easy",
           source_note_id: input.source_note_id ?? null,
           sacred_days: input.sacred_days ?? 127,
+          repeat_every: input.repeat_every ?? 1,
+          repeat_unit: input.repeat_unit ?? "day",
         })
         .select()
         .single();
@@ -100,6 +144,10 @@ export function useCreateTask() {
       return data as Task;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+    onError: (error) => {
+      const msg = error instanceof Error ? error.message : "Failed to create quest";
+      toast.error(msg);
+    },
   });
 }
 

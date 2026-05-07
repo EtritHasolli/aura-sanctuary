@@ -32,7 +32,7 @@ export function AiAssistant() {
     {
       role: "assistant",
       content:
-        "Hi, I am Aura Guide. Ask me anything about tasks, stats, classes, boss fights, shop, companions, or settings.",
+        "Greetings, adventurer. I am Aura Guide, an old keeper of this sanctuary's lore. Ask of tasks, stats, paths, boss battles, shop, companions, or settings.",
     },
   ]);
   const [offset, setOffset] = useState(loadSavedPosition);

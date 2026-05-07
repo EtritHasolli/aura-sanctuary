@@ -51,6 +51,11 @@ All **habits**, **dailies**, and **to-dos** use a **difficulty** tier. On a **po
 | medium | 10 |
 | hard | 18 |
 
+Notes:
+
+- Habit **plus** does **not** directly heal HP.
+- Habit **minus** removes HP by the table above.
+
 Implementation: `completePositive` / `negative` in `src/routes/quests.tsx` call `useApplyReward` with the appropriate delta.
 
 ---
@@ -84,11 +89,12 @@ All of the above flows converge on **`useApplyReward`**, which:
    - Subtracts `xpForLevel(level)` from `xp`.
    - Increments `level`.
    - Adds **+10 HP** (regen on level-up) and caps HP by current `max_hp`.
-   - Adds **+50 stamina**, capped by **effective max stamina** (includes equip max stamina bonus).
-5. Applies direct **HP** and **stamina** deltas from the request, clamped to `[0, max_hp]` and `[0, effectiveMaxStamina]`.
-6. **Death handling:** if after all changes `hp <= 0`, the profile is penalized: `level = max(1, level - 1)`, `gold = floor(gold * 0.8)`, `hp = max_hp`, `xp = 0`.
-7. Recomputes **`max_hp`** at least to **`canonicalMaxHpForLevel(level)`** = `50 + (level - 1) * 10` (must match DB default at level 1).
-8. Writes the patch; then calls **`try_unlock_achievements`** (best-effort).
+   - Adds **+50 stamina** (overflow is allowed during level-up moments).
+5. Applies direct **HP** and **stamina** deltas from the request.
+6. If no level-up occurred in this reward call, stamina is clamped to effective max. If level-up occurred, temporary overflow is preserved.
+7. **Death handling:** if after all changes `hp <= 0`, the profile is penalized: `level = max(1, level - 1)`, `gold = floor(gold * 0.8)`, `hp = max_hp`, `xp = 0`.
+8. Recomputes **`max_hp`** at least to **`canonicalMaxHpForLevel(level)`** = `50 + (level - 1) * 10` (must match DB default at level 1).
+9. Writes the patch; then calls **`try_unlock_achievements`** (best-effort).
 
 Constants in `useProfile.ts`: `STAMINA_ON_LEVEL_UP = 50`, `HP_REGEN_PER_LEVEL_UP = 10`, `BASE_MAX_HP = 50`, `MAX_HP_PER_LEVEL_UP = 10`.
 
@@ -112,7 +118,7 @@ So early levels are gentle; later levels grow faster than linearly (quadratic te
 
 ### Passive regen (`apply_stamina_regen`)
 
-The client polls this RPC about every minute (`StaminaRecoveryLoop` in `src/routes/__root.tsx`). Defaults: **5-minute** ticks, **+1 stamina** per tick (see migration `20260507008600_equipment_effective_stats_in_rpcs.sql`).
+The client polls this RPC about every hour (`StaminaRecoveryLoop` in `src/routes/__root.tsx`). Defaults: **5-minute** ticks, **+1 stamina** per tick (see migration `20260507008600_equipment_effective_stats_in_rpcs.sql`), applied in batch based on elapsed time.
 
 - **Effective max:** `max_stamina + equip_max_stamina_bonus`.
 - If the stored **`last_stamina_reset_on`** is before **today’s UTC date**, stamina is set to **full effective max** and the regen clock is aligned (daily UTC reset).
@@ -139,21 +145,23 @@ The client polls this RPC about every minute (`StaminaRecoveryLoop` in `src/rout
 
 Dailies use the profile’s **IANA `timezone`** (`profiles.timezone`, default UTC) for “today” and streak logic (`src/lib/aura/dates.ts`, `src/routes/quests.tsx`).
 
-- **Sacred days:** `sacred_days` is a **bitmask** — bit `d` set means the daily is due on weekday `d` (Sun = 1<<0 … Sat = 1<<6). `127` means every day.
-- **Complete (plus):** Only if today is a sacred day and the daily was **not** already completed for **today’s local calendar date** (`last_completed_local_date`). Awards difficulty XP + gold, **+1 CON**, then sets `completed`, `last_completed_local_date`, `last_completed_at`, and updates **streak**:
+- **Repeat schedule:** each daily has `repeat_every` + `repeat_unit` (`day|week|month|year`) and an anchor date. Due checks use `isDailyDueByRepeat` on the client and `is_daily_due_on` in SQL.
+- **Complete (plus):** Only if the daily is due today by repeat schedule and it was **not** already completed for **today’s local calendar date** (`last_completed_local_date`). Awards difficulty XP + gold, **+1 CON**, then sets `completed`, `last_completed_local_date`, `last_completed_at`, and updates **streak**:
   - If last completion was **yesterday** (local), `streak_current = previous + 1`; else streak becomes **1**.
   - `streak_best` is the max of prior best and new streak.
 - **To-dos with checklist:** the UI blocks completion until **every checklist item** is done.
 
 ### To-dos
 
-- **Plus:** same XP/gold pipeline as others, **+1 INT**, marks `completed: true`. Checklist gate above.
+- **Plus:** same XP/gold pipeline as others, **+1 INT**. Checklist gate above.
+- On completion, the app removes the to-do from the active list by deleting the task.
+- If archive notes were linked via `source_task_id`, those linked notes are also deleted.
 
 ### Server-side daily refresh (`refresh_user_dailies`)
 
 Called when tasks load (`src/hooks/useTasks.ts`). Migration: `20260507120000_task_depth_tags_checklist_schedule.sql`.
 
-1. For each daily where **yesterday** was a sacred day but **`last_completed_local_date` < yesterday** → set **`streak_current = 0`** (missed day).
+1. For each daily due on **yesterday** by repeat schedule but **`last_completed_local_date` < yesterday** → set **`streak_current = 0`** (missed day).
 2. For dailies with `completed = true` but **`last_completed_local_date` < today** → set **`completed = false`** so they can be done again today.
 
 Returns JSON including `today`, `timezone`, `dow_today`, counts of resets.
@@ -162,10 +170,9 @@ Returns JSON including `today`, `timezone`, `dow_today`, counts of resets.
 
 ## 8. Party shadow — missed dailies → boss rage
 
-`apply_party_shadow_from_missed_dailies()` (migration `20260507125200_strike_buffs_rage_shadow.sql`) runs from the client task flow (with `refresh_user_dailies`). It counts dailies that **should** have been done **yesterday** (sacred bit set for yesterday’s DOW) but were not completed on or before yesterday. For each party the user is in, it adds to **`parties.boss_rage`**:
+`apply_party_shadow_from_missed_dailies()` runs from the client task flow (with `refresh_user_dailies`). It counts dailies that were due **yesterday** by repeat schedule but were not completed on or before yesterday. For each party the user is in, it adds:
 
-- **`shadow_pressure_mode = 'hardcore'`:** `+8` rage per missed daily.
-- **Otherwise (support mode):** `+2` per missed daily.
+- **`+2` boss rage per missed daily**.
 
 Rage is capped at **5000** on the party.
 
@@ -216,7 +223,7 @@ Definitions: `supabase/migrations/20260507121000_paths_skills_buffs.sql`.
 - **Tasks** are the main driver of **predictable** XP/gold and **stat specialization** by column (habit/daily/todo).
 - **Equipment** scales **XP and gold** from tasks (and indirectly helps boss **loot gold** on kill).
 - **Strength (base + equip)** scales **boss strike damage**, which also feeds **XP on strike** via `r.dmg`.
-- **Dailies** tie to **calendar + timezone**, **streaks**, and optionally **party rage** if you miss sacred days while in a party.
+- **Dailies** tie to **calendar + timezone**, **repeat schedule**, **streaks**, and optionally **party rage** if you miss due dailies while in a party.
 - **Buffs** (Focus Ward, Shadow Strike) layer on top and are enforced server-side where noted.
 
 For HTTP/RPC names useful to tools or integrations, see `docs/API.md`.
@@ -266,6 +273,22 @@ New gold-only consumables were added:
 
 They use the existing `consume_user_item` metadata effect pipeline and are intended as repeatable sinks.
 
+### Custom challenges (player-authored)
+
+Players can now create challenge templates from the Challenges page with:
+
+- task type (`habit`, `daily`, `todo`)
+- difficulty
+- duration (days)
+- custom task title/description
+- daily cadence controls via template type/duration and generated task schedule fields
+
+When a custom run starts, `start_challenge_run` creates run tasks that participate in the same daily scheduling/score flow as normal tasks.
+Challenge scoring also tracks more than to-do completion:
+
+- `daily` / `todo`: +1 score on completion toggle false -> true
+- `habit`: score increases by each `positive_count` increment
+
 ### Boss rage relief valve
 
 New trigger on `tasks` completion:
@@ -275,10 +298,10 @@ New trigger on `tasks` completion:
 
 ### Level-up stamina impact
 
-Level-up stamina no longer hard-caps to effective max during the level-up loop:
+Level-up stamina can overflow effective max:
 
-- each level-up adds `+50 stamina` as overflow.
-- overflow is temporary and naturally consumed by actions.
+- each level-up adds `+50 stamina`.
+- overflow is only preserved when that reward call actually included a level-up; non-level-up reward calls clamp stamina back to effective max.
 
 ### Path synergy
 

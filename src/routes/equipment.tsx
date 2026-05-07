@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Hammer, Shirt } from "lucide-react";
+import { Hammer, Shirt, Info } from "lucide-react";
 import { PetSprite } from "@/components/aura/PetSprite";
 import { useProfile } from "@/hooks/useProfile";
 import {
@@ -22,6 +22,7 @@ import {
   parseItemBonuses,
 } from "@/lib/aura/equipmentBonuses";
 import { toast } from "sonner";
+import { useState } from "react";
 
 export const Route = createFileRoute("/equipment")({
   head: () => ({ meta: [{ title: "Equipment — Aura" }] }),
@@ -77,6 +78,7 @@ function EquipmentPage() {
       toast.error(e instanceof Error ? e.message : "Could not unequip");
     }
   };
+  const [showInfo, setShowInfo] = useState(false);
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
@@ -84,9 +86,19 @@ function EquipmentPage() {
         <div className="flex items-center gap-3">
           <Shirt className="text-primary" size={28} />
           <div>
-            <h1 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
-              EQUIPMENT
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+                EQUIPMENT
+              </h1>
+              <button
+                type="button"
+                onClick={() => setShowInfo(true)}
+                className="text-muted-foreground hover:text-primary"
+                title="Equipment tips"
+              >
+                <Info size={16} />
+              </button>
+            </div>
             <p
               className="text-xs text-muted-foreground"
               style={{ fontFamily: "var(--font-display)" }}
@@ -355,6 +367,49 @@ function EquipmentPage() {
           ))}
         </ul>
       </section>
+      {showInfo && (
+        <div
+          className="fixed inset-0 z-[130] bg-black/50 p-4 flex items-center justify-center"
+          onClick={() => setShowInfo(false)}
+        >
+          <div
+            className="pixel-panel w-full max-w-xl p-4 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+                EQUIPMENT GUIDE
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowInfo(false)}
+                className="px-2 py-0.5 border border-border hover:border-primary text-xs"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                CLOSE
+              </button>
+            </div>
+            <ul className="list-disc pl-5 space-y-2 text-base text-muted-foreground">
+              <li>
+                <strong className="text-foreground">Equip gear:</strong> Items can boost STR, INT,
+                CON, stamina cap, XP, and gold gains.
+              </li>
+              <li>
+                <strong className="text-foreground">Loadout totals:</strong> Shows your effective
+                stats after all current gear bonuses.
+              </li>
+              <li>
+                <strong className="text-foreground">Pet preview:</strong> Reflects your currently
+                equipped visual gear set.
+              </li>
+              <li>
+                <strong className="text-foreground">Bag usage:</strong> Unequipped gear stays in
+                your bag and can be forged or re-equipped later.
+              </li>
+            </ul>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

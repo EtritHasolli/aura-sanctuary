@@ -1,5 +1,6 @@
 export type TaskType = "habit" | "daily" | "todo";
 export type Difficulty = "trivial" | "easy" | "medium" | "hard";
+export type RepeatUnit = "day" | "week" | "month" | "year";
 export type PetState = "idle" | "working" | "sleeping";
 export type AuraPath = "warden" | "scholar" | "strider" | "keeper";
 
@@ -28,6 +29,7 @@ export interface Profile {
   equip_max_stamina_bonus?: number;
   equip_xp_bonus_pct?: number;
   equip_gold_bonus_pct?: number;
+  avatar_url?: string | null;
   pet_name: string;
   pet_state: PetState;
 }
@@ -63,6 +65,9 @@ export interface Task {
   last_completed_at?: string | null;
   /** Bitmask Sun=1<<0 .. Sat=1<<6; 127 = every day. */
   sacred_days?: number;
+  repeat_every?: number;
+  repeat_unit?: RepeatUnit;
+  repeat_anchor_date?: string | null;
   streak_current?: number;
   streak_best?: number;
   last_completed_local_date?: string | null;
