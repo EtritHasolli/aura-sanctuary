@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import { Plus, Minus, Check, Trash2, FileDown, X, ExternalLink, Flame } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   useTasks,
   useCreateTask,
@@ -256,7 +257,7 @@ function TaskRow({
     setNotesText(linkedNote?.content ?? task.notes ?? "");
   }, [linkedNote?.content, task.notes, task.source_note_id]);
 
-  const completePositive = () => {
+  const completePositive = async () => {
     if (!prof) return;
     const tz = prof.timezone || "UTC";
     const today = calendarDateInTimeZone(tz);
@@ -279,7 +280,7 @@ function TaskRow({
 
     const baseXp = DIFFICULTY_XP[task.difficulty];
     const baseGold = DIFFICULTY_GOLD[task.difficulty];
-    reward.mutate({
+    await reward.mutateAsync({
       xp: baseXp,
       gold: baseGold,
       stat,
@@ -304,6 +305,22 @@ function TaskRow({
       });
     } else {
       update.mutate({ id: task.id, patch: { completed: true } });
+      if (task.difficulty === "hard") {
+        const { data } = await supabase.rpc("redeem_ghost_mercy_if_eligible", {
+          p_task_type: "todo",
+          p_task_difficulty: "hard",
+        });
+        const mercy = data as {
+          redeemed?: boolean;
+          gold_refund?: number;
+          xp_refund?: number;
+        } | null;
+        if (mercy?.redeemed) {
+          toast.success(
+            `Ghost mercy redeemed: +${mercy.xp_refund ?? 0} XP · +${mercy.gold_refund ?? 0}g`,
+          );
+        }
+      }
     }
 
     const xpOut = prof ? withXpEquipBonus(baseXp, prof) : baseXp;
@@ -346,7 +363,7 @@ function TaskRow({
         {task.type === "habit" ? (
           <>
             <button
-              onClick={completePositive}
+              onClick={() => void completePositive()}
               className="w-7 h-7 bg-primary/20 hover:bg-primary text-primary hover:text-primary-foreground border border-primary flex items-center justify-center"
             >
               <Plus size={14} />
@@ -360,7 +377,7 @@ function TaskRow({
           </>
         ) : (
           <button
-            onClick={completePositive}
+            onClick={() => void completePositive()}
             disabled={task.completed}
             className={`w-7 h-7 border-2 ${task.completed ? "bg-primary border-primary" : "border-border hover:border-primary"} flex items-center justify-center`}
           >

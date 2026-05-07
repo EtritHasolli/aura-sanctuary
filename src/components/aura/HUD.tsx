@@ -113,7 +113,7 @@ function NotificationsBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-10 z-50 w-72 pixel-panel p-2 shadow-xl">
+        <div className="absolute right-0 top-10 z-[120] w-72 pixel-panel p-2 shadow-xl">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[9px] text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
               NOTIFICATIONS
@@ -176,7 +176,7 @@ export function HUD() {
   const effCon = effectiveConstitution(profile);
 
   return (
-    <header className="border-b-2 border-border bg-card/80 backdrop-blur px-4 py-3">
+    <header className="relative z-[110] border-b-2 border-border bg-card/80 backdrop-blur px-4 py-3">
       <div className="flex items-center gap-4 flex-wrap">
         {/* Avatar + Pet */}
         <div className="flex items-center gap-3">

@@ -173,24 +173,26 @@ function SettingsPage() {
           <div className="text-sm text-muted-foreground">
             {notifications.length} total notifications, {unread} unread.
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={markAllRead}
-              className="px-3 py-2.5 border-2 border-border hover:border-primary text-sm"
-              style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
-            >
-              MARK ALL READ
-            </button>
-            <button
-              onClick={clear}
-              className="px-3 py-2.5 border-2 border-border hover:border-destructive text-sm"
-              style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
-            >
-              CLEAR ALL
-            </button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={markAllRead}
+                className="px-3 py-2.5 border-2 border-border hover:border-primary text-sm"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
+              >
+                MARK ALL READ
+              </button>
+              <button
+                onClick={clear}
+                className="px-3 py-2.5 border-2 border-border hover:border-destructive text-sm"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
+              >
+                CLEAR ALL
+              </button>
+            </div>
             <button
               onClick={saveNotificationPrefs}
-              className="ml-auto px-3 py-2.5 bg-primary text-primary-foreground text-sm"
+              className="px-3 py-2.5 bg-primary text-primary-foreground text-sm"
               style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
             >
               SAVE PREFS

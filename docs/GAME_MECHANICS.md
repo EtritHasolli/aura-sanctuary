@@ -220,3 +220,86 @@ Definitions: `supabase/migrations/20260507121000_paths_skills_buffs.sql`.
 - **Buffs** (Focus Ward, Shadow Strike) layer on top and are enforced server-side where noted.
 
 For HTTP/RPC names useful to tools or integrations, see `docs/API.md`.
+
+---
+
+## 12. Balance pass updates (May 2026)
+
+The following updates were applied after the initial mechanics rollout.
+
+### STR meta reduction and stat parity
+
+- **INT now reduces path skill cooldowns** server-side in all 4 skill RPCs.
+- Effective INT is `intelligence + equip_int_bonus`.
+- Cooldown reduction formula: `reduction_pct = floor(effective_int / 2)`, clamped to 40%.
+- Final cooldown is `floor(base_minutes * (100 - reduction_pct) / 100)` with per-skill minimums:
+  - Focus Ward: min 10m
+  - Party Mend: min 15m
+  - Shadow Strike: min 15m
+  - Second Wind: min 20m
+
+### CON-based death penalty scaling
+
+In `useApplyReward`, death penalty now scales with effective CON:
+
+- `effective_con = constitution + equip_con_bonus`
+- Gold loss percent: `max(5, 20 - floor(effective_con / 2))`
+- Level loss only happens when `effective_con < 30`
+- XP still resets to 0 on death
+
+This makes CON a defensive/safety stat rather than only a daily-assigned gain.
+
+### Mercy window (redemption quest)
+
+On death, the app stores a 24-hour `ghost_mercy` buff in `profile_buffs` with `lost_gold` and `lost_xp` metadata.
+
+- New RPC: `redeem_ghost_mercy_if_eligible(p_task_type, p_task_difficulty)`
+- Completing a **hard to-do** attempts redemption.
+- If active, player regains **50%** of stored lost gold and XP, then the mercy buff is consumed.
+
+### Gold sinks (economy longevity)
+
+New gold-only consumables were added:
+
+- `stamina-vigor-draught` (+30 stamina)
+- `hp-phoenix-salt` (+25 HP)
+
+They use the existing `consume_user_item` metadata effect pipeline and are intended as repeatable sinks.
+
+### Boss rage relief valve
+
+New trigger on `tasks` completion:
+
+- When a user marks a **to-do** completed, there is a **20% chance** to reduce each joined party's `boss_rage` by 1.
+- This gives non-strike productive activity a way to stabilize parties.
+
+### Level-up stamina impact
+
+Level-up stamina no longer hard-caps to effective max during the level-up loop:
+
+- each level-up adds `+50 stamina` as overflow.
+- overflow is temporary and naturally consumed by actions.
+
+### Path synergy
+
+`use_skill_party_mend` now checks party auras:
+
+- if any party member has active `xp_focus_bonus` (Focus Ward), Party Mend heal gets **+10%**.
+
+### Keeper skill cap fix
+
+`use_skill_second_wind` now caps stamina at **effective** max (`max_stamina + equip_max_stamina_bonus`), not base max.
+
+### About generic buff support
+
+Yes — the codebase supports temporary buff types beyond XP/Gold percentages via `profile_buffs`:
+
+- `buff_key` identifies behavior
+- `expires_at` handles TTL
+- `meta` JSON stores custom parameters (percent, counters, lost resource snapshots, etc.)
+
+Current examples now include:
+
+- `xp_focus_bonus` (`meta.pct`)
+- `boss_dmg_bonus` (`meta.pct`)
+- `ghost_mercy` (`meta.lost_gold`, `meta.lost_xp`, etc.)

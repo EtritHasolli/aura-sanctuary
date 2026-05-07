@@ -1,6 +1,12 @@
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import {
-  Outlet, Link, createRootRouteWithContext, useRouter, HeadContent, Scripts, useRouterState,
+  Outlet,
+  Link,
+  createRootRouteWithContext,
+  useRouter,
+  HeadContent,
+  Scripts,
+  useRouterState,
 } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
@@ -10,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile, useApplyReward } from "@/hooks/useProfile";
 import { HUD } from "@/components/aura/HUD";
 import { SideNav } from "@/components/aura/SideNav";
+import { AiAssistant } from "@/components/aura/AiAssistant";
 import { PomodoroProvider } from "@/components/aura/PomodoroContext";
 import { NotificationsProvider, useNotifications } from "@/components/aura/NotificationsContext";
 import { Toaster } from "@/components/ui/sonner";
@@ -21,9 +28,15 @@ function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="text-center">
-        <h1 className="text-4xl text-primary" style={{ fontFamily: "var(--font-pixel)" }}>404</h1>
+        <h1 className="text-4xl text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+          404
+        </h1>
         <p className="mt-4 text-muted-foreground">Lost in the void.</p>
-        <Link to="/" className="mt-6 inline-block px-4 py-2 bg-primary text-primary-foreground" style={{ fontFamily: "var(--font-pixel)", fontSize: 12 }}>
+        <Link
+          to="/"
+          className="mt-6 inline-block px-4 py-2 bg-primary text-primary-foreground"
+          style={{ fontFamily: "var(--font-pixel)", fontSize: 12 }}
+        >
           Return Home
         </Link>
       </div>
@@ -37,13 +50,20 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-xl text-primary" style={{ fontFamily: "var(--font-pixel)" }}>A wild bug appeared!</h1>
+        <h1 className="text-xl text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+          A wild bug appeared!
+        </h1>
         <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
         <button
-          onClick={() => { router.invalidate(); reset(); }}
+          onClick={() => {
+            router.invalidate();
+            reset();
+          }}
           className="mt-6 px-4 py-2 bg-primary text-primary-foreground"
           style={{ fontFamily: "var(--font-pixel)", fontSize: 12 }}
-        >Retry</button>
+        >
+          Retry
+        </button>
       </div>
     </div>
   );
@@ -55,13 +75,30 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Aura — The Desktop Sanctuary" },
-      { name: "description", content: "A productivity RPG where your habits power your sanctuary." },
+      {
+        name: "description",
+        content: "A productivity RPG where your habits power your sanctuary.",
+      },
       { property: "og:title", content: "Aura — The Desktop Sanctuary" },
       { name: "twitter:title", content: "Aura — The Desktop Sanctuary" },
-      { property: "og:description", content: "A productivity RPG where your habits power your sanctuary." },
-      { name: "twitter:description", content: "A productivity RPG where your habits power your sanctuary." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5b90adb9-4ddd-48ed-b6e8-4a3024c6758a/id-preview-81d33f96--e9335d2c-6c11-4c04-81b3-3c8eee4b82ff.lovable.app-1778095997293.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5b90adb9-4ddd-48ed-b6e8-4a3024c6758a/id-preview-81d33f96--e9335d2c-6c11-4c04-81b3-3c8eee4b82ff.lovable.app-1778095997293.png" },
+      {
+        property: "og:description",
+        content: "A productivity RPG where your habits power your sanctuary.",
+      },
+      {
+        name: "twitter:description",
+        content: "A productivity RPG where your habits power your sanctuary.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5b90adb9-4ddd-48ed-b6e8-4a3024c6758a/id-preview-81d33f96--e9335d2c-6c11-4c04-81b3-3c8eee4b82ff.lovable.app-1778095997293.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5b90adb9-4ddd-48ed-b6e8-4a3024c6758a/id-preview-81d33f96--e9335d2c-6c11-4c04-81b3-3c8eee4b82ff.lovable.app-1778095997293.png",
+      },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
@@ -76,8 +113,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <head><HeadContent /></head>
-      <body>{children}<Scripts /></body>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        {children}
+        <Scripts />
+      </body>
     </html>
   );
 }
@@ -190,7 +232,9 @@ function AppGate() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-primary" style={{ fontFamily: "var(--font-pixel)" }}>LOADING...</div>
+        <div className="text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+          LOADING...
+        </div>
       </div>
     );
   }
@@ -198,12 +242,19 @@ function AppGate() {
   // PomodoroProvider wraps everything so usePomodoro() is always available,
   // even during the brief render before the redirect to /auth fires.
   return (
-    <PomodoroProvider onFocusComplete={() => {
+    <PomodoroProvider
+      onFocusComplete={() => {
         toast.success("+10 INT — focus complete!");
-        push(`Focus session complete! +10 INT +3 gold +${FOCUS_STAMINA_RESTORE} stamina`, "success");
-      }}>
+        push(
+          `Focus session complete! +10 INT +3 gold +${FOCUS_STAMINA_RESTORE} stamina`,
+          "success",
+        );
+      }}
+    >
       {!user ? (
-        path === "/auth" ? <Outlet /> : null
+        path === "/auth" ? (
+          <Outlet />
+        ) : null
       ) : (
         <>
           <FocusReward />
@@ -216,6 +267,7 @@ function AppGate() {
                 <Outlet />
               </main>
             </div>
+            <AiAssistant />
           </div>
         </>
       )}
@@ -229,7 +281,8 @@ function FocusReward() {
   // capture function via state-less effect: re-mount provider would call onFocusComplete prop;
   // simpler: subscribe via a tiny event
   useEffect(() => {
-    const handler = () => reward.mutate({ xp: 10, gold: 3, stamina: FOCUS_STAMINA_RESTORE, stat: "intelligence" });
+    const handler = () =>
+      reward.mutate({ xp: 10, gold: 3, stamina: FOCUS_STAMINA_RESTORE, stat: "intelligence" });
     window.addEventListener("aura:focus-complete", handler);
     return () => window.removeEventListener("aura:focus-complete", handler);
   }, [reward]);
@@ -254,7 +307,9 @@ function StaminaRecoveryLoop() {
     };
 
     void tick();
-    const timer = window.setInterval(() => { void tick(); }, 60_000);
+    const timer = window.setInterval(() => {
+      void tick();
+    }, 60_000);
     return () => window.clearInterval(timer);
   }, [user?.id, qc]);
 

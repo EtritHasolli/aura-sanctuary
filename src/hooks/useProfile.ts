@@ -114,8 +114,7 @@ export function useApplyReward() {
       let level = p.level;
       let max_hp = Math.max(p.max_hp, canonicalMaxHpForLevel(p.level));
       let hp = Math.min(max_hp, p.hp + (delta.hp ?? 0));
-      let stamina = Math.max(0, Math.min(effMaxSta, p.stamina + (delta.stamina ?? 0)));
-      const max_stamina = p.max_stamina;
+      let stamina = Math.max(0, p.stamina + (delta.stamina ?? 0));
       let gold = Math.max(0, p.gold + goldDelta);
 
       // Level up
@@ -123,19 +122,36 @@ export function useApplyReward() {
         xp -= xpForLevel(level);
         level += 1;
         hp += HP_REGEN_PER_LEVEL_UP;
-        stamina = Math.min(effMaxSta, stamina + STAMINA_ON_LEVEL_UP);
+        // Intentional level-up overflow: make level moments impactful.
+        stamina += STAMINA_ON_LEVEL_UP;
       }
 
       // Death loop
       if (hp <= 0) {
-        level = Math.max(1, level - 1);
-        gold = Math.floor(gold * 0.8);
+        const effCon = p.constitution + (p.equip_con_bonus ?? 0);
+        const loseLevel = effCon < 30;
+        const goldPenaltyPct = Math.max(5, 20 - Math.floor(effCon / 2));
+        const lostGold = gold - Math.floor((gold * (100 - goldPenaltyPct)) / 100);
+        const lostXp = xp;
+        if (loseLevel) level = Math.max(1, level - 1);
+        gold = Math.floor((gold * (100 - goldPenaltyPct)) / 100);
         hp = max_hp;
         xp = 0;
+        await supabase.from("profile_buffs").upsert({
+          user_id: user!.id,
+          buff_key: "ghost_mercy",
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          meta: {
+            lost_gold: Math.max(0, lostGold),
+            lost_xp: Math.max(0, lostXp),
+            lose_level: loseLevel,
+          },
+        });
       }
 
       max_hp = Math.max(max_hp, canonicalMaxHpForLevel(level));
       hp = Math.min(max_hp, hp);
+      stamina = Math.max(0, stamina);
 
       const patch: Partial<Profile> = { xp, level, max_hp, hp, stamina, gold };
       if (delta.stat === "strength") patch.strength = p.strength + 1;
