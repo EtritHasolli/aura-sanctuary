@@ -1,7 +1,9 @@
+import type { Database } from "@/integrations/supabase/types";
+
 export type TaskType = "habit" | "daily" | "todo";
 export type Difficulty = "trivial" | "easy" | "medium" | "hard";
 export type RepeatUnit = "day" | "week" | "month" | "year";
-export type PetState = "idle" | "working" | "sleeping";
+export type CharacterState = "idle" | "working" | "sleeping";
 export type AuraPath = "swordsman" | "mage" | "tank" | "rogue";
 
 export const AURA_PATHS: Array<{
@@ -70,8 +72,10 @@ export interface Profile {
   equip_xp_bonus_pct?: number;
   equip_gold_bonus_pct?: number;
   avatar_url?: string | null;
-  pet_name: string;
-  pet_state: PetState;
+  /** Display label for the player's character (stored as `pet_name` in DB). */
+  character_name: string;
+  /** Pomodoro-driven pose for friend cards / profile (stored as `pet_state` in DB). */
+  character_state: CharacterState;
 }
 
 export interface Tag {
@@ -158,4 +162,24 @@ export function xpForLevel(level: number) {
   const linear = n * 24;
   const quad = Math.floor(n * n * 3.5);
   return Math.max(25, base + linear + quad);
+}
+
+/** Maps a Supabase `profiles` row to app `Profile` (DB still uses `pet_name` / `pet_state`). */
+export function profileFromDbRow(row: Database["public"]["Tables"]["profiles"]["Row"]): Profile {
+  const { pet_name, pet_state, ...rest } = row;
+  return {
+    ...rest,
+    character_name: pet_name,
+    character_state: pet_state as CharacterState,
+  };
+}
+
+export function profilePatchToDb(
+  patch: Partial<Profile>,
+): Partial<Database["public"]["Tables"]["profiles"]["Update"]> {
+  const { character_name, character_state, ...rest } = patch;
+  const out: Partial<Database["public"]["Tables"]["profiles"]["Update"]> = { ...rest };
+  if (character_name !== undefined) out.pet_name = character_name;
+  if (character_state !== undefined) out.pet_state = character_state;
+  return out;
 }

@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import type { PetState } from "./types";
+import type { CharacterState } from "./types";
 
 /** Minimal shape for inventory rows (avoids circular import with useShop). */
-export type UserItemForPetGear = {
+export type UserItemForCompanionGear = {
   equipped: boolean;
   quantity: number;
   shop_items: { slug: string; category: string; rarity?: string; metadata?: unknown } | null;
@@ -24,7 +24,7 @@ const FRONT_SLOT_ORDER: Record<string, number> = {
   weapon: 9,
 };
 
-export interface EquippedPetGearEntry {
+export interface EquippedCompanionGearEntry {
   slug: string;
   slot: string;
   rarity?: string;
@@ -37,11 +37,11 @@ function planeForSlot(slot: string): "back" | "front" {
 }
 
 function layerPlaneForGear(slug: string, slot: string): "back" | "front" {
-  return PET_EQUIPMENT_LAYER_BY_SLUG[slug]?.z ?? planeForSlot(slot);
+  return COMPANION_EQUIPMENT_LAYER_BY_SLUG[slug]?.z ?? planeForSlot(slot);
 }
 
 function slotDrawOrder(slug: string, slot: string): number {
-  const defSlot = PET_EQUIPMENT_LAYER_BY_SLUG[slug]?.slot ?? slot.toLowerCase();
+  const defSlot = COMPANION_EQUIPMENT_LAYER_BY_SLUG[slug]?.slot ?? slot.toLowerCase();
   return FRONT_SLOT_ORDER[defSlot] ?? 50;
 }
 
@@ -61,7 +61,7 @@ function rarityPalette(r?: string): { main: string; glow: string } {
 }
 
 /** Fallback pixel hint for bulk catalog gear without a bespoke illustration. */
-function GenericGearGlyph({ slot, rarity, state }: { slot: string; rarity?: string; state: PetState }) {
+function GenericGearGlyph({ slot, rarity, state }: { slot: string; rarity?: string; state: CharacterState }) {
   const o = dim(state);
   const { main, glow } = rarityPalette(rarity);
   const s = slot.toLowerCase();
@@ -151,13 +151,13 @@ type GearLayerDef = {
   slot: string;
   z: "back" | "front";
   /** Relative to SVG viewBox 0 0 16 16 — crisp-edge pixels */
-  render: (state: PetState) => ReactNode;
+  render: (state: CharacterState) => ReactNode;
 };
 
-const dim = (state: PetState) => (state === "sleeping" ? 0.5 : 1);
+const dim = (state: CharacterState) => (state === "sleeping" ? 0.5 : 1);
 
 /** Gold / brass / linen / leather / wood — readable at 16×16. */
-export const PET_EQUIPMENT_LAYER_BY_SLUG: Record<string, GearLayerDef> = {
+export const COMPANION_EQUIPMENT_LAYER_BY_SLUG: Record<string, GearLayerDef> = {
   "eq-lucky-loop-charm": {
     slot: "charm",
     z: "back",
@@ -350,9 +350,9 @@ export const PET_EQUIPMENT_LAYER_BY_SLUG: Record<string, GearLayerDef> = {
   },
 };
 
-export function deriveEquippedPetGear(items: UserItemForPetGear[] | undefined): EquippedPetGearEntry[] {
+export function deriveEquippedCompanionGear(items: UserItemForCompanionGear[] | undefined): EquippedCompanionGearEntry[] {
   if (!items?.length) return [];
-  const out: EquippedPetGearEntry[] = [];
+  const out: EquippedCompanionGearEntry[] = [];
   for (const row of items) {
     if (!row.equipped || row.quantity < 1) continue;
     const cat = row.shop_items?.category;
@@ -370,7 +370,7 @@ export function deriveEquippedPetGear(items: UserItemForPetGear[] | undefined): 
   return out;
 }
 
-function sortGearForPlane(entries: EquippedPetGearEntry[], plane: "back" | "front"): EquippedPetGearEntry[] {
+function sortGearForPlane(entries: EquippedCompanionGearEntry[], plane: "back" | "front"): EquippedCompanionGearEntry[] {
   const filtered = entries.filter((e) => layerPlaneForGear(e.slug, e.slot) === plane);
   const sorted = [...filtered].sort((a, b) => {
     if (plane === "back") {
@@ -384,31 +384,31 @@ function sortGearForPlane(entries: EquippedPetGearEntry[], plane: "back" | "fron
 }
 
 function gearGroup(
-  entries: EquippedPetGearEntry[],
+  entries: EquippedCompanionGearEntry[],
   plane: "back" | "front",
   prefix: string,
-  state: PetState,
+  state: CharacterState,
 ) {
   const list = sortGearForPlane(entries, plane);
   if (!list.length) return null;
   return list.map((e) => {
-    const def = PET_EQUIPMENT_LAYER_BY_SLUG[e.slug];
+    const def = COMPANION_EQUIPMENT_LAYER_BY_SLUG[e.slug];
     return (
-      <g key={`${prefix}-${e.slug}`} data-testid={`pet-gear-${e.slug}`}>
+      <g key={`${prefix}-${e.slug}`} data-testid={`companion-gear-${e.slug}`}>
         {def ? def.render(state) : <GenericGearGlyph slot={e.slot} rarity={e.rarity} state={state} />}
       </g>
     );
   });
 }
 
-/** Renders behind the pet body (e.g. floating charm). */
-export function PetEquipmentBack({ state, gear }: { state: PetState; gear: EquippedPetGearEntry[] }) {
+/** Renders behind the companion body (e.g. floating charm). */
+export function CompanionEquipmentBack({ state, gear }: { state: CharacterState; gear: EquippedCompanionGearEntry[] }) {
   if (!gear.length) return null;
-  return <>{gearGroup(gear, "back", "pet-gear-b", state)}</>;
+  return <>{gearGroup(gear, "back", "companion-gear-b", state)}</>;
 }
 
-/** Renders in front of the full pet silhouette (armor, wraps, head, weapon). */
-export function PetEquipmentFront({ state, gear }: { state: PetState; gear: EquippedPetGearEntry[] }) {
+/** Renders in front of the companion silhouette (armor, wraps, head, weapon). */
+export function CompanionEquipmentFront({ state, gear }: { state: CharacterState; gear: EquippedCompanionGearEntry[] }) {
   if (!gear.length) return null;
-  return <>{gearGroup(gear, "front", "pet-gear-f", state)}</>;
+  return <>{gearGroup(gear, "front", "companion-gear-f", state)}</>;
 }

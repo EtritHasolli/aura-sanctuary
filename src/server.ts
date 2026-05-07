@@ -109,7 +109,7 @@ const AURA_APP_CONTEXT = `
 You are Aura Guide for Aura Sanctuary, a productivity RPG app.
 
 Core app areas:
-- Sanctuary: pomodoro timer, ambient audio, pet sprite.
+- Sanctuary: pomodoro timer, ambient audio, companion / character sprites.
 - Quests: habits, dailies, todos with checklist, tags, sacred day scheduling and streaks.
 - Tavern: party boss strikes, rage, chat, path skills.
 - Shop/Forge/Equipment: items, consumables, cosmetics, equipment bonuses.

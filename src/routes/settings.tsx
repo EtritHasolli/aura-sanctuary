@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell, Clock3, Save, ShieldCheck, UserRound } from "lucide-react";
 import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
@@ -104,13 +105,14 @@ function SettingsPage() {
   const { focusMinutes, breakMinutes, updateDurations } = usePomodoro();
 
   const [displayName, setDisplayName] = useState("");
-  const [petName, setPetName] = useState("");
+  const [characterName, setCharacterName] = useState("");
   const [timezone, setTimezone] = useState("UTC");
   const [auraPath, setAuraPath] = useState<AuraPath | "">("");
   const [desktopNotifs, setDesktopNotifs] = useState(false);
   const [soundNotifs, setSoundNotifs] = useState(true);
   const [pathTestingOverride, setPathTestingOverride] = useState(false);
   const [pathModalOpen, setPathModalOpen] = useState(false);
+  const [settingsPathCardGifMode, setSettingsPathCardGifMode] = useState<"idle" | "stance">("idle");
   const [nextFocusMinutes, setNextFocusMinutes] = useState(focusMinutes);
   const [nextBreakMinutes, setNextBreakMinutes] = useState(breakMinutes);
   const [avatarDraft, setAvatarDraft] = useState<string | null>(null);
@@ -134,7 +136,7 @@ function SettingsPage() {
   useEffect(() => {
     if (!profile) return;
     setDisplayName(profile.display_name);
-    setPetName(profile.pet_name);
+    setCharacterName(profile.character_name);
     setTimezone(profile.timezone || "UTC");
     setAuraPath(profile.aura_path ?? "");
     setPathTestingOverride(!!profile.path_testing_override);
@@ -163,12 +165,27 @@ function SettingsPage() {
   }, [profile?.level, profile?.xp]);
   const timezoneOptions = useMemo(() => FALLBACK_TIMEZONES, []);
 
+  const effectivePathIdForCard = (auraPath || profile?.aura_path || "") as AuraPath | "";
+
+  useEffect(() => {
+    if (!effectivePathIdForCard) return;
+    setSettingsPathCardGifMode("idle");
+  }, [effectivePathIdForCard]);
+
+  useEffect(() => {
+    if (!effectivePathIdForCard) return;
+    const timer = window.setInterval(() => {
+      setSettingsPathCardGifMode((m) => (m === "idle" ? "stance" : "idle"));
+    }, 15_000);
+    return () => window.clearInterval(timer);
+  }, [effectivePathIdForCard]);
+
   const saveProfile = async () => {
     if (!profile) return;
     const nextDisplayName = displayName.trim();
-    const nextPetName = petName.trim();
-    if (!nextDisplayName || !nextPetName) {
-      toast.error("Display name and pet name cannot be empty.");
+    const nextCharacterName = characterName.trim();
+    if (!nextDisplayName || !nextCharacterName) {
+      toast.error("Display name and character name cannot be empty.");
       return;
     }
     let avatarUrlToSave = avatarDraft ?? profile.avatar_url ?? null;
@@ -196,7 +213,7 @@ function SettingsPage() {
     }
     await updateProfile.mutateAsync({
       display_name: nextDisplayName,
-      pet_name: nextPetName,
+      character_name: nextCharacterName,
       timezone:
         timezone === SYSTEM_TIMEZONE_VALUE
           ? Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
@@ -475,12 +492,12 @@ function SettingsPage() {
             className="w-full px-3 py-2 bg-input border-2 border-border focus:border-primary outline-none text-base"
             placeholder="Your adventurer name"
           />
-          <label className="block text-sm text-muted-foreground">Pet name</label>
+          <label className="block text-sm text-muted-foreground">Character name</label>
           <input
-            value={petName}
-            onChange={(e) => setPetName(e.target.value)}
+            value={characterName}
+            onChange={(e) => setCharacterName(e.target.value)}
             className="w-full px-3 py-2 bg-input border-2 border-border focus:border-primary outline-none text-base"
-            placeholder="Your companion name"
+            placeholder="Your character name"
           />
           <label className="block text-sm text-muted-foreground">Timezone</label>
           <select
@@ -502,19 +519,32 @@ function SettingsPage() {
               onClick={() => {
                 if (pathTestingOverride || !profile.aura_path) setPathModalOpen(true);
               }}
-              className={`w-full border-2 border-border bg-secondary/40 p-3 text-sm space-y-1 text-left ${
+              className={`relative w-full overflow-hidden border-2 border-border bg-secondary/40 p-3 text-sm text-left ${
                 pathTestingOverride || !profile.aura_path
                   ? "hover:border-primary hover:shadow-[0_0_14px_rgba(217,150,48,0.35)]"
                   : "cursor-default"
               }`}
             >
-              <div className="text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
-                {activePath.label}
+              <motion.img
+                key={`${activePath.id}-${settingsPathCardGifMode}`}
+                aria-hidden
+                alt=""
+                src={PATH_GIFS[activePath.id][settingsPathCardGifMode]}
+                className="pointer-events-none absolute right-2 top-2 z-0 h-[96px] w-auto max-w-[min(44%,140px)] object-contain object-top sm:h-[112px]"
+                style={{ imageRendering: "pixelated" }}
+                initial={false}
+                animate={{ y: [0, -2, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+              />
+              <div className="relative z-[1] space-y-1 min-w-0 pr-[calc(96px+0.75rem)] sm:pr-[calc(112px+1rem)]">
+                <div className="text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+                  {activePath.label}
+                </div>
+                <p className="text-muted-foreground">{activePath.fantasy}</p>
+                <p className="text-accent">{activePath.growth}</p>
+                <p className="text-muted-foreground">Skill: {activePath.skill}</p>
+                <p className="text-sm text-foreground/90 italic">{dramaticByPath[activePath.id]}</p>
               </div>
-              <p className="text-muted-foreground">{activePath.fantasy}</p>
-              <p className="text-accent">{activePath.growth}</p>
-              <p className="text-muted-foreground">Skill: {activePath.skill}</p>
-              <p className="text-sm text-foreground/90 italic">{dramaticByPath[activePath.id]}</p>
             </button>
           )}
           {!activePath && (

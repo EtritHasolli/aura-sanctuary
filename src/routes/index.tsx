@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { motion } from "framer-motion";
+import { animate, motion, useMotionValue } from "framer-motion";
 import {
   Play,
   Pause,
@@ -10,34 +10,26 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useTasks, useUpdateTask, useUpdateChecklistItem } from "@/hooks/useTasks";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import type { AuraPath } from "@/lib/aura/types";
-import swordsmanIdle from "../../characters/swordsman/idle.gif";
-import mageIdle from "../../characters/mage/idle.gif";
-import paladinIdle from "../../characters/paladin/idle.gif";
-import rogueIdle from "../../characters/rogue/idle.gif";
+import { pathCharacterSpriteSrc, pathCharacterWalkSpriteSrc } from "@/lib/aura/pathCharacterSprites";
+import { SANCTUARY_WANDER_MIN_STEP_PX } from "@/lib/aura/sanctuaryCharacterWander";
+import { useSanctuaryIdleWander } from "@/hooks/useSanctuaryIdleWander";
+import { AURA_PATHS } from "@/lib/aura/types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Sanctuary — Aura" },
-      { name: "description", content: "Your peaceful focus room with your pet companion." },
+      { name: "description", content: "Your peaceful focus room with your character and companion." },
     ],
   }),
   component: SanctuaryPage,
 });
-
-const PATH_IDLE_GIFS: Record<AuraPath, string> = {
-  swordsman: swordsmanIdle,
-  mage: mageIdle,
-  tank: paladinIdle,
-  rogue: rogueIdle,
-};
 
 function fmt(s: number) {
   const m = Math.floor(s / 60)
@@ -72,7 +64,9 @@ function getYouTubeVideoId(raw: string) {
 }
 
 function SanctuaryPage() {
-  const { running, mode, secondsLeft, start, pause, reset, petState } = usePomodoro();
+  const { running, mode, secondsLeft, start, pause, reset, characterState } = usePomodoro();
+  const characterStateRef = useRef(characterState);
+  characterStateRef.current = characterState;
   const { data: profile } = useProfile();
   const { data: tasks = [] } = useTasks();
   const updateTask = useUpdateTask();
@@ -82,7 +76,136 @@ function SanctuaryPage() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const stopGeneratedRef = useRef<(() => void) | null>(null);
 
-  const focused = petState === "working";
+  const focused = characterState === "working";
+  const pathLabel = useMemo(
+    () =>
+      profile?.aura_path != null
+        ? (AURA_PATHS.find((p) => p.id === profile.aura_path)?.label ?? profile.aura_path)
+        : "No path",
+    [profile?.aura_path],
+  );
+  const pathCharacterClickable = Boolean(profile?.aura_path);
+  const [sanctuaryTapAcknowledge, setSanctuaryTapAcknowledge] = useState(false);
+
+  const roamSanctuaryIdle =
+    pathCharacterClickable && characterState === "idle" && !sanctuaryTapAcknowledge;
+  const roamSanctuaryIdleRef = useRef(roamSanctuaryIdle);
+  roamSanctuaryIdleRef.current = roamSanctuaryIdle;
+
+  const idleWander = useSanctuaryIdleWander({
+    roaming: roamSanctuaryIdle,
+    resetHomeWhenRoamingEnds: characterState === "sleeping" || !pathCharacterClickable,
+  });
+
+  const xPan = useMotionValue(0);
+  const sanctuaryPanCtlRef = useRef<ReturnType<typeof animate> | null>(null);
+  const sanctuaryTapTimeoutRef = useRef<number | null>(null);
+  const sanctuaryPausedStrideRef = useRef<{ endX: number; dir: "left" | "right" } | null>(null);
+  const prevCharacterStateForPanRef = useRef(characterState);
+
+  const sanctuarySpriteUrl = useMemo(() => {
+    if (profile?.aura_path == null) return null;
+    const path = profile.aura_path;
+    if (sanctuaryTapAcknowledge) return pathCharacterSpriteSrc(path, "working");
+    if (characterState === "sleeping") return pathCharacterSpriteSrc(path, "sleeping");
+    if (characterState === "working") return pathCharacterSpriteSrc(path, "working");
+    if (idleWander.walkDirection === "left" || idleWander.walkDirection === "right") {
+      return pathCharacterWalkSpriteSrc(path, idleWander.walkDirection);
+    }
+    return pathCharacterSpriteSrc(path, "idle");
+  }, [
+    profile?.aura_path,
+    characterState,
+    idleWander.walkDirection,
+    sanctuaryTapAcknowledge,
+  ]);
+
+  useEffect(() => {
+    sanctuaryPanCtlRef.current?.stop();
+    const pathOk = pathCharacterClickable;
+    const panSpeed = idleWander.strideSpeedPxPerSec;
+
+    const prevChar = prevCharacterStateForPanRef.current;
+    prevCharacterStateForPanRef.current = characterState;
+
+    if (sanctuaryTapAcknowledge && characterState === "idle" && pathOk) {
+      return () => sanctuaryPanCtlRef.current?.stop();
+    }
+
+    if (!pathOk || characterState === "sleeping") {
+      sanctuaryPanCtlRef.current = animate(xPan, 0, { duration: 0, ease: "linear" });
+      return () => sanctuaryPanCtlRef.current?.stop();
+    }
+
+    if (characterState === "working") {
+      if (prevChar !== "working") {
+        idleWander.syncPanSnapshot(xPan.get());
+      }
+      return () => sanctuaryPanCtlRef.current?.stop();
+    }
+
+    const from = xPan.get();
+    const to = idleWander.targetX;
+    const dur = Math.max(0.05, Math.abs(to - from) / panSpeed);
+    sanctuaryPanCtlRef.current = animate(xPan, to, {
+      duration: dur,
+      ease: "linear",
+      onComplete: () => {
+        if (!roamSanctuaryIdleRef.current) return;
+        idleWander.onWalkStrideComplete();
+      },
+    });
+
+    return () => sanctuaryPanCtlRef.current?.stop();
+  }, [
+    characterState,
+    pathCharacterClickable,
+    sanctuaryTapAcknowledge,
+    idleWander.targetX,
+    idleWander.strideSpeedPxPerSec,
+    idleWander.syncPanSnapshot,
+    idleWander.onWalkStrideComplete,
+    xPan,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      sanctuaryPanCtlRef.current?.stop();
+      if (sanctuaryTapTimeoutRef.current != null) window.clearTimeout(sanctuaryTapTimeoutRef.current);
+    };
+  }, []);
+
+  const showNativeSleepSprite = characterState === "sleeping" && !sanctuaryTapAcknowledge;
+  const useSanctuaryStageFocusBob = characterState === "working" || sanctuaryTapAcknowledge;
+
+  const onSanctuaryPathCharacterTap = () => {
+    if (!pathCharacterClickable) return;
+    if (sanctuaryTapAcknowledge) return;
+    const dir = idleWander.walkDirection;
+    sanctuaryPausedStrideRef.current =
+      dir === "left" || dir === "right" ? { endX: idleWander.targetX, dir } : null;
+    sanctuaryPanCtlRef.current?.stop();
+    idleWander.clearStrideExpectation();
+    setSanctuaryTapAcknowledge(true);
+    if (sanctuaryTapTimeoutRef.current != null) window.clearTimeout(sanctuaryTapTimeoutRef.current);
+    sanctuaryTapTimeoutRef.current = window.setTimeout(() => {
+      sanctuaryTapTimeoutRef.current = null;
+      if (characterStateRef.current === "idle") {
+        const px = xPan.get();
+        const saved = sanctuaryPausedStrideRef.current;
+        sanctuaryPausedStrideRef.current = null;
+        if (
+          saved &&
+          Math.abs(saved.endX - px) >= SANCTUARY_WANDER_MIN_STEP_PX * 0.5
+        ) {
+          idleWander.resumeInterruptedStride(px, saved.endX, saved.dir);
+        } else {
+          idleWander.syncPanSnapshot(px);
+        }
+      }
+      setSanctuaryTapAcknowledge(false);
+    }, 2000);
+  };
   const [trackLabel, setTrackLabel] = useState("chillhop stream");
   const [trackIdx, setTrackIdx] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -453,26 +576,82 @@ function SanctuaryPage() {
               }}
             />
 
-            {/* path character center stage */}
-            <div className="absolute bottom-[21%] left-1/2 -translate-x-1/2">
-              {profile?.aura_path ? (
-                <img
-                  src={PATH_IDLE_GIFS[profile.aura_path]}
-                  alt={`${profile.aura_path} character`}
-                  className="h-[140px] w-auto object-contain"
-                />
-              ) : (
-                <div className="h-[140px] w-[120px] border-2 border-border bg-secondary/30 flex items-center justify-center text-sm text-muted-foreground">
-                  Choose path
-                </div>
-              )}
-              <p
-                className="text-center mt-2 text-primary"
-                style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
+            {/* Path character — idle stroll via pan MV; tap = 2s stance (motion stops), then resume */}
+            <div className="absolute bottom-[21%] left-1/2 -translate-x-1/2 overflow-visible px-10">
+              <motion.div
+                className={`flex flex-col items-center rounded-sm outline-none ${
+                  pathCharacterClickable
+                    ? "cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-primary"
+                    : ""
+                }`}
+                style={{ x: xPan }}
+                initial={false}
+                role={pathCharacterClickable ? "button" : undefined}
+                tabIndex={pathCharacterClickable ? 0 : undefined}
+                title={pathCharacterClickable ? "Tap for a quick acknowledgement" : undefined}
+                onClick={pathCharacterClickable ? onSanctuaryPathCharacterTap : undefined}
+                onKeyDown={
+                  pathCharacterClickable
+                    ? (e) => {
+                        if (e.key !== "Enter" && e.key !== " ") return;
+                        e.preventDefault();
+                        onSanctuaryPathCharacterTap();
+                      }
+                    : undefined
+                }
               >
-                {profile?.aura_path ? `${profile.aura_path} path` : "No path selected"} ·{" "}
-                <span className="text-muted-foreground">{petState}</span>
-              </p>
+                {profile?.aura_path && sanctuarySpriteUrl ? (
+                  showNativeSleepSprite ? (
+                    <img
+                      key={sanctuarySpriteUrl}
+                      src={sanctuarySpriteUrl}
+                      alt={`${pathLabel} sleeping`}
+                      className="h-[140px] w-auto object-contain"
+                      style={{ imageRendering: "pixelated" }}
+                    />
+                  ) : (
+                    <motion.img
+                      key={sanctuarySpriteUrl}
+                      src={sanctuarySpriteUrl}
+                      alt={`${pathLabel} character`}
+                      className="h-[140px] w-auto object-contain"
+                      style={{ imageRendering: "pixelated" }}
+                      initial={false}
+                      animate={
+                        useSanctuaryStageFocusBob
+                          ? { y: [0, -2, 0] }
+                          : idleWander.walkDirection
+                            ? { y: 0 }
+                            : { y: [0, -1, 0] }
+                      }
+                      transition={{
+                        duration: useSanctuaryStageFocusBob
+                          ? 0.6
+                          : idleWander.walkDirection
+                            ? 0.2
+                            : 1.6,
+                        repeat:
+                          useSanctuaryStageFocusBob ||
+                          (!idleWander.walkDirection && characterState === "idle")
+                            ? Infinity
+                            : 0,
+                        ease: "easeInOut",
+                      }}
+                    />
+                  )
+                ) : (
+                  <div className="h-[140px] w-[120px] border-2 border-border bg-secondary/30 flex items-center justify-center text-sm text-muted-foreground">
+                    Choose path
+                  </div>
+                )}
+                <p
+                  className="text-center mt-2 text-primary whitespace-nowrap"
+                  style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
+                >
+                  {profile?.character_name ?? "Sprig"} ·{" "}
+                  <span className="text-muted-foreground">{characterState}</span>
+                </p>
+              </motion.div>
             </div>
           </div>
         </div>

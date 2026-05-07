@@ -8,11 +8,8 @@ import {
   effectiveMaxStamina,
   effectiveStrength,
 } from "@/lib/aura/equipmentBonuses";
-import { usePomodoro } from "./PomodoroContext";
+import { pathCharacterSpriteSrc } from "@/lib/aura/pathCharacterSprites";
 import { useNotifications } from "./NotificationsContext";
-import { PetSprite } from "./PetSprite";
-import { useEquippedPetGear } from "@/hooks/useShop";
-import { useUserCompanions } from "@/hooks/useCompanions";
 import { xpForLevel } from "@/lib/aura/types";
 import {
   Coins,
@@ -28,7 +25,7 @@ import {
   Footprints,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 
 function useTheme() {
   const [dark, setDark] = useState(() => !document.documentElement.classList.contains("light"));
@@ -309,14 +306,20 @@ function NotificationsBell() {
   );
 }
 
+/** Header path portrait — larger than clip; tune for head-only crop. */
+const HUD_PATH_IDLE_SCALE = 3.5;
+/** Negative moves sprite up inside the clip (pixels). Aligns bust with avatar row. */
+const HUD_PATH_IDLE_NUDGE_Y_PX = -24;
+
 export function HUD() {
   const { data: profile } = useProfile();
   const { data: ach = [] } = useAchievements();
-  const { petState } = usePomodoro();
-  const petGear = useEquippedPetGear();
-  const { data: companions = [] } = useUserCompanions();
-  const companionSpriteKey = companions.find((c) => c.equipped_as === "pet")?.companions
-    ?.sprite_key;
+  /** Always idle in the HUD; full-body states stay on the Sanctuary screen. */
+  const hudIdleCharacterSrc = useMemo(
+    () =>
+      profile?.aura_path != null ? pathCharacterSpriteSrc(profile.aura_path, "idle") : null,
+    [profile?.aura_path],
+  );
   if (!profile) return null;
   const xpMax = xpForLevel(profile.level);
   const staCap = effectiveMaxStamina(profile);
@@ -328,7 +331,7 @@ export function HUD() {
   return (
     <header className="relative z-[110] border-b-2 border-border bg-card/80 backdrop-blur px-4 py-3">
       <div className="flex items-center gap-4 flex-wrap">
-        {/* Avatar + Pet */}
+        {/* Avatar + path character */}
         <div className="flex items-center gap-3">
           <div className="w-14 h-14 pixel-panel flex items-center justify-center bg-secondary overflow-hidden">
             {profile.avatar_url ? (
@@ -343,13 +346,27 @@ export function HUD() {
               </span>
             )}
           </div>
-          <div className="w-14 h-14 flex items-center justify-center">
-            <PetSprite
-              state={petState}
-              size={56}
-              gear={petGear}
-              companionSpriteKey={companionSpriteKey}
-            />
+          <div className="relative h-14 w-14 shrink-0 overflow-hidden" title="Path character (idle)">
+            {hudIdleCharacterSrc ? (
+              <img
+                key={hudIdleCharacterSrc}
+                src={hudIdleCharacterSrc}
+                alt=""
+                className="pointer-events-none absolute left-1/2 top-0 block w-14 max-w-none h-auto"
+                style={{
+                  imageRendering: "pixelated",
+                  transform: `translateX(-50%) translateY(${HUD_PATH_IDLE_NUDGE_Y_PX}px) scale(${HUD_PATH_IDLE_SCALE})`,
+                  transformOrigin: "top center",
+                }}
+              />
+            ) : (
+              <div
+                className="h-full w-full text-[9px] flex items-center justify-center text-muted-foreground opacity-70"
+                title="Choose a path in Settings"
+              >
+                —
+              </div>
+            )}
           </div>
         </div>
 

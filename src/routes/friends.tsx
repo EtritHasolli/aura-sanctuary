@@ -11,7 +11,7 @@ import {
   useSendFriendRequest,
   useSendFriendRequestByEmail,
 } from "@/hooks/useFriends";
-import { PetSprite } from "@/components/aura/PetSprite";
+import { CompanionSprite } from "@/components/aura/CompanionSprite";
 import { xpForLevel } from "@/lib/aura/types";
 import {
   effectiveConstitution,
@@ -417,10 +417,11 @@ function FriendsPage() {
                   ) : null}
                 </div>
                 <div className="w-12 h-12 flex items-center justify-center">
-                  <PetSprite
-                    state={f.profile.pet_state}
+                  <CompanionSprite
+                    state={f.profile.character_state}
                     size={42}
-                    companionSpriteKey={f.petSpriteKey ?? undefined}
+                    gear={[]}
+                    companionSpriteKey={f.companionSpriteKey ?? undefined}
                   />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -435,7 +436,7 @@ function FriendsPage() {
                     style={{ fontFamily: "var(--font-pixel)" }}
                   >
                     LV {f.profile.level}
-                    {f.petLabel ? ` · ${f.petLabel}` : ""}
+                    {f.companionLabel ? ` · ${f.companionLabel}` : ""}
                   </div>
                 </div>
                 <div className="w-56 space-y-1.5 pr-2">

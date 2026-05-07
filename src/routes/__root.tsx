@@ -185,7 +185,8 @@ function CustomCursorOverlay() {
       isInteractiveRef.current = !!target?.closest(interactiveSelector);
       updateCursorImage();
       el.style.opacity = "1";
-      el.style.transform = `translate(${event.clientX}px, ${event.clientY}px)`;
+      /* Hotspot at image center — matches centered cursor URL hotspots in styles.css */
+      el.style.transform = `translate(${event.clientX}px, ${event.clientY}px) translate(-50%, -50%)`;
     };
 
     const down = (event: PointerEvent) => {

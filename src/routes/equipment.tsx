@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Hammer, Shirt, Info } from "lucide-react";
-import { PetSprite } from "@/components/aura/PetSprite";
+import { CompanionSprite } from "@/components/aura/CompanionSprite";
 import { useProfile } from "@/hooks/useProfile";
 import {
   useEquipUserItem,
-  useEquippedPetGear,
+  useEquippedCompanionGear,
   useUnequipUserItem,
   useUserItems,
 } from "@/hooks/useShop";
@@ -51,7 +51,7 @@ function bonusSummary(meta: Record<string, unknown>): string {
 
 function EquipmentPage() {
   const { data: profile } = useProfile();
-  const petGear = useEquippedPetGear();
+  const companionGear = useEquippedCompanionGear();
   const { data: items = [], isLoading } = useUserItems();
   const equip = useEquipUserItem();
   const unequip = useUnequipUserItem();
@@ -159,13 +159,13 @@ function EquipmentPage() {
               PET PREVIEW
             </h2>
             <div className="px-6 py-4 bg-secondary/40 border-2 border-border">
-              <PetSprite state="idle" size={112} gear={petGear} />
+              <CompanionSprite state="idle" size={112} gear={companionGear} />
             </div>
             <p
               className="mt-2 text-[10px] text-muted-foreground text-center"
               style={{ fontFamily: "var(--font-pixel)" }}
             >
-              {profile?.pet_name ?? "Companion"} · idle
+              {profile?.character_name ?? "Companion"} · idle
             </p>
             <p
               className="mt-1 text-[9px] text-muted-foreground text-center max-w-[200px]"
@@ -416,7 +416,7 @@ function EquipmentPage() {
                 stats after all current gear bonuses.
               </li>
               <li>
-                <strong className="text-foreground">Pet preview:</strong> Reflects your currently
+                <strong className="text-foreground">Companion preview:</strong> Reflects your currently
                 equipped visual gear set.
               </li>
               <li>

@@ -1,18 +1,18 @@
 import { motion } from "framer-motion";
-import type { PetState } from "@/lib/aura/types";
-import type { EquippedPetGearEntry } from "@/lib/aura/petEquipmentLayers";
-import { PetEquipmentBack, PetEquipmentFront } from "@/lib/aura/petEquipmentLayers";
+import type { CharacterState } from "@/lib/aura/types";
+import type { EquippedCompanionGearEntry } from "@/lib/aura/companionEquipmentLayers";
+import { CompanionEquipmentBack, CompanionEquipmentFront } from "@/lib/aura/companionEquipmentLayers";
 
-export function PetSprite({
+export function CompanionSprite({
   state,
   size = 96,
   gear = [],
   companionSpriteKey,
 }: {
-  state: PetState;
+  state: CharacterState;
   size?: number;
-  /** Equipped items that map to SVG overlays (`useEquippedPetGear`). */
-  gear?: EquippedPetGearEntry[];
+  /** Equipped items that map to SVG overlays (`useEquippedCompanionGear`). */
+  gear?: EquippedCompanionGearEntry[];
   /** Companion catalog `sprite_key` when a hatched companion is equipped as pet. */
   companionSpriteKey?: string;
 }) {
@@ -47,7 +47,7 @@ export function PetSprite({
       style={{ width: size, height: size, imageRendering: "pixelated" }}
       className="relative"
     >
-      {/* Pixel pet — built with divs */}
+      {/* Pixel companion — built with divs */}
       <svg
         viewBox="0 0 16 16"
         width={size}
@@ -55,7 +55,7 @@ export function PetSprite({
         shapeRendering="crispEdges"
         style={{ imageRendering: "pixelated" }}
       >
-        <PetEquipmentBack state={state} gear={gear} />
+        <CompanionEquipmentBack state={state} gear={gear} />
         {/* body */}
         <rect x="4" y="6" width="8" height="6" fill={tint} />
         <rect x="3" y="7" width="1" height="4" fill={tint} />
@@ -80,7 +80,7 @@ export function PetSprite({
         {/* feet */}
         <rect x="5" y="12" width="2" height="1" fill={tint} />
         <rect x="9" y="12" width="2" height="1" fill={tint} />
-        <PetEquipmentFront state={state} gear={gear} />
+        <CompanionEquipmentFront state={state} gear={gear} />
       </svg>
       {state === "sleeping" && (
         <motion.span

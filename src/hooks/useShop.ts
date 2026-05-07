@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import { deriveEquippedPetGear } from "@/lib/aura/petEquipmentLayers";
+import { deriveEquippedCompanionGear } from "@/lib/aura/companionEquipmentLayers";
 
 export interface ShopItemRow {
   id: string;
@@ -81,10 +81,10 @@ export function useUserItems() {
   });
 }
 
-/** Equipped shop equipment that defines a pet sprite layer (see `PET_EQUIPMENT_LAYER_BY_SLUG`). */
-export function useEquippedPetGear() {
+/** Equipped shop equipment that defines a companion sprite layer (see `COMPANION_EQUIPMENT_LAYER_BY_SLUG`). */
+export function useEquippedCompanionGear() {
   const { data } = useUserItems();
-  return useMemo(() => deriveEquippedPetGear(data), [data]);
+  return useMemo(() => deriveEquippedCompanionGear(data), [data]);
 }
 
 export function usePurchaseShopItem() {

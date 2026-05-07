@@ -89,20 +89,20 @@ describe("usePomodoro", () => {
     expect(result.current.secondsLeft).toBe(25 * 60);
   });
 
-  it("pet state is 'working' during a focus session", () => {
+  it("character state is 'working' during a focus session", () => {
     const { result } = renderHook(() => usePomodoro(), { wrapper });
 
     act(() => {
       result.current.start();
     });
 
-    expect(result.current.petState).toBe("working");
+    expect(result.current.characterState).toBe("working");
   });
 
-  it("pet state is 'idle' when paused and recently active", () => {
+  it("character state is 'idle' when paused and recently active", () => {
     const { result } = renderHook(() => usePomodoro(), { wrapper });
 
-    expect(result.current.petState).toBe("idle");
+    expect(result.current.characterState).toBe("idle");
   });
 
   it("switches to break mode after focus completes", () => {

@@ -40,7 +40,9 @@
 
 :root {
   --radius: 0.25rem;
-  --cursor-pointer: url("/pointer.png") 0 0, auto;
+  /* Hotspots = image center @ 32×32 (matches overlay w-8 h-8 in CustomCursorOverlay) */
+  --cursor-pointer: url("/pointer.png") 16 16, auto;
+
 
   /* Midnight Calico dark palette */
   --background: #1a1714;         /* Deep Espresso */

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Profile } from "@/lib/aura/types";
-import { xpForLevel } from "@/lib/aura/types";
+import { profileFromDbRow, profilePatchToDb, xpForLevel } from "@/lib/aura/types";
 import {
   effectiveMaxStamina,
   withGoldEquipBonus,
@@ -57,7 +57,7 @@ export function useProfile() {
           if (!again.error && again.data) data = again.data;
         }
       }
-      return data as Profile | null;
+      return profileFromDbRow(data);
     },
   });
 }
@@ -69,12 +69,12 @@ export function useUpdateProfile() {
     mutationFn: async (patch: Partial<Profile>) => {
       const { data, error } = await supabase
         .from("profiles")
-        .update(patch)
+        .update(profilePatchToDb(patch))
         .eq("id", user!.id)
         .select()
         .single();
       if (error) throw error;
-      return data;
+      return profileFromDbRow(data);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["profile"] }),
   });
@@ -127,7 +127,7 @@ export function useApplyReward() {
         .eq("id", user!.id)
         .single();
       if (!prof) throw new Error("no profile");
-      const p = prof as Profile;
+      const p = profileFromDbRow(prof);
 
       const effMaxSta = effectiveMaxStamina(p);
       let xpGain = delta.xp ?? 0;
@@ -224,7 +224,7 @@ export function useApplyReward() {
       else if (delta.stat === "dexterity")
         patch.dexterity = Math.max(0, dexterity + statAmount);
 
-      const { error } = await supabase.from("profiles").update(patch).eq("id", user!.id);
+      const { error } = await supabase.from("profiles").update(profilePatchToDb(patch)).eq("id", user!.id);
       if (error) throw error;
       try {
         await supabase.rpc("try_unlock_achievements");

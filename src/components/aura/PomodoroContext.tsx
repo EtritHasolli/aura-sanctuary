@@ -12,7 +12,7 @@ interface Ctx {
   pause: () => void;
   reset: () => void;
   updateDurations: (durations: { focusMinutes: number; breakMinutes: number }) => void;
-  petState: "idle" | "working" | "sleeping";
+  characterState: "idle" | "working" | "sleeping";
   onCycleComplete?: (cb: () => void) => void;
 }
 
@@ -70,15 +70,15 @@ export function PomodoroProvider({ children, onFocusComplete }: { children: Reac
     return () => clearInterval(t);
   }, [running, mode, focusMinutes, breakMinutes]);
 
-  const petState: Ctx["petState"] =
+  const characterState: Ctx["characterState"] =
     running && mode === "focus" ? "working" :
     idleTicks > 60 ? "sleeping" : "idle";
 
   // toggle the focused theme on the html element when working
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.toggle("theme-focused", petState === "working");
-  }, [petState]);
+    root.classList.toggle("theme-focused", characterState === "working");
+  }, [characterState]);
 
   const updateDurations: Ctx["updateDurations"] = ({ focusMinutes, breakMinutes }) => {
     const nextFocus = sanitizeMinutes(focusMinutes, FOCUS_SECS / 60);
@@ -103,7 +103,7 @@ export function PomodoroProvider({ children, onFocusComplete }: { children: Reac
     pause: () => setRunning(false),
     reset: () => { setRunning(false); setMode("focus"); setSecondsLeft(focusMinutes * 60); },
     updateDurations,
-    petState,
+    characterState,
   };
   return <PomodoroCtx.Provider value={value}>{children}</PomodoroCtx.Provider>;
 }
