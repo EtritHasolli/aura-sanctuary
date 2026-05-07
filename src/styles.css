@@ -40,6 +40,7 @@
 
 :root {
   --radius: 0.25rem;
+  --cursor-pointer: url("/pointer.png") 0 0, auto;
 
   /* Midnight Calico dark palette */
   --background: #1a1714;         /* Deep Espresso */
@@ -136,8 +137,14 @@
 @layer base {
   * { border-color: var(--color-border); }
   html, body, #root { height: 100%; }
+  .custom-cursor-active,
+  .custom-cursor-active *,
+  .custom-cursor-active *::before,
+  .custom-cursor-active *::after {
+    cursor: none !important;
+  }
   body {
-    cursor: auto;
+    cursor: var(--cursor-pointer);
   }
   button,
   a,
@@ -147,7 +154,7 @@
   input[type="reset"],
   select,
   label[for] {
-    cursor: pointer;
+    cursor: var(--cursor-pointer);
   }
   button:disabled {
     cursor: not-allowed;

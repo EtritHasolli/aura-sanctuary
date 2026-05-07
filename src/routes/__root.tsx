@@ -153,12 +153,24 @@ function CustomCursorOverlay() {
   const isInteractiveRef = useRef(false);
 
   useEffect(() => {
+    const canUseCustomCursor = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    if (!canUseCustomCursor) return;
+
+    const preloadImage = (src: string) =>
+      new Promise<void>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error(`Failed to load ${src}`));
+        img.src = src;
+      });
+
+    let active = false;
     const interactiveSelector =
       'button, a, [role="button"], input[type="button"], input[type="submit"], input[type="reset"], select, label[for]';
 
     const updateCursorImage = () => {
       const el = cursorRef.current;
-      if (!el) return;
+      if (!el || !active) return;
       if (isPressedRef.current) {
         el.src = "/click.png";
         return;
@@ -193,14 +205,27 @@ function CustomCursorOverlay() {
       el.style.opacity = "0";
     };
 
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerdown", down);
-    window.addEventListener("pointerup", up);
-    window.addEventListener("pointercancel", up);
-    window.addEventListener("blur", hide);
-    document.addEventListener("mouseleave", hide);
+    const enable = () => {
+      if (active) return;
+      active = true;
+      document.documentElement.classList.add("custom-cursor-active");
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerdown", down);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+      window.addEventListener("blur", hide);
+      document.addEventListener("mouseleave", hide);
+    };
+
+    void Promise.all([
+      preloadImage("/cursor.png"),
+      preloadImage("/pointer.png"),
+      preloadImage("/click.png"),
+    ]).then(enable);
 
     return () => {
+      active = false;
+      document.documentElement.classList.remove("custom-cursor-active");
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerdown", down);
       window.removeEventListener("pointerup", up);
