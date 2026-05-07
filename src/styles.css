@@ -163,6 +163,31 @@
 }
 
 @layer utilities {
+  /* Readability floor for micro text across UI panels/buttons. */
+  .text-\[10px\] {
+    font-size: 13px !important;
+    line-height: 1.35;
+  }
+  .text-\[11px\] {
+    font-size: 14px !important;
+    line-height: 1.35;
+  }
+  .text-xs {
+    font-size: 14px !important;
+    line-height: 1.4;
+  }
+  .text-sm {
+    font-size: 16px !important;
+    line-height: 1.35;
+  }
+  /* Catch tiny inline styles used in TSX (fontSize: 9/10/11). */
+  [style*="font-size: 9px"],
+  [style*="font-size: 10px"],
+  [style*="font-size: 11px"] {
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+  }
+
   .pixel-border {
     box-shadow:
       0 0 0 2px var(--background),

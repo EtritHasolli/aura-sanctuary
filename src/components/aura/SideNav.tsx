@@ -30,7 +30,7 @@ const items = [
 export function SideNav() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   return (
-    <nav className="w-20 lg:w-44 bg-card border-r-2 border-border flex flex-col py-4 gap-1 shrink-0">
+    <nav className="w-24 lg:w-56 bg-card border-r-2 border-border flex flex-col py-4 gap-1 shrink-0">
       <div className="px-3 mb-4 hidden lg:block">
         <h1 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
           AURA
