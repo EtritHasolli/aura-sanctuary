@@ -8,7 +8,7 @@ import {
   Scripts,
   useRouterState,
 } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import appCss from "../styles.css?url";
 import { supabase } from "@/integrations/supabase/client";
@@ -138,11 +138,87 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <NotificationsProvider>
+        <CustomCursorOverlay />
         <PersistentYouTubeAudio />
         <AppGate />
         <Toaster />
       </NotificationsProvider>
     </QueryClientProvider>
+  );
+}
+
+function CustomCursorOverlay() {
+  const cursorRef = useRef<HTMLImageElement | null>(null);
+  const isPressedRef = useRef(false);
+  const isInteractiveRef = useRef(false);
+
+  useEffect(() => {
+    const interactiveSelector =
+      'button, a, [role="button"], input[type="button"], input[type="submit"], input[type="reset"], select, label[for]';
+
+    const updateCursorImage = () => {
+      const el = cursorRef.current;
+      if (!el) return;
+      if (isPressedRef.current) {
+        el.src = "/click.png";
+        return;
+      }
+      el.src = isInteractiveRef.current ? "/pointer.png" : "/cursor.png";
+    };
+
+    const move = (event: PointerEvent) => {
+      const el = cursorRef.current;
+      if (!el) return;
+      const target = event.target as Element | null;
+      isInteractiveRef.current = !!target?.closest(interactiveSelector);
+      updateCursorImage();
+      el.style.opacity = "1";
+      el.style.transform = `translate(${event.clientX}px, ${event.clientY}px)`;
+    };
+
+    const down = (event: PointerEvent) => {
+      move(event);
+      isPressedRef.current = true;
+      updateCursorImage();
+    };
+
+    const up = () => {
+      isPressedRef.current = false;
+      updateCursorImage();
+    };
+
+    const hide = () => {
+      const el = cursorRef.current;
+      if (!el) return;
+      el.style.opacity = "0";
+    };
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerdown", down);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    window.addEventListener("blur", hide);
+    document.addEventListener("mouseleave", hide);
+
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      window.removeEventListener("blur", hide);
+      document.removeEventListener("mouseleave", hide);
+    };
+  }, []);
+
+  return (
+    <img
+      ref={cursorRef}
+      src="/cursor.png"
+      alt=""
+      aria-hidden="true"
+      className="fixed left-0 top-0 z-[9999] w-8 h-8 pointer-events-none select-none opacity-0"
+      style={{ transform: "translate(-100px, -100px)" }}
+    />
   );
 }
 
