@@ -13,8 +13,9 @@ import { PetSprite } from "./PetSprite";
 import { useEquippedPetGear } from "@/hooks/useShop";
 import { useUserCompanions } from "@/hooks/useCompanions";
 import { xpForLevel } from "@/lib/aura/types";
-import { Coins, Swords, Brain, Heart, Bell, Sun, Moon, Sparkles, Trophy } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Coins, Swords, Brain, Heart, Bell, Sun, Moon, Sparkles, Trophy, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useRef, useState, useEffect } from "react";
 
 function useTheme() {
   const [dark, setDark] = useState(() => !document.documentElement.classList.contains("light"));
@@ -87,8 +88,10 @@ function Bar({
 }
 
 function NotificationsBell() {
-  const { notifications, unread, markAllRead, clear } = useNotifications();
+  const { notifications, unread, markAllRead, deleteOne, clear } = useNotifications();
   const [open, setOpen] = useState(false);
+  const [allOpen, setAllOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   const toggle = () => {
@@ -100,6 +103,36 @@ function NotificationsBell() {
     message: string,
   ): { to: string; search?: Record<string, string> } | null => {
     const lower = message.toLowerCase();
+    const tavernMatch = message.match(/\/tavern\?([^\s]+)/i);
+    if (tavernMatch) {
+      const params = new URLSearchParams(tavernMatch[1]);
+      const party = params.get("party") ?? undefined;
+      const invite = params.get("invite") ?? undefined;
+      const msg = params.get("message") ?? undefined;
+      return {
+        to: "/tavern",
+        search: {
+          ...(party ? { party } : {}),
+          ...(invite ? { invite } : {}),
+          ...(msg ? { message: msg } : {}),
+        },
+      };
+    }
+    const friendMatch = message.match(/\/friends\?([^\s]+)/i);
+    if (friendMatch) {
+      const params = new URLSearchParams(friendMatch[1]);
+      const invite = params.get("invite") ?? undefined;
+      const friend = params.get("friend") ?? undefined;
+      const msg = params.get("message") ?? undefined;
+      return {
+        to: "/friends",
+        search: {
+          ...(invite ? { invite } : {}),
+          ...(friend ? { friend } : {}),
+          ...(msg ? { message: msg } : {}),
+        },
+      };
+    }
     const inviteMatch = message.match(/\/tavern\?invite=([0-9a-f-]{36})/i);
     if (inviteMatch) {
       return { to: "/tavern", search: { invite: inviteMatch[1] } };
@@ -113,15 +146,38 @@ function NotificationsBell() {
     return null;
   };
 
+  const displayMessage = (message: string) =>
+    message.replace(/\s*\/(?:tavern|friends)\?[^\s]+/gi, "").trim();
+
   const onNotificationClick = (message: string) => {
     const target = targetForMessage(message);
     if (!target) return;
     setOpen(false);
+    setAllOpen(false);
     void navigate({ to: target.to, search: target.search });
   };
 
+  const notificationClass = (type: (typeof notifications)[number]["type"], clickable: boolean) =>
+    `px-2 py-1.5 border-l-2 text-xs transition-colors ${
+      type === "success"
+        ? "border-primary text-primary"
+        : type === "warning"
+          ? "border-[color:var(--color-gold)] text-[color:var(--color-gold)]"
+          : "border-accent text-foreground"
+    } ${clickable ? "cursor-pointer hover:bg-secondary/50" : ""}`;
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!dropdownRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
   return (
-    <div className="relative">
+    <div ref={dropdownRef} className="relative">
       <button
         onClick={toggle}
         className="relative w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
@@ -145,13 +201,26 @@ function NotificationsBell() {
               NOTIFICATIONS
             </span>
             {notifications.length > 0 && (
-              <button
-                onClick={clear}
-                className="text-[8px] text-muted-foreground hover:text-destructive"
-                style={{ fontFamily: "var(--font-pixel)" }}
-              >
-                CLEAR
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setAllOpen(true);
+                    setOpen(false);
+                  }}
+                  className="text-[8px] text-muted-foreground hover:text-primary"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
+                  SEE ALL
+                </button>
+                <span className="h-3 border-l-2 border-border" aria-hidden="true" />
+                <button
+                  onClick={clear}
+                  className="text-[8px] text-destructive hover:bg-destructive/10 px-1 py-0.5 border border-destructive/40"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
+                  CLEAR ALL
+                </button>
+              </div>
             )}
           </div>
           {notifications.length === 0 ? (
@@ -163,18 +232,12 @@ function NotificationsBell() {
               {notifications.map((n) => (
                 <div
                   key={n.id}
-                  className={`px-2 py-1.5 border-l-2 text-xs transition-colors ${
-                    n.type === "success"
-                      ? "border-primary text-primary"
-                      : n.type === "warning"
-                        ? "border-[color:var(--color-gold)] text-[color:var(--color-gold)]"
-                        : "border-accent text-foreground"
-                  } ${targetForMessage(n.message) ? "cursor-pointer hover:bg-secondary/50" : ""}`}
+                  className={notificationClass(n.type, !!targetForMessage(n.message))}
                   style={{ fontFamily: "var(--font-display)" }}
                   onClick={() => onNotificationClick(n.message)}
                   title={targetForMessage(n.message) ? "Open related page" : undefined}
                 >
-                  {n.message}
+                  {displayMessage(n.message)}
                   <div className="text-[10px] text-muted-foreground mt-0.5">
                     {new Date(n.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </div>
@@ -184,6 +247,54 @@ function NotificationsBell() {
           )}
         </div>
       )}
+      <Dialog open={allOpen} onOpenChange={setAllOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle style={{ fontFamily: "var(--font-pixel)" }}>Notifications</DialogTitle>
+          </DialogHeader>
+          {notifications.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic text-center py-6">
+              No notifications.
+            </p>
+          ) : (
+            <div className="max-h-[65vh] overflow-y-auto space-y-1 pr-1">
+              {notifications.map((n) => {
+                const target = targetForMessage(n.message);
+                return (
+                  <div
+                    key={n.id}
+                    className={`group relative pr-9 ${notificationClass(n.type, !!target)}`}
+                    style={{ fontFamily: "var(--font-display)" }}
+                    onClick={() => onNotificationClick(n.message)}
+                    title={target ? "Open related page" : undefined}
+                  >
+                    {displayMessage(n.message)}
+                    <div className="text-[10px] text-muted-foreground mt-0.5">
+                      {new Date(n.at).toLocaleString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void deleteOne(n.id);
+                      }}
+                      className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                      title="Delete notification"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

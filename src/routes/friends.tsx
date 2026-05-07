@@ -19,6 +19,8 @@ import {
   effectiveStrength,
 } from "@/lib/aura/equipmentBonuses";
 import { useAuth } from "@/hooks/useAuth";
+import { useMarkMessageScopeRead } from "@/hooks/useMessageUnreadCounts";
+import { useNotifications } from "@/components/aura/NotificationsContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,7 +35,11 @@ type FriendMessage = {
 
 export const Route = createFileRoute("/friends")({
   head: () => ({ meta: [{ title: "Friends — Aura" }] }),
-  validateSearch: z.object({ invite: z.string().uuid().optional() }),
+  validateSearch: z.object({
+    invite: z.string().uuid().optional(),
+    friend: z.string().uuid().optional(),
+    message: z.string().uuid().optional(),
+  }),
   component: FriendsPage,
 });
 
@@ -69,7 +75,7 @@ function Meter({
 
 function FriendsPage() {
   const { user } = useAuth();
-  const { invite } = Route.useSearch();
+  const { invite, friend: friendSearchId, message: messageSearchId } = Route.useSearch();
   const { data: friends = [], isLoading } = useFriends();
   const {
     data: pending = [],
@@ -79,6 +85,8 @@ function FriendsPage() {
   const sendFriendRequest = useSendFriendRequest();
   const sendFriendRequestByEmail = useSendFriendRequestByEmail();
   const acceptFriendRequest = useAcceptFriendRequest();
+  const markMessageScopeRead = useMarkMessageScopeRead();
+  const { markFriendMessagesRead } = useNotifications();
   const [copied, setCopied] = useState(false);
   const [showEmailInvite, setShowEmailInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -90,7 +98,17 @@ function FriendsPage() {
   const friendWsRef = useRef<WebSocket | null>(null);
   const friendReconnectTimerRef = useRef<number | null>(null);
   const friendReconnectDelayRef = useRef(1000);
+  const markMessageScopeReadRef = useRef(markMessageScopeRead);
+  const markFriendMessagesReadRef = useRef(markFriendMessagesRead);
   const INVITE_PROCESSED_KEY = "friendInviteProcessed";
+
+  useEffect(() => {
+    markMessageScopeReadRef.current = markMessageScopeRead;
+  }, [markMessageScopeRead]);
+
+  useEffect(() => {
+    markFriendMessagesReadRef.current = markFriendMessagesRead;
+  }, [markFriendMessagesRead]);
 
   const directRoomId = useMemo(() => {
     if (!user?.id || !selectedFriendId) return null;
@@ -109,6 +127,18 @@ function FriendsPage() {
         toast.error(e instanceof Error ? e.message : "Could not send request."),
       );
   }, [invite, sendFriendRequest, user]);
+
+  useEffect(() => {
+    if (friendSearchId) setSelectedFriendId(friendSearchId);
+  }, [friendSearchId]);
+
+  useEffect(() => {
+    if (!messageSearchId) return;
+    document.getElementById(`friend-message-${messageSearchId}`)?.scrollIntoView({
+      block: "center",
+      behavior: "smooth",
+    });
+  }, [friendMessages, messageSearchId]);
 
   const copyInviteLink = async () => {
     if (!user) return;
@@ -139,8 +169,8 @@ function FriendsPage() {
       return;
     }
     void (async () => {
-      const { data } = await (supabase as any)
-        .from("friend_messages")
+      const { data } = await supabase
+        .from("friend_messages" as never)
         .select("*")
         .or(
           `and(sender_id.eq.${user.id},recipient_id.eq.${selectedFriendId}),and(sender_id.eq.${selectedFriendId},recipient_id.eq.${user.id})`,
@@ -148,6 +178,11 @@ function FriendsPage() {
         .order("created_at", { ascending: true })
         .limit(200);
       setFriendMessages((data ?? []) as FriendMessage[]);
+      markFriendMessagesReadRef.current(selectedFriendId);
+      markMessageScopeReadRef.current.mutate(
+        { scopeType: "friend", scopeId: selectedFriendId },
+        { onError: (e) => console.warn("mark friend read failed", e) },
+      );
     })();
   }, [selectedFriendId, user?.id]);
 
@@ -178,6 +213,13 @@ function FriendsPage() {
             (msg.sender_id === selectedFriendId && msg.recipient_id === user.id);
           if (!isPair) return;
           setFriendMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+          if (msg.sender_id !== user.id) {
+            void markMessageScopeReadRef.current.mutateAsync({
+              scopeType: "friend",
+              scopeId: msg.sender_id,
+            });
+            markFriendMessagesReadRef.current(msg.sender_id);
+          }
         } catch {
           // ignore malformed websocket packet
         }
@@ -211,13 +253,13 @@ function FriendsPage() {
     const content = friendMessageInput.trim();
     if (!content) return;
     setFriendMessageInput("");
-    const { data, error } = await (supabase as any)
-      .from("friend_messages")
+    const { data, error } = await supabase
+      .from("friend_messages" as never)
       .insert({
         sender_id: user.id,
         recipient_id: selectedFriendId,
         content,
-      })
+      } as never)
       .select("*")
       .single();
     if (error) {
@@ -226,7 +268,9 @@ function FriendsPage() {
     }
     const row = data as FriendMessage;
     if (friendWsRef.current?.readyState === WebSocket.OPEN) {
-      friendWsRef.current.send(JSON.stringify({ type: "chat", partyId: directRoomId, message: row }));
+      friendWsRef.current.send(
+        JSON.stringify({ type: "chat", partyId: directRoomId, message: row }),
+      );
     } else {
       setFriendMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, row]));
     }
@@ -527,7 +571,15 @@ function FriendsPage() {
                     friendMessages.map((m) => {
                       const mine = m.sender_id === user?.id;
                       return (
-                        <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                        <div
+                          key={m.id}
+                          id={`friend-message-${m.id}`}
+                          className={`flex ${mine ? "justify-end" : "justify-start"} ${
+                            messageSearchId === m.id
+                              ? "bg-primary/10 outline outline-1 outline-primary"
+                              : ""
+                          }`}
+                        >
                           <div
                             className={`max-w-[80%] px-2 py-1 border text-xs ${
                               mine

@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Send, UserPlus, Check, Mail, Flame, ArrowLeft, Info, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile, useApplyReward } from "@/hooks/useProfile";
+import { useMarkMessageScopeRead, useMessageUnreadCounts } from "@/hooks/useMessageUnreadCounts";
+import { useNotifications } from "@/components/aura/NotificationsContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { xpForLevel } from "@/lib/aura/types";
 import {
@@ -19,7 +20,11 @@ import { z } from "zod";
 
 export const Route = createFileRoute("/tavern")({
   head: () => ({ meta: [{ title: "The Tavern — Aura" }] }),
-  validateSearch: z.object({ invite: z.string().optional() }),
+  validateSearch: z.object({
+    invite: z.string().optional(),
+    party: z.string().optional(),
+    message: z.string().optional(),
+  }),
   component: TavernPage,
 });
 
@@ -123,14 +128,16 @@ function playerStat(base: number, bonus?: number) {
 
 function TavernPage() {
   const { user } = useAuth();
-  const qc = useQueryClient();
   const { data: profile } = useProfile();
+  const { data: unreadCounts } = useMessageUnreadCounts();
+  const { notifications, markTavernPartyRead } = useNotifications();
+  const markMessageScopeRead = useMarkMessageScopeRead();
   const reward = useApplyReward();
   const focusWard = useSkillFocusWard();
   const partyMend = useSkillPartyMend();
   const shadowStrike = useSkillShadowStrike();
   const secondWind = useSkillSecondWind();
-  const { invite } = Route.useSearch();
+  const { invite, party: partySearchId, message: messageSearchId } = Route.useSearch();
   const [myParties, setMyParties] = useState<Party[]>([]);
   const [party, setParty] = useState<Party | null>(null);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -155,7 +162,22 @@ function TavernPage() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const reconnectDelayRef = useRef(1000);
+  const markMessageScopeReadRef = useRef(markMessageScopeRead);
   const INVITE_PROCESSED_KEY = "tavernInviteProcessed";
+
+  useEffect(() => {
+    markMessageScopeReadRef.current = markMessageScopeRead;
+  }, [markMessageScopeRead]);
+
+  const partyNotificationCounts = notifications.reduce<Record<string, number>>((acc, n) => {
+    if (n.read) return acc;
+    const match = n.message.match(/\/tavern\?([^\s]+)/i);
+    if (!match) return acc;
+    const partyId = new URLSearchParams(match[1]).get("party");
+    if (!partyId) return acc;
+    acc[partyId] = (acc[partyId] ?? 0) + 1;
+    return acc;
+  }, {});
 
   const loadAdventure = async (partyId: string) => {
     const { data: adv } = await supabase
@@ -212,6 +234,11 @@ function TavernPage() {
       .order("created_at", { ascending: true })
       .limit(100);
     setMessages((msgs ?? []) as ChatMsg[]);
+    markTavernPartyRead(partyId);
+    markMessageScopeRead.mutate(
+      { scopeType: "party", scopeId: partyId },
+      { onError: (e) => console.warn("mark party read failed", e) },
+    );
   };
 
   const loadPartyPlayers = async (partyId: string) => {
@@ -252,27 +279,27 @@ function TavernPage() {
     setPlayersLoading(false);
   };
 
-  // bootstrap: get or create the global tavern party, handle invite link
+  // bootstrap: load selected party, handle invite link
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const targetId: string | undefined = invite;
-      const inviteProcessKey = targetId ? `${user.id}:${targetId}` : null;
+      const targetId: string | undefined = invite ?? partySearchId;
+      const inviteProcessKey = invite ? `${user.id}:${invite}` : null;
       const alreadyProcessedInvite =
         inviteProcessKey &&
         sessionStorage.getItem(`${INVITE_PROCESSED_KEY}:${inviteProcessKey}`) === "1";
 
-      if (targetId && !alreadyProcessedInvite) {
+      if (invite && !alreadyProcessedInvite) {
         sessionStorage.setItem(`${INVITE_PROCESSED_KEY}:${inviteProcessKey}`, "1");
-        await supabase.rpc("join_party_by_id", { p_party_id: targetId });
+        await supabase.rpc("join_party_by_id", { p_party_id: invite });
       }
       const parties = await loadMyParties();
       const initialId = targetId && parties.some((p) => p.id === targetId) ? targetId : undefined;
       if (initialId) await loadParty(initialId);
-      if (targetId && !alreadyProcessedInvite) toast.success("Joined the party!");
+      if (invite && !alreadyProcessedInvite) toast.success("Joined the party!");
       setLoading(false);
     })();
-  }, [user, invite]);
+  }, [user, invite, partySearchId]);
 
   // realtime (party state only; chat is handled by custom websocket)
   useEffect(() => {
@@ -298,6 +325,14 @@ function TavernPage() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
+
+  useEffect(() => {
+    if (!messageSearchId) return;
+    document.getElementById(`tavern-message-${messageSearchId}`)?.scrollIntoView({
+      block: "center",
+      behavior: "smooth",
+    });
+  }, [messageSearchId, messages]);
 
   useEffect(() => {
     if (!party?.id) return;
@@ -347,6 +382,13 @@ function TavernPage() {
             return;
           const msg = packet.message;
           setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+          if (msg.user_id !== user?.id) {
+            void markMessageScopeReadRef.current.mutateAsync({
+              scopeType: "party",
+              scopeId: party.id,
+            });
+            markTavernPartyRead(party.id);
+          }
         } catch {
           // Ignore malformed packets
         }
@@ -374,7 +416,7 @@ function TavernPage() {
       wsRef.current?.close();
       wsRef.current = null;
     };
-  }, [party?.id]);
+  }, [party?.id, user?.id]);
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -539,17 +581,28 @@ function TavernPage() {
             </div>
             {myParties.length > 0 ? (
               <div className="space-y-1 max-h-72 overflow-y-auto">
-                {myParties.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => void loadParty(p.id)}
-                    className="w-full text-left px-2 py-1 border border-border hover:border-primary text-xs"
-                    style={{ fontFamily: "var(--font-pixel)" }}
-                  >
-                    {p.name}
-                  </button>
-                ))}
+                {myParties.map((p) => {
+                  const unread = Math.max(
+                    unreadCounts?.partyUnreadById[p.id] ?? 0,
+                    partyNotificationCounts[p.id] ?? 0,
+                  );
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => void loadParty(p.id)}
+                      className="w-full text-left px-2 py-1 border border-border hover:border-primary text-xs flex items-center gap-2"
+                      style={{ fontFamily: "var(--font-pixel)" }}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                      {unread > 0 && (
+                        <span className="min-w-[16px] h-4 px-1 bg-destructive text-destructive-foreground flex items-center justify-center text-[9px]">
+                          {unread > 99 ? "99+" : unread}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <p
@@ -625,7 +678,7 @@ function TavernPage() {
           setMessages([]);
           setAdventure(null);
         }}
-        className="absolute -left-12 top-8 z-10 px-2 py-1 border-2 border-border hover:border-primary text-xs bg-background"
+        className="absolute -left-6 top-6 z-10 px-2 py-1 border-2 border-border hover:border-primary text-xs bg-background"
         style={{ fontFamily: "var(--font-pixel)" }}
         title="Back to party list"
       >
@@ -790,14 +843,20 @@ function TavernPage() {
               <h3 className="text-sm text-primary mb-2" style={{ fontFamily: "var(--font-pixel)" }}>
                 TAVERN CHAT
               </h3>
-              <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-1 pr-1">
+              <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-1 px-1">
                 {messages.length === 0 && (
                   <p className="text-sm text-muted-foreground italic">
                     The hall is quiet... break the silence.
                   </p>
                 )}
                 {messages.map((m) => (
-                  <div key={m.id} className="text-sm">
+                  <div
+                    key={m.id}
+                    id={`tavern-message-${m.id}`}
+                    className={`text-sm px-2 py-0.5 ${
+                      messageSearchId === m.id ? "bg-primary/10 border border-primary" : ""
+                    }`}
+                  >
                     <span
                       className={m.user_id === user?.id ? "text-primary" : "text-accent"}
                       style={{ fontFamily: "var(--font-pixel)", fontSize: 12 }}

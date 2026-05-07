@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useCallback, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -15,12 +15,34 @@ interface NotificationsCtx {
   unread: number;
   push: (message: string, type?: AppNotification["type"]) => void;
   markAllRead: () => void;
+  markTavernPartyRead: (partyId: string) => void;
+  markFriendMessagesRead: (friendId: string) => void;
+  deleteOne: (id: string) => void;
   clear: () => void;
 }
 
-const Ctx = createContext<NotificationsCtx | null>(null);
+interface NotificationRow {
+  id: string;
+  message: string;
+  type: string;
+  read: boolean;
+  created_at: string;
+}
 
-function toAppNotif(row: { id: string; message: string; type: string; read: boolean; created_at: string }): AppNotification {
+const Ctx = createContext<NotificationsCtx | null>(null);
+const notificationsTable = "notifications" as never;
+const fallbackCtx: NotificationsCtx = {
+  notifications: [],
+  unread: 0,
+  push: () => undefined,
+  markAllRead: () => undefined,
+  markTavernPartyRead: () => undefined,
+  markFriendMessagesRead: () => undefined,
+  deleteOne: () => undefined,
+  clear: () => undefined,
+};
+
+function toAppNotif(row: NotificationRow): AppNotification {
   return {
     id: row.id,
     message: row.message,
@@ -32,61 +54,136 @@ function toAppNotif(row: { id: string; message: string; type: string; read: bool
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const userId = user?.id;
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
-  // Load existing notifications on mount
+  // Load existing notifications on mount.
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     supabase
-      .from("notifications")
+      .from(notificationsTable)
       .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50)
+      .eq("user_id" as never, userId)
+      .order("created_at" as never, { ascending: false })
       .then(({ data }) => {
-        if (data) setNotifications(data.map(toAppNotif));
+        if (data) setNotifications((data as unknown as NotificationRow[]).map(toAppNotif));
       });
-  }, [user?.id]);
+  }, [userId]);
 
-  // Realtime: insert new rows as they arrive
+  // Realtime: insert new rows as they arrive.
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     const channel = supabase
-      .channel(`notifications:${user.id}`)
+      .channel(`notifications:${userId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
         (payload) => {
-          setNotifications((prev) => [toAppNotif(payload.new as Parameters<typeof toAppNotif>[0]), ...prev].slice(0, 50));
-        }
+          setNotifications((prev) =>
+            [toAppNotif(payload.new as NotificationRow), ...prev].slice(0, 50),
+          );
+        },
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user?.id]);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
-  // Push: insert into DB (realtime will pick it up) or fall back to local-only
-  const push = useCallback(async (message: string, type: AppNotification["type"] = "info") => {
-    if (!user) return;
-    await supabase.from("notifications").insert({ user_id: user.id, message, type });
-    // Realtime subscription handles updating the state
-  }, [user?.id]);
+  const push = useCallback(
+    async (message: string, type: AppNotification["type"] = "info") => {
+      if (!userId) return;
+      await supabase.from(notificationsTable).insert({ user_id: userId, message, type } as never);
+    },
+    [userId],
+  );
 
   const markAllRead = useCallback(async () => {
-    if (!user) return;
+    if (!userId) return;
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
-  }, [user?.id]);
+    await supabase
+      .from(notificationsTable)
+      .update({ read: true } as never)
+      .eq("user_id" as never, userId)
+      .eq("read" as never, false);
+  }, [userId]);
+
+  const markMatchingRead = useCallback(
+    async (matcher: (message: string) => boolean, dbPattern: string) => {
+      if (!userId) return;
+      setNotifications((prev) => prev.map((n) => (matcher(n.message) ? { ...n, read: true } : n)));
+      await supabase
+        .from(notificationsTable)
+        .update({ read: true } as never)
+        .eq("user_id" as never, userId)
+        .eq("read" as never, false)
+        .ilike("message" as never, dbPattern as never);
+    },
+    [userId],
+  );
+
+  const markTavernPartyRead = useCallback(
+    (partyId: string) => {
+      void markMatchingRead((message) => {
+        const match = message.match(/\/tavern\?([^\s]+)/i);
+        return match ? new URLSearchParams(match[1]).get("party") === partyId : false;
+      }, `%/tavern?%party=${partyId}%`);
+    },
+    [markMatchingRead],
+  );
+
+  const markFriendMessagesRead = useCallback(
+    (friendId: string) => {
+      void markMatchingRead((message) => {
+        const match = message.match(/\/friends\?([^\s]+)/i);
+        return match ? new URLSearchParams(match[1]).get("friend") === friendId : false;
+      }, `%/friends?%friend=${friendId}%`);
+    },
+    [markMatchingRead],
+  );
 
   const clear = useCallback(async () => {
-    if (!user) return;
+    if (!userId) return;
     setNotifications([]);
-    await supabase.from("notifications").delete().eq("user_id", user.id);
-  }, [user?.id]);
+    await supabase
+      .from(notificationsTable)
+      .delete()
+      .eq("user_id" as never, userId);
+  }, [userId]);
+
+  const deleteOne = useCallback(
+    async (id: string) => {
+      if (!userId) return;
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      await supabase
+        .from(notificationsTable)
+        .delete()
+        .eq("user_id" as never, userId)
+        .eq("id" as never, id);
+    },
+    [userId],
+  );
 
   const unread = notifications.filter((n) => !n.read).length;
 
   return (
-    <Ctx.Provider value={{ notifications, unread, push, markAllRead, clear }}>
+    <Ctx.Provider
+      value={{
+        notifications,
+        unread,
+        push,
+        markAllRead,
+        markTavernPartyRead,
+        markFriendMessagesRead,
+        deleteOne,
+        clear,
+      }}
+    >
       {children}
     </Ctx.Provider>
   );
@@ -94,6 +191,5 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
 export function useNotifications() {
   const ctx = useContext(Ctx);
-  if (!ctx) throw new Error("useNotifications outside provider");
-  return ctx;
+  return ctx ?? fallbackCtx;
 }

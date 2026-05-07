@@ -64,6 +64,15 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         >
           Retry
         </button>
+        <a
+          href={`mailto:support@aurasanctuary.app?subject=${encodeURIComponent(
+            "Aura Sanctuary bug report",
+          )}&body=${encodeURIComponent(`Error: ${error.message}`)}`}
+          className="mt-3 block text-xs text-muted-foreground hover:text-primary"
+          style={{ fontFamily: "var(--font-pixel)" }}
+        >
+          Contact support
+        </a>
       </div>
     </div>
   );
