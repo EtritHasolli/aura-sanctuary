@@ -86,7 +86,7 @@ function FriendsPage() {
   const sendFriendRequestByEmail = useSendFriendRequestByEmail();
   const acceptFriendRequest = useAcceptFriendRequest();
   const markMessageScopeRead = useMarkMessageScopeRead();
-  const { markFriendMessagesRead } = useNotifications();
+  const { notifications, markFriendMessagesRead } = useNotifications();
   const [copied, setCopied] = useState(false);
   const [showEmailInvite, setShowEmailInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -131,6 +131,11 @@ function FriendsPage() {
   useEffect(() => {
     if (friendSearchId) setSelectedFriendId(friendSearchId);
   }, [friendSearchId]);
+
+  useEffect(() => {
+    if (!selectedFriendId) return;
+    markFriendMessagesRead(selectedFriendId);
+  }, [markFriendMessagesRead, notifications, selectedFriendId]);
 
   useEffect(() => {
     if (!messageSearchId) return;
