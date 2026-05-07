@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Send, UserPlus, Check, Mail, Flame, ArrowLeft, Info } from "lucide-react";
+import { Send, UserPlus, Check, Mail, Flame, ArrowLeft, Info, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile, useApplyReward } from "@/hooks/useProfile";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { xpForLevel } from "@/lib/aura/types";
 import {
   useSkillFocusWard,
   useSkillPartyMend,
@@ -61,11 +63,62 @@ interface StrikePartyBossResult {
   stamina_spent: number;
   boss_rage_after?: number;
 }
+interface PartyPlayer {
+  id: string;
+  display_name: string;
+  level: number;
+  hp: number;
+  max_hp: number;
+  xp: number;
+  stamina: number;
+  max_stamina: number;
+  strength: number;
+  intelligence: number;
+  constitution: number;
+  avatar_url?: string | null;
+  equip_str_bonus?: number;
+  equip_int_bonus?: number;
+  equip_con_bonus?: number;
+}
 async function refreshPartyScaled(partyId: string) {
   const { error: syncErr } = await supabase.rpc("sync_party_boss_scaling", { p_party_id: partyId });
   if (syncErr) console.warn("sync_party_boss_scaling:", syncErr.message);
   const { data } = await supabase.from("parties").select("*").eq("id", partyId).maybeSingle();
   return data as Party | null;
+}
+
+function PlayerMeter({
+  label,
+  value,
+  max,
+  color,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  color: string;
+}) {
+  const pct = Math.max(0, Math.min(100, max > 0 ? (value / max) * 100 : 0));
+  return (
+    <div>
+      <div
+        className="flex justify-between text-[10px] mb-0.5 text-muted-foreground"
+        style={{ fontFamily: "var(--font-pixel)" }}
+      >
+        <span>{label}</span>
+        <span>
+          {value}/{max}
+        </span>
+      </div>
+      <div className="h-2 border border-border bg-secondary/50">
+        <div className="h-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+    </div>
+  );
+}
+
+function playerStat(base: number, bonus?: number) {
+  return base + (bonus ?? 0);
 }
 
 function TavernPage() {
@@ -95,6 +148,9 @@ function TavernPage() {
   const [pendingTeamDamage, setPendingTeamDamage] = useState(0);
   const [startingDifficulty, setStartingDifficulty] = useState<Adventure["difficulty"] | "">("");
   const [showBossInfo, setShowBossInfo] = useState(false);
+  const [playersOpen, setPlayersOpen] = useState(false);
+  const [partyPlayers, setPartyPlayers] = useState<PartyPlayer[]>([]);
+  const [playersLoading, setPlayersLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
@@ -158,6 +214,44 @@ function TavernPage() {
     setMessages((msgs ?? []) as ChatMsg[]);
   };
 
+  const loadPartyPlayers = async (partyId: string) => {
+    setPlayersLoading(true);
+    const { data: memberRows, error: memberErr } = await supabase
+      .from("party_members")
+      .select("user_id")
+      .eq("party_id", partyId);
+    if (memberErr) {
+      toast.error(memberErr.message);
+      setPartyPlayers([]);
+      setPlayersLoading(false);
+      return;
+    }
+
+    const ids = Array.from(new Set((memberRows ?? []).map((r) => r.user_id)));
+    if (!ids.length) {
+      setPartyPlayers([]);
+      setPlayersLoading(false);
+      return;
+    }
+
+    const { data: profileRows, error: profileErr } = await supabase
+      .from("profiles")
+      .select(
+        "id, display_name, level, hp, max_hp, xp, stamina, max_stamina, strength, intelligence, constitution, avatar_url, equip_str_bonus, equip_int_bonus, equip_con_bonus",
+      )
+      .in("id", ids)
+      .order("display_name");
+    if (profileErr) {
+      toast.error(profileErr.message);
+      setPartyPlayers([]);
+      setPlayersLoading(false);
+      return;
+    }
+
+    setPartyPlayers((profileRows ?? []) as unknown as PartyPlayer[]);
+    setPlayersLoading(false);
+  };
+
   // bootstrap: get or create the global tavern party, handle invite link
   useEffect(() => {
     if (!user) return;
@@ -165,7 +259,8 @@ function TavernPage() {
       const targetId: string | undefined = invite;
       const inviteProcessKey = targetId ? `${user.id}:${targetId}` : null;
       const alreadyProcessedInvite =
-        inviteProcessKey && sessionStorage.getItem(`${INVITE_PROCESSED_KEY}:${inviteProcessKey}`) === "1";
+        inviteProcessKey &&
+        sessionStorage.getItem(`${INVITE_PROCESSED_KEY}:${inviteProcessKey}`) === "1";
 
       if (targetId && !alreadyProcessedInvite) {
         sessionStorage.setItem(`${INVITE_PROCESSED_KEY}:${inviteProcessKey}`, "1");
@@ -248,7 +343,8 @@ function TavernPage() {
           if (packet.type === "joined") {
             return;
           }
-          if (packet.type !== "chat" || !packet.message || packet.message.party_id !== party.id) return;
+          if (packet.type !== "chat" || !packet.message || packet.message.party_id !== party.id)
+            return;
           const msg = packet.message;
           setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
         } catch {
@@ -578,6 +674,17 @@ function TavernPage() {
           </div>
           <div className="flex items-center gap-1">
             <button
+              onClick={() => {
+                setPlayersOpen(true);
+                void loadPartyPlayers(party.id);
+              }}
+              className="flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-muted-foreground hover:text-primary transition-colors"
+              style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+              title="View party players"
+            >
+              <Users size={10} /> PLAYERS
+            </button>
+            <button
               onClick={() => setShowEmailInvite((v) => !v)}
               className="flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-muted-foreground hover:text-primary transition-colors"
               style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
@@ -596,6 +703,85 @@ function TavernPage() {
             </button>
           </div>
         </div>
+
+        <Dialog open={playersOpen} onOpenChange={setPlayersOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle style={{ fontFamily: "var(--font-pixel)" }}>
+                {party.name} Players
+              </DialogTitle>
+            </DialogHeader>
+            {playersLoading ? (
+              <p className="text-sm text-muted-foreground">Loading players...</p>
+            ) : partyPlayers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No players found in this party.</p>
+            ) : (
+              <div className="max-h-[60vh] overflow-y-auto divide-y-2 divide-border border-2 border-border">
+                {partyPlayers.map((player) => (
+                  <div key={player.id} className="p-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 border-2 border-border bg-secondary overflow-hidden shrink-0">
+                        {player.avatar_url ? (
+                          <img
+                            src={player.avatar_url}
+                            alt={`${player.display_name} avatar`}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : null}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div
+                          className="text-primary truncate"
+                          style={{ fontFamily: "var(--font-pixel)" }}
+                        >
+                          {player.display_name}
+                          {player.id === party.leader_id ? " · LEADER" : ""}
+                        </div>
+                        <div
+                          className="text-xs text-muted-foreground"
+                          style={{ fontFamily: "var(--font-pixel)" }}
+                        >
+                          LV {player.level}
+                        </div>
+                        <div className="grid grid-cols-3 gap-1 mt-2 text-[10px]">
+                          <span className="border border-border px-1 py-0.5">
+                            STR {playerStat(player.strength, player.equip_str_bonus)}
+                          </span>
+                          <span className="border border-border px-1 py-0.5">
+                            INT {playerStat(player.intelligence, player.equip_int_bonus)}
+                          </span>
+                          <span className="border border-border px-1 py-0.5">
+                            CON {playerStat(player.constitution, player.equip_con_bonus)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="w-56 space-y-1.5 pr-2">
+                        <PlayerMeter
+                          label="HP"
+                          value={player.hp}
+                          max={player.max_hp}
+                          color="var(--color-hp)"
+                        />
+                        <PlayerMeter
+                          label="XP"
+                          value={player.xp}
+                          max={xpForLevel(player.level)}
+                          color="var(--color-xp)"
+                        />
+                        <PlayerMeter
+                          label="STA"
+                          value={player.stamina}
+                          max={player.max_stamina}
+                          color="var(--color-stamina)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 h-[calc(100%-4.5rem)]">
           <div className="space-y-4 flex flex-col min-h-0">
