@@ -12,13 +12,15 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
-import { PetSprite } from "@/components/aura/PetSprite";
 import { useProfile } from "@/hooks/useProfile";
-import { useEquippedPetGear } from "@/hooks/useShop";
-import { useUserCompanions } from "@/hooks/useCompanions";
 import { useTasks, useUpdateTask, useUpdateChecklistItem } from "@/hooks/useTasks";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { AuraPath } from "@/lib/aura/types";
+import swordsmanIdle from "../../characters/swordsman/idle.gif";
+import mageIdle from "../../characters/mage/idle.gif";
+import paladinIdle from "../../characters/paladin/idle.gif";
+import rogueIdle from "../../characters/rogue/idle.gif";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,6 +31,13 @@ export const Route = createFileRoute("/")({
   }),
   component: SanctuaryPage,
 });
+
+const PATH_IDLE_GIFS: Record<AuraPath, string> = {
+  swordsman: swordsmanIdle,
+  mage: mageIdle,
+  tank: paladinIdle,
+  rogue: rogueIdle,
+};
 
 function fmt(s: number) {
   const m = Math.floor(s / 60)
@@ -68,10 +77,6 @@ function SanctuaryPage() {
   const { data: tasks = [] } = useTasks();
   const updateTask = useUpdateTask();
   const updateChecklist = useUpdateChecklistItem();
-  const petGear = useEquippedPetGear();
-  const { data: companions = [] } = useUserCompanions();
-  const equippedPet = companions.find((c) => c.equipped_as === "pet");
-  const companionSpriteKey = equippedPet?.companions?.sprite_key;
   const [muted, setMuted] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -347,6 +352,11 @@ function SanctuaryPage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
+      <div className="mb-3 flex items-center justify-end">
+        <div className="px-2 py-1 border border-border bg-secondary/30 text-xs text-muted-foreground capitalize">
+          Path: {profile?.aura_path ? `${profile.aura_path}` : "unbound"}
+        </div>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* The Sanctuary room */}
         <div className="lg:col-span-2">
@@ -443,19 +453,24 @@ function SanctuaryPage() {
               }}
             />
 
-            {/* pet center stage */}
+            {/* path character center stage */}
             <div className="absolute bottom-[21%] left-1/2 -translate-x-1/2">
-              <PetSprite
-                state={petState}
-                size={140}
-                gear={petGear}
-                companionSpriteKey={companionSpriteKey}
-              />
+              {profile?.aura_path ? (
+                <img
+                  src={PATH_IDLE_GIFS[profile.aura_path]}
+                  alt={`${profile.aura_path} character`}
+                  className="h-[140px] w-auto object-contain"
+                />
+              ) : (
+                <div className="h-[140px] w-[120px] border-2 border-border bg-secondary/30 flex items-center justify-center text-sm text-muted-foreground">
+                  Choose path
+                </div>
+              )}
               <p
                 className="text-center mt-2 text-primary"
                 style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
               >
-                {profile?.pet_name ?? "Sprig"} ·{" "}
+                {profile?.aura_path ? `${profile.aura_path} path` : "No path selected"} ·{" "}
                 <span className="text-muted-foreground">{petState}</span>
               </p>
             </div>
