@@ -1,10 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Hammer, Shirt, Info } from "lucide-react";
-import { CompanionSprite } from "@/components/aura/CompanionSprite";
 import { useProfile } from "@/hooks/useProfile";
 import {
   useEquipUserItem,
-  useEquippedCompanionGear,
   useUnequipUserItem,
   useUserItems,
 } from "@/hooks/useShop";
@@ -22,6 +20,7 @@ import {
   effectiveStrength,
   parseItemBonuses,
 } from "@/lib/aura/equipmentBonuses";
+import { pathCharacterSpriteSrc } from "@/lib/aura/pathCharacterSprites";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -51,7 +50,6 @@ function bonusSummary(meta: Record<string, unknown>): string {
 
 function EquipmentPage() {
   const { data: profile } = useProfile();
-  const companionGear = useEquippedCompanionGear();
   const { data: items = [], isLoading } = useUserItems();
   const equip = useEquipUserItem();
   const unequip = useUnequipUserItem();
@@ -156,22 +154,36 @@ function EquipmentPage() {
               className="text-sm text-primary mb-3 self-stretch text-center sm:text-left"
               style={{ fontFamily: "var(--font-pixel)" }}
             >
-              PET PREVIEW
+              PATH PREVIEW
             </h2>
             <div className="px-6 py-4 bg-secondary/40 border-2 border-border">
-              <CompanionSprite state="idle" size={112} gear={companionGear} />
+              {profile?.aura_path ? (
+                <img
+                  src={pathCharacterSpriteSrc(profile.aura_path, "idle")}
+                  alt="Path character"
+                  className="h-[112px] w-auto object-contain"
+                  style={{ imageRendering: "pixelated" }}
+                />
+              ) : (
+                <div
+                  className="h-[112px] w-[112px] flex items-center justify-center text-[10px] text-muted-foreground"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
+                  Choose path
+                </div>
+              )}
             </div>
             <p
               className="mt-2 text-[10px] text-muted-foreground text-center"
               style={{ fontFamily: "var(--font-pixel)" }}
             >
-              {profile?.character_name ?? "Companion"} · idle
+              {profile?.character_name ?? "Character"} · idle
             </p>
             <p
               className="mt-1 text-[9px] text-muted-foreground text-center max-w-[200px]"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              Reflects currently equipped gear. Changes when you equip or unequip.
+              Reflects your selected Aura path character.
             </p>
           </div>
         </div>

@@ -10,13 +10,17 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useTasks, useUpdateTask, useUpdateChecklistItem } from "@/hooks/useTasks";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { pathCharacterSpriteSrc, pathCharacterWalkSpriteSrc } from "@/lib/aura/pathCharacterSprites";
+import {
+  pathCharacterFallingSpriteSrc,
+  pathCharacterSpriteSrc,
+  pathCharacterWalkSpriteSrc,
+} from "@/lib/aura/pathCharacterSprites";
 import { SANCTUARY_WANDER_MIN_STEP_PX } from "@/lib/aura/sanctuaryCharacterWander";
 import { useSanctuaryIdleWander } from "@/hooks/useSanctuaryIdleWander";
 import { AURA_PATHS } from "@/lib/aura/types";
@@ -30,6 +34,8 @@ export const Route = createFileRoute("/")({
   }),
   component: SanctuaryPage,
 });
+
+const FALL_ASLEEP_TRANSITION_MS = 1300;
 
 function fmt(s: number) {
   const m = Math.floor(s / 60)
@@ -86,6 +92,24 @@ function SanctuaryPage() {
   );
   const pathCharacterClickable = Boolean(profile?.aura_path);
   const [sanctuaryTapAcknowledge, setSanctuaryTapAcknowledge] = useState(false);
+  const [sleepGifRestartKey, setSleepGifRestartKey] = useState(0);
+  const [showFallingSleepTransition, setShowFallingSleepTransition] = useState(false);
+  const sleepTransitionTimeoutRef = useRef<number | null>(null);
+  const previousCharacterStateRef = useRef(characterState);
+
+  const triggerSleepTransition = useCallback(() => {
+    if (profile?.aura_path == null) return;
+    if (!pathCharacterFallingSpriteSrc(profile.aura_path)) return;
+    if (sleepTransitionTimeoutRef.current != null) {
+      window.clearTimeout(sleepTransitionTimeoutRef.current);
+      sleepTransitionTimeoutRef.current = null;
+    }
+    setShowFallingSleepTransition(true);
+    sleepTransitionTimeoutRef.current = window.setTimeout(() => {
+      sleepTransitionTimeoutRef.current = null;
+      setShowFallingSleepTransition(false);
+    }, FALL_ASLEEP_TRANSITION_MS);
+  }, [profile?.aura_path]);
 
   const roamSanctuaryIdle =
     pathCharacterClickable && characterState === "idle" && !sanctuaryTapAcknowledge;
@@ -107,6 +131,9 @@ function SanctuaryPage() {
     if (profile?.aura_path == null) return null;
     const path = profile.aura_path;
     if (sanctuaryTapAcknowledge) return pathCharacterSpriteSrc(path, "working");
+    if (characterState === "sleeping" && showFallingSleepTransition) {
+      return pathCharacterFallingSpriteSrc(path) ?? pathCharacterSpriteSrc(path, "sleeping");
+    }
     if (characterState === "sleeping") return pathCharacterSpriteSrc(path, "sleeping");
     if (characterState === "working") return pathCharacterSpriteSrc(path, "working");
     if (idleWander.walkDirection === "left" || idleWander.walkDirection === "right") {
@@ -116,9 +143,28 @@ function SanctuaryPage() {
   }, [
     profile?.aura_path,
     characterState,
+    showFallingSleepTransition,
     idleWander.walkDirection,
     sanctuaryTapAcknowledge,
   ]);
+
+  useEffect(() => {
+    const prev = previousCharacterStateRef.current;
+    previousCharacterStateRef.current = characterState;
+
+    if (profile?.aura_path == null || characterState !== "sleeping") {
+      if (sleepTransitionTimeoutRef.current != null) {
+        window.clearTimeout(sleepTransitionTimeoutRef.current);
+        sleepTransitionTimeoutRef.current = null;
+      }
+      setShowFallingSleepTransition(false);
+      return;
+    }
+
+    if (prev !== "sleeping") {
+      triggerSleepTransition();
+    }
+  }, [characterState, profile?.aura_path, triggerSleepTransition]);
 
   useEffect(() => {
     sanctuaryPanCtlRef.current?.stop();
@@ -172,6 +218,9 @@ function SanctuaryPage() {
     return () => {
       sanctuaryPanCtlRef.current?.stop();
       if (sanctuaryTapTimeoutRef.current != null) window.clearTimeout(sanctuaryTapTimeoutRef.current);
+      if (sleepTransitionTimeoutRef.current != null) {
+        window.clearTimeout(sleepTransitionTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -187,6 +236,11 @@ function SanctuaryPage() {
     sanctuaryPanCtlRef.current?.stop();
     idleWander.clearStrideExpectation();
     setSanctuaryTapAcknowledge(true);
+    // If we're currently sleeping, ensure the sleeping GIF restarts from the beginning after the
+    // 2s "stance" acknowledgement finishes (by forcing a remount via key).
+    if (characterStateRef.current === "sleeping") {
+      setSleepGifRestartKey((k) => k + 1);
+    }
     if (sanctuaryTapTimeoutRef.current != null) window.clearTimeout(sanctuaryTapTimeoutRef.current);
     sanctuaryTapTimeoutRef.current = window.setTimeout(() => {
       sanctuaryTapTimeoutRef.current = null;
@@ -204,6 +258,9 @@ function SanctuaryPage() {
         }
       }
       setSanctuaryTapAcknowledge(false);
+      if (characterStateRef.current === "sleeping") {
+        triggerSleepTransition();
+      }
     }, 2000);
   };
   const [trackLabel, setTrackLabel] = useState("chillhop stream");
@@ -603,9 +660,13 @@ function SanctuaryPage() {
                 {profile?.aura_path && sanctuarySpriteUrl ? (
                   showNativeSleepSprite ? (
                     <img
-                      key={sanctuarySpriteUrl}
+                      key={`${sanctuarySpriteUrl}-sleep-${sleepGifRestartKey}`}
                       src={sanctuarySpriteUrl}
-                      alt={`${pathLabel} sleeping`}
+                      alt={
+                        showFallingSleepTransition
+                          ? `${pathLabel} falling asleep`
+                          : `${pathLabel} sleeping`
+                      }
                       className="h-[140px] w-auto object-contain"
                       style={{ imageRendering: "pixelated" }}
                     />

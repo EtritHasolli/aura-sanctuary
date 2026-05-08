@@ -4,21 +4,25 @@ import swordsmanStance from "../../../characters/swordsman/stance.gif";
 import swordsmanSleep from "../../../characters/swordsman/sleep.gif";
 import swordsmanLeft from "../../../characters/swordsman/left.gif";
 import swordsmanRight from "../../../characters/swordsman/right.gif";
+import swordsmanFalling from "../../../characters/swordsman/falling.gif";
 import mageIdle from "../../../characters/mage/idle.gif";
 import mageStance from "../../../characters/mage/stance.gif";
 import mageSleep from "../../../characters/mage/sleep.gif";
 import mageLeft from "../../../characters/mage/left.gif";
 import mageRight from "../../../characters/mage/right.gif";
+import mageFalling from "../../../characters/mage/falling.gif";
 import paladinIdle from "../../../characters/paladin/idle.gif";
 import paladinStance from "../../../characters/paladin/stance.gif";
 import paladinSleep from "../../../characters/paladin/sleep.gif";
 import paladinLeft from "../../../characters/paladin/left.gif";
 import paladinRight from "../../../characters/paladin/right.gif";
+import paladinFalling from "../../../characters/paladin/falling.gif";
 import rogueIdle from "../../../characters/rogue/idle.gif";
 import rogueStance from "../../../characters/rogue/stance.gif";
 import rogueSleep from "../../../characters/rogue/sleep.gif";
 import rogueLeft from "../../../characters/rogue/left.gif";
 import rogueRight from "../../../characters/rogue/right.gif";
+import rogueFalling from "../../../characters/rogue/falling.gif";
 
 export const PATH_CHARACTER_SPRITES: Record<
   AuraPath,
@@ -52,4 +56,12 @@ export function pathCharacterSpriteSrc(path: AuraPath, state: CharacterState): s
 export function pathCharacterWalkSpriteSrc(path: AuraPath, direction: "left" | "right"): string {
   const s = PATH_CHARACTER_SPRITES[path];
   return direction === "left" ? s.left : s.right;
+}
+
+export function pathCharacterFallingSpriteSrc(path: AuraPath): string | null {
+  if (path === "swordsman") return swordsmanFalling;
+  if (path === "mage") return mageFalling;
+  if (path === "tank") return paladinFalling;
+  if (path === "rogue") return rogueFalling;
+  return null;
 }

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Clock3, Save, ShieldCheck, UserRound } from "lucide-react";
+import { Bell, Clock3, Plus, Save, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
 import { useNotifications } from "@/components/aura/NotificationsContext";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
@@ -102,7 +102,7 @@ function SettingsPage() {
   const { data: profile } = useProfile();
   const updateProfile = useUpdateProfile();
   const { notifications, unread, markAllRead, clear } = useNotifications();
-  const { focusMinutes, breakMinutes, updateDurations } = usePomodoro();
+  const { focusMinutes, breakMinutes, updateDurations, sessionPlan, updateSessionPlan } = usePomodoro();
 
   const [displayName, setDisplayName] = useState("");
   const [characterName, setCharacterName] = useState("");
@@ -115,6 +115,7 @@ function SettingsPage() {
   const [settingsPathCardGifMode, setSettingsPathCardGifMode] = useState<"idle" | "stance">("idle");
   const [nextFocusMinutes, setNextFocusMinutes] = useState(focusMinutes);
   const [nextBreakMinutes, setNextBreakMinutes] = useState(breakMinutes);
+  const [nextSessionPlan, setNextSessionPlan] = useState(sessionPlan);
   const [avatarDraft, setAvatarDraft] = useState<string | null>(null);
   const [avatarBlob, setAvatarBlob] = useState<Blob | null>(null);
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
@@ -157,7 +158,8 @@ function SettingsPage() {
   useEffect(() => {
     setNextFocusMinutes(focusMinutes);
     setNextBreakMinutes(breakMinutes);
-  }, [focusMinutes, breakMinutes]);
+    setNextSessionPlan(sessionPlan);
+  }, [focusMinutes, breakMinutes, sessionPlan]);
 
   const xpToNextLevel = useMemo(() => {
     if (!profile) return 0;
@@ -412,6 +414,41 @@ function SettingsPage() {
     toast.success("Pomodoro settings updated.");
   };
 
+  const updateDraftSessionAt = (
+    index: number,
+    patch: Partial<{ focusMinutes: number; breakMinutes: number }>,
+  ) => {
+    setNextSessionPlan((sessions) =>
+      sessions.map((session, i) =>
+        i === index
+          ? {
+              ...session,
+              ...patch,
+            }
+          : session,
+      ),
+    );
+  };
+
+  const addSessionDraft = () => {
+    setNextSessionPlan((sessions) => [
+      ...sessions,
+      { focusMinutes: nextFocusMinutes, breakMinutes: nextBreakMinutes },
+    ]);
+  };
+
+  const removeSessionDraft = (index: number) => {
+    setNextSessionPlan((sessions) => {
+      if (sessions.length <= 1) return sessions;
+      return sessions.filter((_, i) => i !== index);
+    });
+  };
+
+  const saveSessionPlan = () => {
+    updateSessionPlan(nextSessionPlan);
+    toast.success("Pomodoro session queue saved.");
+  };
+
   if (!profile) {
     return <div className="p-6 text-muted-foreground">Loading settings...</div>;
   }
@@ -569,14 +606,16 @@ function SettingsPage() {
             />
             Testing override: allow changing path
           </label>
-          <button
-            onClick={saveProfile}
-            disabled={updateProfile.isPending}
-            className="px-4 py-2.5 bg-primary text-primary-foreground flex items-center gap-2 disabled:opacity-60"
-            style={{ fontFamily: "var(--font-pixel)", fontSize: 14 }}
-          >
-            <Save size={14} /> {updateProfile.isPending ? "SAVING..." : "SAVE PROFILE"}
-          </button>
+          <div className="flex justify-end">
+            <button
+              onClick={saveProfile}
+              disabled={updateProfile.isPending}
+              className="px-4 py-2.5 bg-primary text-primary-foreground flex items-center gap-2 disabled:opacity-60"
+              style={{ fontFamily: "var(--font-pixel)", fontSize: 14 }}
+            >
+              <Save size={14} /> {updateProfile.isPending ? "SAVING..." : "SAVE PROFILE"}
+            </button>
+          </div>
         </section>
 
         <section className="pixel-panel p-5 space-y-4">
@@ -667,42 +706,90 @@ function SettingsPage() {
         </section>
 
         <section className="pixel-panel p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            <Clock3 size={18} className="text-primary" />
-            <h2 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
-              POMODORO
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm text-muted-foreground mb-1">Focus minutes</label>
-              <input
-                type="number"
-                value={nextFocusMinutes}
-                onChange={(e) => setNextFocusMinutes(Number(e.target.value || focusMinutes))}
-                className="w-full px-3 py-2 bg-input border-2 border-border focus:border-primary outline-none text-base"
-              />
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Clock3 size={18} className="text-primary" />
+              <h2 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+                POMODORO
+              </h2>
             </div>
-            <div>
-              <label className="block text-sm text-muted-foreground mb-1">Break minutes</label>
-              <input
-                type="number"
-                value={nextBreakMinutes}
-                onChange={(e) => setNextBreakMinutes(Number(e.target.value || breakMinutes))}
-                className="w-full px-3 py-2 bg-input border-2 border-border focus:border-primary outline-none text-base"
-              />
+            <button
+              type="button"
+              onClick={addSessionDraft}
+              className="px-2 py-1 border-2 border-border hover:border-primary text-[11px] flex items-center gap-1"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              <Plus size={12} /> ADD SESSION
+            </button>
+          </div>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              {nextSessionPlan.map((session, index) => (
+                <div key={`session-${index}`} className="border border-border p-2 space-y-2 bg-background/30">
+                  <div
+                    className="text-[11px] text-muted-foreground"
+                    style={{ fontFamily: "var(--font-pixel)" }}
+                  >
+                    Session {index + 1}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                    <label className="text-xs text-muted-foreground">
+                      Focus (min)
+                      <input
+                        type="number"
+                        min={1}
+                        value={session.focusMinutes}
+                        onChange={(e) =>
+                          updateDraftSessionAt(index, {
+                            focusMinutes: Number(e.target.value || session.focusMinutes),
+                          })
+                        }
+                        className="mt-1 w-full px-2 py-1 bg-input border-2 border-border focus:border-primary outline-none text-sm"
+                      />
+                    </label>
+                    <label className="text-xs text-muted-foreground">
+                      Break (min)
+                      <input
+                        type="number"
+                        min={1}
+                        value={session.breakMinutes}
+                        onChange={(e) =>
+                          updateDraftSessionAt(index, {
+                            breakMinutes: Number(e.target.value || session.breakMinutes),
+                          })
+                        }
+                        className="mt-1 w-full px-2 py-1 bg-input border-2 border-border focus:border-primary outline-none text-sm"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => removeSessionDraft(index)}
+                      disabled={nextSessionPlan.length <= 1}
+                      className="h-9 px-2 border-2 border-border hover:border-destructive disabled:opacity-50 disabled:cursor-not-allowed text-destructive"
+                      title="Remove session"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Start timer manually for Session 1 focus. After that, break and next sessions run
+              automatically in order.
+            </p>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={saveSessionPlan}
+                className="px-4 py-2.5 bg-primary text-primary-foreground"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 14 }}
+              >
+                SAVE POMODORO SESSION
+              </button>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Changes apply to the current timer when paused, and to new cycles right away.
-          </p>
-          <button
-            onClick={savePomodoro}
-            className="px-4 py-2.5 bg-primary text-primary-foreground"
-            style={{ fontFamily: "var(--font-pixel)", fontSize: 14 }}
-          >
-            APPLY TIMER SETTINGS
-          </button>
         </section>
       </div>
 

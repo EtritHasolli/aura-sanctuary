@@ -47,6 +47,16 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+  const supportSubject = "A wild bug has Appeared";
+  const supportBody = [
+    "A wild bug has Appeared!",
+    "",
+    `Error message: ${error.message}`,
+    error.stack ? `Stack: ${error.stack}` : "Stack: unavailable",
+    "",
+    `Path: ${typeof window !== "undefined" ? window.location.href : "unknown"}`,
+    `Time: ${new Date().toISOString()}`,
+  ].join("\n");
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
@@ -65,9 +75,9 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           Retry
         </button>
         <a
-          href={`mailto:support@aurasanctuary.app?subject=${encodeURIComponent(
-            "Aura Sanctuary bug report",
-          )}&body=${encodeURIComponent(`Error: ${error.message}`)}`}
+          href={`mailto:etrithasolli5@gmail.com?subject=${encodeURIComponent(
+            supportSubject,
+          )}&body=${encodeURIComponent(supportBody)}`}
           className="mt-3 block text-xs text-muted-foreground hover:text-primary"
           style={{ fontFamily: "var(--font-pixel)" }}
         >

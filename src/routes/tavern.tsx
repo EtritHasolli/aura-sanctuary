@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Send, UserPlus, Check, Mail, Flame, ArrowLeft, Info, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +34,8 @@ interface Party {
   boss_name: string;
   boss_hp: number;
   boss_max_hp: number;
+  boss_level?: number | null;
+  boss_loop_count?: number | null;
   invite_code?: string | null;
   leader_id?: string | null;
   boss_rage?: number | null;
@@ -87,6 +89,20 @@ interface PartyPlayer {
   equip_con_bonus?: number;
   equip_dex_bonus?: number;
 }
+
+const PARTY_CHAT_NAME_COLORS = [
+  "#f59e0b",
+  "#fb923c",
+  "#f97316",
+  "#22c55e",
+  "#14b8a6",
+  "#38bdf8",
+  "#60a5fa",
+  "#a78bfa",
+  "#f472b6",
+  "#f43f5e",
+];
+
 async function refreshPartyScaled(partyId: string) {
   const { error: syncErr } = await supabase.rpc("sync_party_boss_scaling", { p_party_id: partyId });
   if (syncErr) console.warn("sync_party_boss_scaling:", syncErr.message);
@@ -155,10 +171,10 @@ function TavernPage() {
   const [editingPartyName, setEditingPartyName] = useState("");
   const [adventure, setAdventure] = useState<Adventure | null>(null);
   const [pendingTeamDamage, setPendingTeamDamage] = useState(0);
-  const [startingDifficulty, setStartingDifficulty] = useState<Adventure["difficulty"] | "">("");
   const [showBossInfo, setShowBossInfo] = useState(false);
   const [playersOpen, setPlayersOpen] = useState(false);
   const [partyPlayers, setPartyPlayers] = useState<PartyPlayer[]>([]);
+  const [partyMemberIds, setPartyMemberIds] = useState<string[]>([]);
   const [playersLoading, setPlayersLoading] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -242,12 +258,26 @@ function TavernPage() {
       .order("created_at", { ascending: true })
       .limit(100);
     setMessages((msgs ?? []) as ChatMsg[]);
+    const { data: memberRows } = await supabase
+      .from("party_members")
+      .select("user_id")
+      .eq("party_id", partyId);
+    setPartyMemberIds(Array.from(new Set((memberRows ?? []).map((r) => r.user_id))));
     markTavernPartyRead(partyId);
     markMessageScopeRead.mutate(
       { scopeType: "party", scopeId: partyId },
       { onError: (e) => console.warn("mark party read failed", e) },
     );
   };
+
+  const chatNameColorByUserId = useMemo(() => {
+    const idsFromMessages = Array.from(new Set(messages.map((m) => m.user_id)));
+    const merged = Array.from(new Set([...partyMemberIds, ...idsFromMessages]));
+    const sorted = merged.sort((a, b) => a.localeCompare(b)).slice(0, PARTY_CHAT_NAME_COLORS.length);
+    const map = new Map<string, string>();
+    sorted.forEach((id, idx) => map.set(id, PARTY_CHAT_NAME_COLORS[idx]));
+    return map;
+  }, [messages, partyMemberIds]);
 
   const loadPartyPlayers = async (partyId: string) => {
     setPlayersLoading(true);
@@ -536,10 +566,10 @@ function TavernPage() {
   };
 
   const startAdventure = async () => {
-    if (!party || !startingDifficulty) return;
+    if (!party) return;
     const { error } = await supabase.rpc("start_party_adventure", {
       p_party_id: party.id,
-      p_difficulty: startingDifficulty,
+      p_difficulty: "party",
     });
     if (error) {
       toast.error(error.message);
@@ -548,8 +578,7 @@ function TavernPage() {
     await loadAdventure(party.id);
     const refreshed = await refreshPartyScaled(party.id);
     setParty(refreshed);
-    setStartingDifficulty("");
-    toast.success("Adventure started.");
+    toast.success("Boss hunt started.");
   };
 
   const invokeSkill = async (key: "swordsman" | "mage" | "rogue" | "tank") => {
@@ -692,26 +721,25 @@ function TavernPage() {
   return (
     <div className="p-6 max-w-6xl mx-auto h-full">
       <div className="space-y-4 h-full">
-        <div className="flex items-center">
-          <button
-            type="button"
-            onClick={() => {
-              setParty(null);
-              setMessages([]);
-              setAdventure(null);
-            }}
-            className="inline-flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-xs bg-background"
-            style={{ fontFamily: "var(--font-pixel)" }}
-            title="Back to party list"
-          >
-            <ArrowLeft size={14} />
-            <span>PARTIES</span>
-          </button>
-        </div>
         <div className="pixel-panel p-3 flex flex-col lg:flex-row lg:items-start gap-3">
           <div className="flex-1 min-w-0">
-            <div className="w-full border border-primary bg-primary/10 text-xs">
-              <div className="flex items-center gap-1 px-2 py-1">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setParty(null);
+                  setMessages([]);
+                  setAdventure(null);
+                }}
+                className="inline-flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-xs bg-background shrink-0"
+                style={{ fontFamily: "var(--font-pixel)" }}
+                title="Back to party list"
+              >
+                <ArrowLeft size={14} />
+                <span>PARTIES</span>
+              </button>
+              <div className="w-full border border-primary bg-primary/10 text-xs">
+                <div className="flex items-center gap-1 px-2 py-1">
                 {editingPartyId === party.id ? (
                   <input
                     autoFocus
@@ -745,6 +773,7 @@ function TavernPage() {
                     {editingPartyId === party.id ? "SAVE" : "EDIT"}
                   </button>
                 )}
+                </div>
               </div>
             </div>
           </div>
@@ -884,8 +913,11 @@ function TavernPage() {
                     }`}
                   >
                     <span
-                      className={m.user_id === user?.id ? "text-primary" : "text-accent"}
-                      style={{ fontFamily: "var(--font-pixel)", fontSize: 12 }}
+                      style={{
+                        color: chatNameColorByUserId.get(m.user_id) ?? "var(--color-primary)",
+                        fontFamily: "var(--font-pixel)",
+                        fontSize: 12,
+                      }}
                     >
                       {m.display_name}:
                     </span>{" "}
@@ -897,7 +929,7 @@ function TavernPage() {
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Speak..."
+                  placeholder="Cast into ink..."
                   className="flex-1 bg-input border-2 border-border px-2 py-1.5 text-sm focus:border-primary outline-none"
                 />
                 <button className="px-3 bg-primary text-primary-foreground">
@@ -938,14 +970,17 @@ function TavernPage() {
                 className="text-xs text-muted-foreground mt-1"
                 style={{ fontFamily: "var(--font-pixel)" }}
               >
-                {shownBossHp} / {shownBossMaxHp} HP · Shadow rage {party.boss_rage ?? 0}
+                LV {Math.max(1, Math.min(10, Number(party.boss_level ?? 1)))} · {shownBossHp} /{" "}
+                {shownBossMaxHp} HP
+                <br />
+                Shadow rage {party.boss_rage ?? 0}
               </p>
               {adventure?.active && (
                 <p
                   className="text-[10px] text-accent mt-1"
                   style={{ fontFamily: "var(--font-pixel)" }}
                 >
-                  Adventure: {adventure.difficulty.toUpperCase()}
+                  Adventure: BOSS LADDER
                   <br />
                   Pending team dmg: {pendingTeamDamage}
                 </p>
@@ -981,32 +1016,26 @@ function TavernPage() {
                 >
                   ADVENTURE BOSS
                 </div>
-                <div className="flex gap-1">
-                  <select
-                    value={startingDifficulty}
-                    onChange={(e) =>
-                      setStartingDifficulty(e.target.value as Adventure["difficulty"] | "")
-                    }
-                    className="flex-1 bg-input border-2 border-border px-2 py-1 text-sm"
-                  >
-                    <option value="">Select difficulty</option>
-                    <option value="easy">Easy</option>
-                    <option value="medium">Medium</option>
-                    <option value="hard">Hard</option>
-                    <option value="mythic">Mythic</option>
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => void startAdventure()}
-                    disabled={!startingDifficulty}
-                    className="px-2 py-1 bg-primary text-primary-foreground disabled:opacity-50 text-sm flex items-center gap-1"
-                  >
-                    <Flame size={10} /> START
-                  </button>
+                <div className="flex items-center justify-between border border-border px-2 py-1 text-sm">
+                  <span>Boss level</span>
+                  <span className="text-primary">
+                    {Math.max(1, Math.min(10, Number(party.boss_level ?? 1)))}
+                  </span>
                 </div>
+                {!adventure?.active && (
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void startAdventure()}
+                      className="w-full px-2 py-1 bg-primary text-primary-foreground text-sm flex items-center justify-center gap-1"
+                    >
+                      <Flame size={10} /> START
+                    </button>
+                  </div>
+                )}
                 <p className="text-sm text-muted-foreground">
-                  Daily/todo completions and habit + actions accumulate party damage, applied at
-                  midnight.
+                  Defeat bosses from level 1 to level 10. After level 10, the final boss remains and
+                  keeps scaling up.
                 </p>
               </div>
             )}

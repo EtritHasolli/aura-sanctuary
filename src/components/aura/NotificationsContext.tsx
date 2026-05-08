@@ -141,8 +141,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     (partyId: string) => {
       void markMatchingRead((message) => {
         const match = message.match(/\/tavern\?([^\s]+)/i);
-        return match ? new URLSearchParams(match[1]).get("party") === partyId : false;
-      }, `%/tavern?%party=${partyId}%`);
+        if (!match) return false;
+        const params = new URLSearchParams(match[1]);
+        return params.get("party") === partyId || params.get("invite") === partyId;
+      }, `%/tavern?%${partyId}%`);
     },
     [markMatchingRead],
   );

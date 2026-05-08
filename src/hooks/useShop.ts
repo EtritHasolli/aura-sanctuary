@@ -109,9 +109,14 @@ export function usePurchaseShopItem() {
       const row = rows[0] as PurchaseResult | undefined;
       if (!row) throw new Error("Purchase returned no row");
       if (goldSpentForArc > 0) {
-        await supabase
-          .rpc("record_quest_arc_event", { p_kind: "spend_gold", p_amount: goldSpentForArc })
-          .catch(() => undefined);
+        try {
+          await supabase.rpc("record_quest_arc_event", {
+            p_kind: "spend_gold",
+            p_amount: goldSpentForArc,
+          });
+        } catch {
+          // best-effort arc tracking; purchase should still succeed
+        }
       }
       return row;
     },

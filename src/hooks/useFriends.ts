@@ -17,6 +17,7 @@ export interface FriendCard {
     | "max_stamina"
     | "avatar_url"
     | "character_state"
+    | "aura_path"
   >;
   companionSpriteKey?: string | null;
   companionLabel?: string | null;
@@ -46,8 +47,9 @@ export interface FriendDetail {
     | "aura_path"
   >;
   equippedItems: Array<{ id: string; name: string; category: string; rarity: string }>;
-  sharedParty: { id: string; name: string } | null;
-  myParty: { id: string; name: string } | null;
+  commonParties: Array<{ id: string; name: string }>;
+  myParties: Array<{ id: string; name: string }>;
+  inviteableParties: Array<{ id: string; name: string }>;
 }
 
 export interface PendingFriendRequest {
@@ -83,7 +85,7 @@ export function useFriends() {
       const { data: profiles, error: profErr } = await supabase
         .from("profiles")
         .select(
-          "id, display_name, level, hp, max_hp, xp, stamina, max_stamina, avatar_url, pet_state",
+          "id, display_name, level, hp, max_hp, xp, stamina, max_stamina, avatar_url, pet_state, aura_path",
         )
         .in("id", friendIds);
       if (profErr) throw profErr;
@@ -123,6 +125,7 @@ export function useFriends() {
           max_stamina: number;
           avatar_url: string | null;
           pet_state: string;
+          aura_path: Profile["aura_path"];
         };
         return {
           id: r.id,
@@ -137,6 +140,7 @@ export function useFriends() {
             max_stamina: r.max_stamina,
             avatar_url: r.avatar_url,
             character_state: r.pet_state as CharacterState,
+            aura_path: r.aura_path,
           },
           companionSpriteKey: companionByUserId.get(r.id)?.sprite_key ?? null,
           companionLabel: companionByUserId.get(r.id)?.name ?? null,
@@ -265,27 +269,25 @@ export function useFriendDetail(friendId: string | null) {
       if (profileErr) throw profileErr;
       if (!profile) throw new Error("Friend profile not found");
 
-      const { data: equippedRows } = await supabase
-        .from("user_items")
-        .select("item_id, shop_items(name, category, rarity)")
-        .eq("user_id", friendId!)
-        .eq("equipped", true);
+      const { data: equippedRows, error: equippedErr } = await supabase.rpc(
+        "get_friend_equipped_items",
+        { p_friend_id: friendId! },
+      );
+      if (equippedErr) throw equippedErr;
       const equippedItems = (
         (equippedRows ?? []) as Array<{
           item_id: string;
-          shop_items?: {
-            name?: string | null;
-            category?: string | null;
-            rarity?: string | null;
-          } | null;
+          name?: string | null;
+          category?: string | null;
+          rarity?: string | null;
         }>
       )
         .filter((r) => !!r.item_id)
         .map((r) => ({
           id: r.item_id,
-          name: r.shop_items?.name ?? "Item",
-          category: r.shop_items?.category ?? "misc",
-          rarity: r.shop_items?.rarity ?? "common",
+          name: r.name ?? "Item",
+          category: r.category ?? "misc",
+          rarity: r.rarity ?? "common",
         }));
 
       const { data: myMemberRows, error: myMemberErr } = await supabase
@@ -302,13 +304,13 @@ export function useFriendDetail(friendId: string | null) {
 
       const myPartyIds = Array.from(new Set((myMemberRows ?? []).map((r) => r.party_id)));
       const friendPartyIds = new Set((friendMemberRows ?? []).map((r) => r.party_id));
-      const sharedPartyId = myPartyIds.find((id) => friendPartyIds.has(id)) ?? null;
 
       const { data: myPartyRows } = myPartyIds.length
-        ? await supabase.from("parties").select("id, name").in("id", myPartyIds).limit(10)
+        ? await supabase.from("parties").select("id, name").in("id", myPartyIds).limit(25)
         : { data: [] as Array<{ id: string; name: string }> };
-      const myParty = (myPartyRows ?? [])[0] ?? null;
-      const sharedParty = (myPartyRows ?? []).find((p) => p.id === sharedPartyId) ?? null;
+      const myParties = (myPartyRows ?? []) as Array<{ id: string; name: string }>;
+      const commonParties = myParties.filter((p) => friendPartyIds.has(p.id));
+      const inviteableParties = myParties.filter((p) => !friendPartyIds.has(p.id));
 
       const p = profile as Omit<FriendDetail["profile"], "character_state"> & { pet_state: string };
       const { pet_state, ...rest } = p;
@@ -316,8 +318,9 @@ export function useFriendDetail(friendId: string | null) {
       return {
         profile: { ...rest, character_state: pet_state as CharacterState },
         equippedItems,
-        sharedParty,
-        myParty,
+        commonParties,
+        myParties,
+        inviteableParties,
       } as FriendDetail;
     },
   });

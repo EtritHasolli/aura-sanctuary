@@ -12,7 +12,8 @@ import {
   useSendFriendRequestByEmail,
 } from "@/hooks/useFriends";
 import { CompanionSprite } from "@/components/aura/CompanionSprite";
-import { xpForLevel } from "@/lib/aura/types";
+import { xpForLevel, type Profile } from "@/lib/aura/types";
+import { pathCharacterSpriteSrc } from "@/lib/aura/pathCharacterSprites";
 import {
   effectiveConstitution,
   effectiveDexterity,
@@ -43,6 +44,10 @@ export const Route = createFileRoute("/friends")({
   }),
   component: FriendsPage,
 });
+
+/** Match HUD-style path portrait crop (head-focused). */
+const FRIEND_PATH_HEAD_SCALE = 3.5;
+const FRIEND_PATH_HEAD_NUDGE_Y_PX = -25;
 
 function Meter({
   label,
@@ -96,6 +101,7 @@ function FriendsPage() {
   const inviteFriendToParty = useInviteFriendToParty();
   const [friendMessages, setFriendMessages] = useState<FriendMessage[]>([]);
   const [friendMessageInput, setFriendMessageInput] = useState("");
+  const [selectedInvitePartyId, setSelectedInvitePartyId] = useState<string>("");
   const friendWsRef = useRef<WebSocket | null>(null);
   const friendReconnectTimerRef = useRef<number | null>(null);
   const friendReconnectDelayRef = useRef(1000);
@@ -132,6 +138,11 @@ function FriendsPage() {
   useEffect(() => {
     if (friendSearchId) setSelectedFriendId(friendSearchId);
   }, [friendSearchId]);
+
+  useEffect(() => {
+    const firstInviteable = selectedDetail?.inviteableParties?.[0]?.id ?? "";
+    setSelectedInvitePartyId(firstInviteable);
+  }, [selectedDetail?.inviteableParties]);
 
   useEffect(() => {
     if (!selectedFriendId) return;
@@ -294,7 +305,7 @@ function FriendsPage() {
       <div className="pixel-panel p-3 space-y-2">
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
-            Invite by link or email (same flow as parties).
+            Invite by link or email.
           </p>
           <div className="flex items-center gap-1">
             <button
@@ -416,13 +427,27 @@ function FriendsPage() {
                     />
                   ) : null}
                 </div>
-                <div className="w-12 h-12 flex items-center justify-center">
-                  <CompanionSprite
-                    state={f.profile.character_state}
-                    size={42}
-                    gear={[]}
-                    companionSpriteKey={f.companionSpriteKey ?? undefined}
-                  />
+                <div className="relative h-12 w-12 shrink-0 overflow-hidden">
+                  {f.profile.aura_path ? (
+                    <img
+                      key={`${f.id}-${f.profile.aura_path}`}
+                      src={pathCharacterSpriteSrc(f.profile.aura_path, "idle")}
+                      alt={`${f.profile.display_name} path character`}
+                      className="pointer-events-none absolute left-1/2 top-0 block w-12 max-w-none h-auto"
+                      style={{
+                        imageRendering: "pixelated",
+                        transform: `translateX(-50%) translateY(${FRIEND_PATH_HEAD_NUDGE_Y_PX}px) scale(${FRIEND_PATH_HEAD_SCALE})`,
+                        transformOrigin: "top center",
+                      }}
+                    />
+                  ) : (
+                    <CompanionSprite
+                      state={f.profile.character_state}
+                      size={42}
+                      gear={[]}
+                      companionSpriteKey={f.companionSpriteKey ?? undefined}
+                    />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div
@@ -430,6 +455,25 @@ function FriendsPage() {
                     style={{ fontFamily: "var(--font-pixel)" }}
                   >
                     {f.profile.display_name}
+                    {f.profile.aura_path && (
+                      <span
+                        className="ml-2 text-[10px] align-middle"
+                        style={{
+                          color:
+                            f.profile.aura_path === "swordsman"
+                              ? "#d97706"
+                              : f.profile.aura_path === "mage"
+                                ? "#2563eb"
+                                : f.profile.aura_path === "rogue"
+                                  ? "#a21caf"
+                                  : "#15803d",
+                        }}
+                      >
+                        {f.profile.aura_path === "tank"
+                          ? "PALADIN"
+                          : f.profile.aura_path.toUpperCase()}
+                      </span>
+                    )}
                   </div>
                   <div
                     className="text-xs text-muted-foreground"
@@ -474,6 +518,11 @@ function FriendsPage() {
             <p className="text-sm text-muted-foreground">Loading friend details...</p>
           ) : (
             <div className="space-y-3">
+              {(() => {
+                const commonParties = selectedDetail.commonParties ?? [];
+                const inviteableParties = selectedDetail.inviteableParties ?? [];
+                return (
+                  <>
               <div className="flex items-center gap-3">
                 <div className="w-14 h-14 border-2 border-border bg-secondary overflow-hidden">
                   {selectedDetail.profile.avatar_url ? (
@@ -501,10 +550,10 @@ function FriendsPage() {
               </div>
 
               <div className="grid grid-cols-3 gap-2">
-                <StatChip label="STR" value={effectiveStrength(selectedDetail.profile)} />
-                <StatChip label="INT" value={effectiveIntelligence(selectedDetail.profile)} />
-                <StatChip label="CON" value={effectiveConstitution(selectedDetail.profile)} />
-                <StatChip label="DEX" value={effectiveDexterity(selectedDetail.profile)} />
+                <StatChip label="STR" value={effectiveStrength(selectedDetail.profile as Profile)} />
+                <StatChip label="INT" value={effectiveIntelligence(selectedDetail.profile as Profile)} />
+                <StatChip label="CON" value={effectiveConstitution(selectedDetail.profile as Profile)} />
+                <StatChip label="DEX" value={effectiveDexterity(selectedDetail.profile as Profile)} />
               </div>
 
               <div>
@@ -527,42 +576,74 @@ function FriendsPage() {
                 )}
               </div>
 
-              <div className="text-xs text-muted-foreground">
-                {selectedDetail.sharedParty
-                  ? `You are in the same party: ${selectedDetail.sharedParty.name}`
-                  : "You are not in the same party."}
+              <div>
+                <div
+                  className="text-xs text-muted-foreground mb-1"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
+                  PARTIES IN COMMON
+                </div>
+                {commonParties.length === 0 ? (
+                  <div className="text-xs text-muted-foreground">No parties in common.</div>
+                ) : (
+                  <div className="flex flex-col gap-0.5 text-xs text-foreground">
+                    {commonParties.map((p) => (
+                      <div key={p.id}>
+                        {p.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end">
+                {inviteableParties.length > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedInvitePartyId}
+                      onChange={(e) => setSelectedInvitePartyId(e.target.value)}
+                      className="px-2 py-1.5 bg-input border-2 border-border text-xs"
+                      style={{ fontFamily: "var(--font-pixel)" }}
+                    >
+                      {inviteableParties.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={inviteFriendToParty.isPending || !selectedInvitePartyId}
+                      onClick={() => {
+                        if (!selectedFriendId || !selectedInvitePartyId) return;
+                        inviteFriendToParty
+                          .mutateAsync({
+                            friendId: selectedFriendId,
+                            partyId: selectedInvitePartyId,
+                          })
+                          .then(() => toast.success("Party invite sent to friend notifications."))
+                          .catch((e: unknown) =>
+                            toast.error(e instanceof Error ? e.message : "Could not invite friend."),
+                          );
+                      }}
+                      className="px-3 py-1.5 bg-primary text-primary-foreground disabled:opacity-50 text-xs flex items-center gap-1"
+                      style={{ fontFamily: "var(--font-pixel)" }}
+                    >
+                      <PlusCircle size={12} />
+                      {inviteFriendToParty.isPending ? "INVITING..." : "INVITE TO PARTY"}
+                    </button>
+                  </div>
+                ) : (
                 <button
                   type="button"
-                  disabled={
-                    !selectedDetail.myParty ||
-                    !!selectedDetail.sharedParty ||
-                    inviteFriendToParty.isPending
-                  }
-                  onClick={() => {
-                    if (!selectedFriendId || !selectedDetail.myParty) return;
-                    inviteFriendToParty
-                      .mutateAsync({
-                        friendId: selectedFriendId,
-                        partyId: selectedDetail.myParty.id,
-                      })
-                      .then(() => toast.success("Party invite sent to friend notifications."))
-                      .catch((e: unknown) =>
-                        toast.error(e instanceof Error ? e.message : "Could not invite friend."),
-                      );
-                  }}
+                  disabled
                   className="px-3 py-1.5 bg-primary text-primary-foreground disabled:opacity-50 text-xs flex items-center gap-1"
                   style={{ fontFamily: "var(--font-pixel)" }}
                 >
                   <PlusCircle size={12} />
-                  {selectedDetail.sharedParty
-                    ? "ALREADY IN PARTY"
-                    : inviteFriendToParty.isPending
-                      ? "INVITING..."
-                      : "ADD TO MY PARTY"}
+                  NO INVITES
                 </button>
+                )}
               </div>
 
               <div className="pt-2 border-t-2 border-border space-y-2">
@@ -613,7 +694,7 @@ function FriendsPage() {
                         void sendFriendMessage();
                       }
                     }}
-                    placeholder="Send a message..."
+                    placeholder="Write to thy ally…"
                     className="flex-1 px-2 py-2 bg-input border-2 border-border text-sm"
                   />
                   <button
@@ -627,6 +708,9 @@ function FriendsPage() {
                   </button>
                 </div>
               </div>
+                  </>
+                );
+              })()}
             </div>
           )}
         </DialogContent>
