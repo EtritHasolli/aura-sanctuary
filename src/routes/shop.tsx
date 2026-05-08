@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Coins, Shirt, ShoppingBag, Sparkles } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
-import { useShopItems, usePurchaseShopItem } from "@/hooks/useShop";
+import { useShopItems, usePurchaseShopItem, getItemIconUrl } from "@/hooks/useShop";
 import { InventoryBag } from "@/components/aura/InventoryBag";
 import { toast } from "sonner";
 
@@ -234,20 +234,31 @@ function ShopPage() {
               return (
                 <li
                   key={item.id}
-                  className="pixel-panel p-3 flex flex-wrap items-start gap-3 justify-between"
+                  className="pixel-panel p-3 flex items-start gap-3 justify-between"
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
-                        {item.name}
-                      </span>
-                      <span
-                        className={`text-[10px] uppercase ${rarityClass(item.rarity)}`}
-                        style={{ fontFamily: "var(--font-pixel)" }}
-                      >
-                        {item.rarity}
-                      </span>
+                  <div className="flex gap-3 min-w-0 flex-1">
+                    <div className="w-12 h-12 bg-background/50 border-2 border-border flex items-center justify-center shrink-0">
+                      <img
+                        src={getItemIconUrl(item.slug)}
+                        alt={item.name}
+                        className="w-10 h-10 pixelated object-contain"
+                        onError={(e) => {
+                          e.currentTarget.style.opacity = "0";
+                        }}
+                      />
                     </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
+                          {item.name}
+                        </span>
+                        <span
+                          className={`text-[10px] uppercase ${rarityClass(item.rarity)}`}
+                          style={{ fontFamily: "var(--font-pixel)" }}
+                        >
+                          {item.rarity}
+                        </span>
+                      </div>
                     <p
                       className="text-xs text-muted-foreground mt-1"
                       style={{ fontFamily: "var(--font-display)" }}
@@ -262,7 +273,8 @@ function ShopPage() {
                       {item.season_slug ? ` · ${item.season_slug}` : ""}
                     </p>
                   </div>
-                  <div className="flex flex-col items-end gap-1 shrink-0">
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
                     <span
                       className="text-sm text-[color:var(--color-gold)]"
                       style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}

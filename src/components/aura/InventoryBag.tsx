@@ -1,5 +1,5 @@
 import { Package } from "lucide-react";
-import { useUserItems, useConsumeUserItem } from "@/hooks/useShop";
+import { useUserItems, useConsumeUserItem, getItemIconUrl } from "@/hooks/useShop";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -39,19 +39,38 @@ export function InventoryBag({ listMaxHeightClass = "max-h-[50vh]", className }:
       )}
       <ul className={`space-y-2 overflow-y-auto ${listMaxHeightClass}`}>
         {bag?.map((row) => (
-          <li key={row.id} className="border-2 border-border p-2 text-xs">
-            <div className="flex justify-between gap-2">
-              <span style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}>{row.shop_items.name}</span>
-              <span className="text-muted-foreground">×{row.quantity}</span>
+          <li key={row.id} className="border-2 border-border p-2 text-xs flex gap-2">
+            <div className="w-10 h-10 bg-background/50 border-2 border-border flex items-center justify-center shrink-0 overflow-hidden">
+              <img
+                src={getItemIconUrl(row.shop_items.slug)}
+                alt={row.shop_items.name}
+                className="w-8 h-8 pixelated object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.opacity = "0";
+                }}
+              />
             </div>
-            <div className="text-[10px] text-muted-foreground mt-1" style={{ fontFamily: "var(--font-display)" }}>
-              {row.shop_items.description}
-            </div>
-            {row.equipped && (
-              <span className="text-[9px] text-[color:var(--color-hp)]" style={{ fontFamily: "var(--font-pixel)" }}>
-                EQUIPPED
-              </span>
-            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex justify-between gap-2">
+                <span style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}>
+                  {row.shop_items.name}
+                </span>
+                <span className="text-muted-foreground shrink-0">×{row.quantity}</span>
+              </div>
+              <div
+                className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {row.shop_items.description}
+              </div>
+              {row.equipped && (
+                <span
+                  className="text-[9px] text-[color:var(--color-hp)]"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
+                  EQUIPPED
+                </span>
+              )}
             {row.shop_items.category === "consumable" && (
               <button
                 type="button"
@@ -63,6 +82,7 @@ export function InventoryBag({ listMaxHeightClass = "max-h-[50vh]", className }:
                 USE
               </button>
             )}
+            </div>
           </li>
         ))}
       </ul>

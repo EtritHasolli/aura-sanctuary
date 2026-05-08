@@ -110,7 +110,7 @@ export function usePurchaseShopItem() {
       if (!row) throw new Error("Purchase returned no row");
       if (goldSpentForArc > 0) {
         try {
-          await supabase.rpc("record_quest_arc_event", {
+          await (supabase as any).rpc("record_quest_arc_event", {
             p_kind: "spend_gold",
             p_amount: goldSpentForArc,
           });
@@ -212,4 +212,10 @@ export function useConsumeUserItem() {
       qc.invalidateQueries({ queryKey: ["profile", user?.id] });
     },
   });
+}
+
+/** Returns the public Supabase Storage URL for an item's icon based on its slug. */
+export function getItemIconUrl(slug: string) {
+  const { data } = supabase.storage.from("item-icons").getPublicUrl(`${slug}.png`);
+  return data.publicUrl;
 }

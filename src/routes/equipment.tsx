@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Hammer, Shirt, Info } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import {
+  getItemIconUrl,
   useEquipUserItem,
   useUnequipUserItem,
   useUserItems,
@@ -206,20 +207,31 @@ function EquipmentPage() {
             return (
               <li
                 key={row.id}
-                className="pixel-panel p-3 flex flex-wrap gap-3 justify-between items-start"
+                className="pixel-panel p-3 flex items-start gap-3 justify-between"
               >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <span style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
-                      {row.shop_items.name}
-                    </span>
-                    <span
-                      className="text-[10px] uppercase text-accent"
-                      style={{ fontFamily: "var(--font-pixel)" }}
-                    >
-                      {slotLabel(meta as Record<string, unknown>)}
-                    </span>
+                <div className="flex gap-3 min-w-0 flex-1">
+                  <div className="w-12 h-12 bg-background/50 border-2 border-border flex items-center justify-center shrink-0">
+                    <img
+                      src={getItemIconUrl(row.shop_items.slug)}
+                      alt={row.shop_items.name}
+                      className="w-10 h-10 pixelated object-contain"
+                      onError={(e) => {
+                        e.currentTarget.style.opacity = "0";
+                      }}
+                    />
                   </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <span style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
+                        {row.shop_items.name}
+                      </span>
+                      <span
+                        className="text-[10px] uppercase text-accent"
+                        style={{ fontFamily: "var(--font-pixel)" }}
+                      >
+                        {slotLabel(meta as Record<string, unknown>)}
+                      </span>
+                    </div>
                   {bonuses && (
                     <p
                       className="text-[10px] text-primary mt-1"
@@ -236,7 +248,8 @@ function EquipmentPage() {
                     </p>
                   )}
                 </div>
-                <button
+              </div>
+              <button
                   type="button"
                   disabled={unequip.isPending}
                   onClick={() => onUnequip(row.id)}
@@ -265,26 +278,37 @@ function EquipmentPage() {
             return (
               <li
                 key={row.id}
-                className="pixel-panel p-3 flex flex-wrap gap-3 justify-between items-start"
+                className="pixel-panel p-3 flex items-start gap-3 justify-between"
               >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <span style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
-                      {row.shop_items.name}
-                    </span>
-                    <span
-                      className="text-[10px] uppercase text-muted-foreground"
-                      style={{ fontFamily: "var(--font-pixel)" }}
-                    >
-                      ×{row.quantity}
-                    </span>
-                    <span
-                      className="text-[10px] uppercase text-accent"
-                      style={{ fontFamily: "var(--font-pixel)" }}
-                    >
-                      {slotLabel(meta as Record<string, unknown>)}
-                    </span>
+                <div className="flex gap-3 min-w-0 flex-1">
+                  <div className="w-12 h-12 bg-background/50 border-2 border-border flex items-center justify-center shrink-0">
+                    <img
+                      src={getItemIconUrl(row.shop_items.slug)}
+                      alt={row.shop_items.name}
+                      className="w-10 h-10 pixelated object-contain"
+                      onError={(e) => {
+                        e.currentTarget.style.opacity = "0";
+                      }}
+                    />
                   </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <span style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
+                        {row.shop_items.name}
+                      </span>
+                      <span
+                        className="text-[10px] uppercase text-muted-foreground"
+                        style={{ fontFamily: "var(--font-pixel)" }}
+                      >
+                        ×{row.quantity}
+                      </span>
+                      <span
+                        className="text-[10px] uppercase text-accent"
+                        style={{ fontFamily: "var(--font-pixel)" }}
+                      >
+                        {slotLabel(meta as Record<string, unknown>)}
+                      </span>
+                    </div>
                   {bonuses && (
                     <p
                       className="text-[10px] text-muted-foreground mt-1"
@@ -301,7 +325,8 @@ function EquipmentPage() {
                     </p>
                   )}
                 </div>
-                <button
+              </div>
+              <button
                   type="button"
                   disabled={equip.isPending}
                   onClick={() => onEquip(row.id)}

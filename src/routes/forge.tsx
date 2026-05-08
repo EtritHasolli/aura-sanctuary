@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Hammer, Shirt, X, Info } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useUserItems, useForgeThreeEquipment } from "@/hooks/useShop";
+import { useUserItems, useForgeThreeEquipment, getItemIconUrl } from "@/hooks/useShop";
 import type { UserItemRow } from "@/hooks/useShop";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
@@ -214,28 +214,39 @@ function ForgePage() {
             return (
               <li
                 key={row.id}
-                className="pixel-panel p-3 flex flex-wrap items-center justify-between gap-2"
+                className="pixel-panel p-3 flex items-center justify-between gap-3"
               >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <span style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
-                      {row.shop_items.name}
-                    </span>
-                    <span
-                      className="text-[10px] uppercase text-muted-foreground"
-                      style={{ fontFamily: "var(--font-pixel)" }}
-                    >
-                      {rar}
-                    </span>
-                    {row.equipped ? (
+                <div className="flex gap-3 min-w-0">
+                  <div className="w-10 h-10 bg-background/50 border-2 border-border flex items-center justify-center shrink-0">
+                    <img
+                      src={getItemIconUrl(row.shop_items.slug)}
+                      alt={row.shop_items.name}
+                      className="w-8 h-8 pixelated object-contain"
+                      onError={(e) => {
+                        e.currentTarget.style.opacity = "0";
+                      }}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <span style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}>
+                        {row.shop_items.name}
+                      </span>
                       <span
-                        className="text-[9px] text-destructive"
+                        className="text-[10px] uppercase text-muted-foreground"
                         style={{ fontFamily: "var(--font-pixel)" }}
                       >
-                        EQUIPPED
+                        {rar}
                       </span>
-                    ) : null}
-                  </div>
+                      {row.equipped ? (
+                        <span
+                          className="text-[9px] text-destructive"
+                          style={{ fontFamily: "var(--font-pixel)" }}
+                        >
+                          EQUIPPED
+                        </span>
+                      ) : null}
+                    </div>
                   <p
                     className="text-[10px] text-muted-foreground mt-0.5"
                     style={{ fontFamily: "var(--font-display)" }}
@@ -244,7 +255,8 @@ function ForgePage() {
                     {n > 0 ? ` · ${n} in basket` : ""}
                   </p>
                 </div>
-                <button
+              </div>
+              <button
                   type="button"
                   disabled={!canAdd}
                   onClick={() => addChip(row)}
