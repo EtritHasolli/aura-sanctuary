@@ -24,6 +24,10 @@ dist-ssr
 .nitro
 *.local
 
+# Electron build output
+electron-dist
+release
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

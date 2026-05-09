@@ -178,9 +178,6 @@ function TavernPage() {
   const [playersLoading, setPlayersLoading] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimerRef = useRef<number | null>(null);
-  const reconnectDelayRef = useRef(1000);
   const markMessageScopeReadRef = useRef(markMessageScopeRead);
   const INVITE_PROCESSED_KEY = "tavernInviteProcessed";
 
@@ -384,53 +381,21 @@ function TavernPage() {
     return () => window.clearTimeout(timer);
   }, [messageSearchId]);
 
+  // Realtime chat — mirrors the boss-HP subscription already used for the parties table
   useEffect(() => {
     if (!party?.id) return;
-    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${wsProtocol}//${window.location.host}/ws/tavern`;
-    let stopped = false;
-
-    const connect = () => {
-      if (stopped) return;
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        reconnectDelayRef.current = 1000;
-        ws.send(JSON.stringify({ type: "join", partyId: party.id }));
-        void (async () => {
-          const { data: latest } = await supabase
-            .from("chat_messages")
-            .select("*")
-            .eq("party_id", party.id)
-            .order("created_at", { ascending: true })
-            .limit(100);
-          const rows = (latest ?? []) as ChatMsg[];
-          if (!rows.length) return;
-          setMessages((prev) => {
-            const seen = new Set(prev.map((m) => m.id));
-            const next = [...prev];
-            for (const row of rows) {
-              if (!seen.has(row.id)) next.push(row);
-            }
-            return next;
-          });
-        })();
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const packet = JSON.parse(String(event.data ?? "")) as {
-            type?: string;
-            message?: ChatMsg;
-            partyId?: string;
-          };
-          if (packet.type === "joined") {
-            return;
-          }
-          if (packet.type !== "chat" || !packet.message || packet.message.party_id !== party.id)
-            return;
-          const msg = packet.message;
+    const channel = supabase
+      .channel(`party-chat:${party.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_messages",
+          filter: `party_id=eq.${party.id}`,
+        },
+        (payload) => {
+          const msg = payload.new as ChatMsg;
           setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
           if (msg.user_id !== user?.id) {
             void markMessageScopeReadRef.current.mutateAsync({
@@ -439,32 +404,11 @@ function TavernPage() {
             });
             markTavernPartyRead(party.id);
           }
-        } catch {
-          // Ignore malformed packets
-        }
-      };
-
-      ws.onclose = () => {
-        if (stopped) return;
-        const delay = reconnectDelayRef.current;
-        reconnectDelayRef.current = Math.min(10_000, delay * 2);
-        reconnectTimerRef.current = window.setTimeout(connect, delay);
-      };
-    };
-
-    connect();
+        },
+      )
+      .subscribe();
     return () => {
-      stopped = true;
-      if (reconnectTimerRef.current) {
-        window.clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
-      reconnectDelayRef.current = 1000;
-      if (wsRef.current?.readyState === WebSocket.OPEN && party?.id) {
-        wsRef.current.send(JSON.stringify({ type: "leave", partyId: party.id }));
-      }
-      wsRef.current?.close();
-      wsRef.current = null;
+      supabase.removeChannel(channel);
     };
   }, [party?.id, user?.id]);
 
@@ -473,26 +417,17 @@ function TavernPage() {
     if (!input.trim() || !party || !user || !profile) return;
     const text = input.trim();
     setInput("");
-    const { data, error } = await supabase
-      .from("chat_messages")
-      .insert({
-        party_id: party.id,
-        user_id: user.id,
-        display_name: profile.display_name,
-        content: text,
-      })
-      .select("*")
-      .single();
+    const { error } = await supabase.from("chat_messages").insert({
+      party_id: party.id,
+      user_id: user.id,
+      display_name: profile.display_name,
+      content: text,
+    });
     if (error) {
       toast.error(error.message);
-      return;
+      setInput(text);
     }
-    const row = data as ChatMsg;
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: "chat", partyId: party.id, message: row }));
-    } else {
-      setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, row]));
-    }
+    // Realtime subscription delivers the new message to all clients including sender
   };
 
   const joinWithCode = async () => {

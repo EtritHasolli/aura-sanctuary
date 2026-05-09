@@ -4,13 +4,9 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
-  HeadContent,
-  Scripts,
   useRouterState,
 } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-
-import appCss from "../styles.css?url";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile, useApplyReward } from "@/hooks/useProfile";
@@ -89,59 +85,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Aura — The Desktop Sanctuary" },
-      {
-        name: "description",
-        content: "A productivity RPG where your habits power your sanctuary.",
-      },
-      { property: "og:title", content: "Aura — The Desktop Sanctuary" },
-      { name: "twitter:title", content: "Aura — The Desktop Sanctuary" },
-      {
-        property: "og:description",
-        content: "A productivity RPG where your habits power your sanctuary.",
-      },
-      {
-        name: "twitter:description",
-        content: "A productivity RPG where your habits power your sanctuary.",
-      },
-      {
-        property: "og:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5b90adb9-4ddd-48ed-b6e8-4a3024c6758a/id-preview-81d33f96--e9335d2c-6c11-4c04-81b3-3c8eee4b82ff.lovable.app-1778095997293.png",
-      },
-      {
-        name: "twitter:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5b90adb9-4ddd-48ed-b6e8-4a3024c6758a/id-preview-81d33f96--e9335d2c-6c11-4c04-81b3-3c8eee4b82ff.lovable.app-1778095997293.png",
-      },
-      { name: "twitter:card", content: "summary_large_image" },
-      { property: "og:type", content: "website" },
-    ],
-    links: [{ rel: "stylesheet", href: appCss }],
-  }),
-  shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
-
-function RootShell({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  );
-}
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();

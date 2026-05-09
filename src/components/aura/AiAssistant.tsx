@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, Send, X } from "lucide-react";
 import { useRouterState } from "@tanstack/react-router";
 import ReactMarkdown from "react-markdown";
+import { supabase } from "@/integrations/supabase/client";
 
 type ChatRole = "user" | "assistant";
 type ChatMessage = { role: ChatRole; content: string };
@@ -139,28 +140,19 @@ export function AiAssistant() {
     setInput("");
     setLoading(true);
     try {
-      const response = await fetch("/api/chatbot", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          routePath,
-          messages: nextMessages.slice(-10),
-        }),
+      const { data, error } = await supabase.functions.invoke("chatbot", {
+        body: { messages: nextMessages.slice(-10), routePath },
       });
-      if (!response.ok) {
-        throw new Error(`Assistant error (${response.status})`);
-      }
-      const data = (await response.json()) as { answer?: string };
-      const answer = data.answer?.trim() || "I could not generate an answer right now.";
+      if (error) throw error;
+      const answer =
+        (data as { answer?: string })?.answer?.trim() ||
+        "I could not generate an answer right now.";
       setMessages((prev) => [...prev, { role: "assistant", content: answer }]);
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Unknown error";
       setMessages((prev) => [
         ...prev,
-        {
-          role: "assistant",
-          content: `I hit an error: ${msg}. Please try again.`,
-        },
+        { role: "assistant", content: `I hit an error: ${msg}. Please try again.` },
       ]);
     } finally {
       setLoading(false);
