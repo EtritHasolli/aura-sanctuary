@@ -32,4 +32,4 @@ publish:
   provider: github
   owner: EtritHasolli
   repo: aura-sanctuary
-  draft: false
+  releaseType: release
