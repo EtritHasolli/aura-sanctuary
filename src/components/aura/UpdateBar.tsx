@@ -39,7 +39,7 @@ export function UpdateBar() {
   if (phase === "ready") {
     return (
       <div
-        className="fixed top-0 left-0 right-0 z-[10000] flex items-center justify-between px-4 py-1.5 bg-primary text-primary-foreground text-[10px]"
+        className="w-full shrink-0 flex items-center justify-between px-4 py-1.5 bg-primary text-primary-foreground text-[10px]"
         style={{ fontFamily: "var(--font-pixel)" }}
       >
         <span>Update ready — restart to install</span>
@@ -54,7 +54,7 @@ export function UpdateBar() {
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[10000] h-[3px] bg-muted">
+    <div className="w-full shrink-0 h-[3px] bg-muted">
       <div
         className="h-full bg-primary transition-all duration-500 ease-out"
         style={{ width: `${percent}%` }}

@@ -65,23 +65,23 @@ function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
-      <div className="absolute inset-0 opacity-20" style={{
+    <div className="min-h-full flex items-start sm:items-center justify-center bg-background p-4 relative overflow-y-auto">
+      <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
         background: "radial-gradient(circle at 50% 40%, var(--color-primary), transparent 60%)"
       }} />
-      <div className="pixel-panel p-8 w-full max-w-sm relative">
-        <div className="text-center mb-6">
+      <div className="pixel-panel p-4 sm:p-8 w-full max-w-sm relative my-auto">
+        <div className="text-center mb-4 sm:mb-6">
           <img
             src={APP_LOGO_URL}
             alt=""
             width={96}
             height={96}
-            className="mx-auto mb-4 h-24 w-24 object-contain"
+            className="mx-auto mb-2 sm:mb-4 h-16 w-16 sm:h-24 sm:w-24 object-contain"
             style={{ imageRendering: "pixelated" }}
             decoding="async"
           />
-          <h1 className="text-2xl text-primary" style={{ fontFamily: "var(--font-pixel)" }}>AURA</h1>
-          <p className="text-xs text-muted-foreground mt-2" style={{ fontFamily: "var(--font-pixel)" }}>
+          <h1 className="text-xl sm:text-2xl text-primary" style={{ fontFamily: "var(--font-pixel)" }}>AURA</h1>
+          <p className="text-xs text-muted-foreground mt-1 sm:mt-2" style={{ fontFamily: "var(--font-pixel)" }}>
             The Desktop Sanctuary
           </p>
         </div>
@@ -99,7 +99,7 @@ function AuthPage() {
               />
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground block">Choose your path</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-1.5">
                   {AURA_PATHS.map((p) => {
                     const selected = p.id === path;
                     const sprite = selected ? PATH_GIFS[p.id].stance : PATH_GIFS[p.id].idle;
@@ -108,19 +108,19 @@ function AuthPage() {
                         key={p.id}
                         type="button"
                         onClick={() => setPath(p.id)}
-                        className={`border-2 p-2 text-left transition-colors ${
+                        className={`border-2 p-1.5 text-left transition-colors ${
                           selected
                             ? "border-primary bg-primary/10"
                             : "border-border bg-secondary/30 hover:border-primary/60"
                         }`}
                       >
-                        <div className="w-full h-24 mb-2 border border-border bg-black/20 flex items-center justify-center overflow-hidden">
+                        <div className="w-full h-16 sm:h-20 mb-1.5 border border-border bg-black/20 flex items-center justify-center overflow-hidden">
                           <img src={sprite} alt={`${p.label} preview`} className="h-full w-auto object-contain" />
                         </div>
-                        <div className="text-primary text-xs" style={{ fontFamily: "var(--font-pixel)" }}>
+                        <div className="text-primary text-[10px] sm:text-xs" style={{ fontFamily: "var(--font-pixel)" }}>
                           {p.label}
                         </div>
-                        <div className="text-muted-foreground text-xs">{p.skill}</div>
+                        <div className="text-muted-foreground text-[10px] sm:text-xs">{p.skill}</div>
                       </button>
                     );
                   })}

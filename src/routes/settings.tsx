@@ -466,7 +466,7 @@ function SettingsPage() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-5">
+    <div className="p-3 lg:p-6 max-w-6xl mx-auto space-y-5">
       <h1 className="text-2xl text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
         SETTINGS
       </h1>
@@ -804,7 +804,7 @@ function SettingsPage() {
             <div className="space-y-3">
               <div
                 ref={previewRef}
-                className="w-full h-96 mx-auto border-2 border-border bg-secondary/20 relative overflow-hidden"
+                className="w-full h-[min(24rem,38dvh)] mx-auto border-2 border-border bg-secondary/20 relative overflow-hidden"
                 onPointerDown={startCropDrag}
               >
                 {imageNatural && (
@@ -875,23 +875,23 @@ function SettingsPage() {
           setPathModalOpen(next);
         }}
       >
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle style={{ fontFamily: "var(--font-pixel)" }}>Choose Your Path</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             {profile.aura_path
               ? "Reshape your role for testing. Pick a path card, then save."
               : "You must choose one path to continue. This choice is permanent unless testing override is enabled."}
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3">
             {AURA_PATHS.map((path) => (
               <button
                 key={path.id}
                 type="button"
                 onClick={() => setAuraPath(path.id)}
                 aria-pressed={selectedPathId === path.id}
-                className={`relative text-left pixel-panel p-3 border-2 transition-all duration-150 ${
+                className={`relative text-left pixel-panel p-2 sm:p-3 border-2 transition-all duration-150 ${
                   selectedPathId === path.id
                     ? "!border-primary !bg-primary/10 shadow-[0_0_0_2px_rgba(217,150,48,0.9),0_0_24px_rgba(217,150,48,0.55)]"
                     : "border-border hover:!border-primary hover:shadow-[0_0_16px_rgba(217,150,48,0.45)]"
@@ -899,26 +899,26 @@ function SettingsPage() {
               >
                 {selectedPathId === path.id && (
                   <span
-                    className="absolute top-2 right-2 px-1.5 py-0.5 text-[9px] bg-primary text-primary-foreground"
+                    className="absolute top-1.5 right-1.5 px-1 py-0.5 text-[8px] sm:text-[9px] bg-primary text-primary-foreground"
                     style={{ fontFamily: "var(--font-pixel)" }}
                   >
                     SELECTED
                   </span>
                 )}
-                <div className="w-full aspect-square border-2 border-border bg-secondary/40 mb-3 flex items-center justify-center overflow-hidden">
+                <div className="w-full h-24 sm:h-28 border-2 border-border bg-secondary/40 mb-2 flex items-center justify-center overflow-hidden">
                   <img
                     src={selectedPathId === path.id ? PATH_GIFS[path.id].stance : PATH_GIFS[path.id].idle}
                     alt={`${path.label} preview`}
                     className="h-full w-auto object-contain"
                   />
                 </div>
-                <div className="text-primary mb-2" style={{ fontFamily: "var(--font-pixel)" }}>
+                <div className="text-primary mb-1 text-xs sm:text-sm" style={{ fontFamily: "var(--font-pixel)" }}>
                   {path.label}
                 </div>
-                <p className="text-sm text-muted-foreground">{path.fantasy}</p>
-                <p className="text-sm text-accent mt-1">{path.growth}</p>
-                <p className="text-sm text-muted-foreground mt-1">Skill: {path.skill}</p>
-                <p className="text-sm text-foreground/90 italic mt-2">{dramaticByPath[path.id]}</p>
+                <p className="text-xs text-muted-foreground">{path.fantasy}</p>
+                <p className="text-xs text-accent mt-0.5">{path.growth}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Skill: {path.skill}</p>
+                <p className="text-xs text-foreground/80 italic mt-1 hidden lg:block">{dramaticByPath[path.id]}</p>
               </button>
             ))}
           </div>

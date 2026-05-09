@@ -781,7 +781,7 @@ function TavernPage() {
               type="button"
               onClick={() => void leaveParty()}
               disabled={leavingParty}
-              className="flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-destructive text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2 py-1 border-2 border-destructive bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
               style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
               title="Leave this party"
             >

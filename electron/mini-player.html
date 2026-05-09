@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; -webkit-user-drag: none; cursor: default; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+
+    /* Badge — collapsed state, fills the 70×70 window */
+    #badge {
+      position: absolute;
+      bottom: 10px; right: 10px;
+      width: 50px; height: 50px;
+      background: #1a1714;
+      border: 2px solid #40362e;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.85);
+      cursor: pointer;
+    }
+    #badge img { width: 32px; height: 32px; image-rendering: pixelated; pointer-events: none; }
+    #badge::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 18px;
+      border: 2px solid #d99630;
+      opacity: 0;
+      animation: pulse 2s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(1.06); }
+    }
+
+    /* Panel — expanded state, fills the 270×104 window */
+    #panel {
+      display: none;
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #1a1714;
+      border: 2px solid #40362e;
+      border-radius: 10px;
+      flex-direction: column;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.85);
+      overflow: hidden;
+    }
+    #panel.visible { display: flex; }
+
+    /* Title bar */
+    #bar {
+      height: 34px;
+      background: #231f1b;
+      border-bottom: 1px solid #40362e;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      padding-right: 8px;
+    }
+    #bar-drag {
+      flex: 1; height: 100%;
+      display: flex; align-items: center;
+      gap: 6px; padding: 0 8px;
+      -webkit-app-region: drag;
+    }
+    #bar-drag img { width: 16px; height: 16px; image-rendering: pixelated; flex-shrink: 0; }
+    #bar-title { font-family: 'Courier New', monospace; font-size: 9px; color: #d99630; letter-spacing: 3px; }
+
+    #close-btn {
+      width: 20px; height: 20px;
+      background: transparent; border: 1px solid #40362e;
+      color: #b9b29d; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; flex-shrink: 0;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    #close-btn:hover { background: #3a3020; border-color: #6a5a40; }
+
+    /* Now playing row */
+    #now-playing {
+      flex: 1;
+      display: flex; align-items: center;
+      gap: 12px; padding: 0 14px;
+    }
+    #np-logo { width: 38px; height: 38px; image-rendering: pixelated; flex-shrink: 0; }
+    #np-text { flex: 1; min-width: 0; }
+    #np-label {
+      font-family: 'Courier New', monospace;
+      font-size: 8px; color: #b9b29d; letter-spacing: 2px; margin-bottom: 5px;
+    }
+    #np-bars { display: flex; align-items: flex-end; gap: 3px; height: 16px; }
+    .bar {
+      width: 4px; background: #d99630; border-radius: 2px;
+      animation: bounce 0.8s ease-in-out infinite;
+    }
+    .bar:nth-child(1) { animation-delay: 0s;    height: 8px; }
+    .bar:nth-child(2) { animation-delay: 0.15s; height: 14px; }
+    .bar:nth-child(3) { animation-delay: 0.3s;  height: 10px; }
+    .bar:nth-child(4) { animation-delay: 0.1s;  height: 16px; }
+    .bar:nth-child(5) { animation-delay: 0.25s; height: 6px; }
+    @keyframes bounce {
+      0%, 100% { transform: scaleY(0.4); }
+      50%       { transform: scaleY(1); }
+    }
+
+    #stop-btn {
+      flex-shrink: 0;
+      padding: 5px 10px;
+      background: transparent; border: 1px solid #40362e;
+      color: #b9b29d;
+      font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 1px;
+      cursor: pointer; border-radius: 4px;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    #stop-btn:hover { background: #b24a35; color: #fff; border-color: #b24a35; }
+  </style>
+</head>
+<body>
+  <div id="badge">
+    <img id="logo-badge" src="" alt="" />
+  </div>
+
+  <div id="panel">
+    <div id="bar">
+      <div id="bar-drag">
+        <img id="logo-bar" src="" alt="" />
+        <span id="bar-title">NOW PLAYING</span>
+      </div>
+      <button id="close-btn">&#x2715;</button>
+    </div>
+    <div id="now-playing">
+      <img id="np-logo" src="" alt="" />
+      <div id="np-text">
+        <div id="np-label">AURA SANCTUARY</div>
+        <div id="np-bars">
+          <div class="bar"></div>
+          <div class="bar"></div>
+          <div class="bar"></div>
+          <div class="bar"></div>
+          <div class="bar"></div>
+        </div>
+      </div>
+      <button id="stop-btn">STOP</button>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const logoUrl = params.get('logo') || '';
+    ['logo-badge', 'logo-bar', 'np-logo'].forEach(id => {
+      document.getElementById(id).src = logoUrl;
+    });
+
+    const badge = document.getElementById('badge');
+    const panel = document.getElementById('panel');
+    let isExpanded = false;
+    let busy = false;
+    let leaveTimer = null;
+
+    async function expand() {
+      if (isExpanded || busy) return;
+      if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+      busy = true;
+      // Resize window first, then reveal content — no layout flash
+      await window.electronAPI?.miniPlayerExpand();
+      panel.classList.add('visible');
+      isExpanded = true;
+      busy = false;
+    }
+
+    async function collapse() {
+      if (!isExpanded || busy) return;
+      busy = true;
+      // Hide content first, then shrink window
+      panel.classList.remove('visible');
+      isExpanded = false;
+      await window.electronAPI?.miniPlayerCollapse();
+      busy = false;
+    }
+
+    badge.addEventListener('mouseenter', () => { void expand(); });
+
+    panel.addEventListener('mouseleave', () => {
+      leaveTimer = setTimeout(() => { void collapse(); }, 400);
+    });
+    panel.addEventListener('mouseenter', () => {
+      if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
+    });
+
+    // X — dismiss the icon, music keeps playing
+    document.getElementById('close-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      window.electronAPI?.miniPlayerClose();
+    });
+
+    // STOP — remove music from main app entirely
+    document.getElementById('stop-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      window.electronAPI?.miniPlayerStop();
+    });
+  </script>
+</body>
+</html>

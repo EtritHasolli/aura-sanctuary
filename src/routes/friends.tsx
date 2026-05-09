@@ -103,9 +103,7 @@ function FriendsPage() {
   const [friendMessages, setFriendMessages] = useState<FriendMessage[]>([]);
   const [friendMessageInput, setFriendMessageInput] = useState("");
   const [selectedInvitePartyId, setSelectedInvitePartyId] = useState<string>("");
-  const friendWsRef = useRef<WebSocket | null>(null);
-  const friendReconnectTimerRef = useRef<number | null>(null);
-  const friendReconnectDelayRef = useRef(1000);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const markMessageScopeReadRef = useRef(markMessageScopeRead);
   const markFriendMessagesReadRef = useRef(markFriendMessagesRead);
   const INVITE_PROCESSED_KEY = "friendInviteProcessed";
@@ -204,80 +202,50 @@ function FriendsPage() {
     })();
   }, [selectedFriendId, user?.id]);
 
+  // Subscribe to incoming messages from the selected friend via Supabase Realtime
   useEffect(() => {
-    if (!user?.id || !selectedFriendId || !directRoomId) return;
-    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${wsProtocol}//${window.location.host}/ws/tavern`;
-    let stopped = false;
+    if (!user?.id || !selectedFriendId) return;
 
-    const connect = () => {
-      if (stopped) return;
-      const ws = new WebSocket(wsUrl);
-      friendWsRef.current = ws;
-      ws.onopen = () => {
-        friendReconnectDelayRef.current = 1000;
-        ws.send(JSON.stringify({ type: "join", partyId: directRoomId }));
-      };
-      ws.onmessage = (event) => {
-        try {
-          const packet = JSON.parse(String(event.data ?? "")) as {
-            type?: string;
-            message?: FriendMessage;
-          };
-          if (packet.type !== "chat" || !packet.message) return;
-          const msg = packet.message;
-          const isPair =
-            (msg.sender_id === user.id && msg.recipient_id === selectedFriendId) ||
-            (msg.sender_id === selectedFriendId && msg.recipient_id === user.id);
-          if (!isPair) return;
+    const channel = supabase
+      .channel(`friend-chat:${directRoomId}`)
+      .on(
+        "postgres_changes" as never,
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "friend_messages",
+          filter: `sender_id=eq.${selectedFriendId}&recipient_id=eq.${user.id}`,
+        } as never,
+        (payload: { new: FriendMessage }) => {
+          const msg = payload.new;
           setFriendMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
-          if (msg.sender_id !== user.id) {
-            void markMessageScopeReadRef.current.mutateAsync({
-              scopeType: "friend",
-              scopeId: msg.sender_id,
-            });
-            markFriendMessagesReadRef.current(msg.sender_id);
-          }
-        } catch {
-          // ignore malformed websocket packet
-        }
-      };
-      ws.onclose = () => {
-        if (stopped) return;
-        const delay = friendReconnectDelayRef.current;
-        friendReconnectDelayRef.current = Math.min(10_000, delay * 2);
-        friendReconnectTimerRef.current = window.setTimeout(connect, delay);
-      };
-    };
+          void markMessageScopeReadRef.current.mutateAsync({
+            scopeType: "friend",
+            scopeId: msg.sender_id,
+          });
+          markFriendMessagesReadRef.current(msg.sender_id);
+        },
+      )
+      .subscribe();
 
-    connect();
     return () => {
-      stopped = true;
-      if (friendReconnectTimerRef.current) {
-        window.clearTimeout(friendReconnectTimerRef.current);
-        friendReconnectTimerRef.current = null;
-      }
-      friendReconnectDelayRef.current = 1000;
-      if (friendWsRef.current?.readyState === WebSocket.OPEN) {
-        friendWsRef.current.send(JSON.stringify({ type: "leave", partyId: directRoomId }));
-      }
-      friendWsRef.current?.close();
-      friendWsRef.current = null;
+      void supabase.removeChannel(channel);
     };
   }, [directRoomId, selectedFriendId, user?.id]);
 
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [friendMessages]);
+
   const sendFriendMessage = async () => {
-    if (!user?.id || !selectedFriendId || !directRoomId) return;
+    if (!user?.id || !selectedFriendId) return;
     const content = friendMessageInput.trim();
     if (!content) return;
     setFriendMessageInput("");
     const { data, error } = await supabase
       .from("friend_messages" as never)
-      .insert({
-        sender_id: user.id,
-        recipient_id: selectedFriendId,
-        content,
-      } as never)
+      .insert({ sender_id: user.id, recipient_id: selectedFriendId, content } as never)
       .select("*")
       .single();
     if (error) {
@@ -285,13 +253,7 @@ function FriendsPage() {
       return;
     }
     const row = data as FriendMessage;
-    if (friendWsRef.current?.readyState === WebSocket.OPEN) {
-      friendWsRef.current.send(
-        JSON.stringify({ type: "chat", partyId: directRoomId, message: row }),
-      );
-    } else {
-      setFriendMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, row]));
-    }
+    setFriendMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, row]));
   };
 
   return (
@@ -687,6 +649,7 @@ function FriendsPage() {
                       );
                     })
                   )}
+                  <div ref={messagesEndRef} />
                 </div>
                 <div className="flex gap-2">
                   <input

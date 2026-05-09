@@ -14,6 +14,7 @@ import { HUD } from "@/components/aura/HUD";
 import { SideNav } from "@/components/aura/SideNav";
 import { AiAssistant } from "@/components/aura/AiAssistant";
 import { UpdateBar } from "@/components/aura/UpdateBar";
+import { TitleBar } from "@/components/aura/TitleBar";
 import { PomodoroProvider } from "@/components/aura/PomodoroContext";
 import { NotificationsProvider, useNotifications } from "@/components/aura/NotificationsContext";
 import { Toaster } from "@/components/ui/sonner";
@@ -97,14 +98,49 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <NotificationsProvider>
-        <UpdateBar />
-        <CustomCursorOverlay />
-        <PersistentYouTubeAudio />
-        <AppGate />
-        <Toaster />
+        <div className="h-screen flex flex-col overflow-hidden">
+          <TitleBar />
+          <UpdateBar />
+          <div className="flex-1 min-h-0 relative">
+            <CustomCursorOverlay />
+            <PersistentYouTubeAudio />
+            <MiniPlayerManager />
+            <AppGate />
+            <Toaster />
+          </div>
+        </div>
       </NotificationsProvider>
     </QueryClientProvider>
   );
+}
+
+function MiniPlayerManager() {
+  const api = window.electronAPI;
+  useEffect(() => {
+    if (!api?.onWindowMinimize) return;
+
+    const offMinimize = api.onWindowMinimize(() => {
+      const hasAudio = !!window.localStorage.getItem("aura:youtube-embed-url");
+      if (!hasAudio) return;
+      void api.showMiniPlayer();
+    });
+
+    const offRestore = api.onWindowRestore(() => {
+      void api.hideMiniPlayer();
+    });
+
+    const offClosed = api.onMiniPlayerClosed(() => {
+      window.dispatchEvent(new CustomEvent("aura:clear-youtube-audio"));
+    });
+
+    return () => {
+      offMinimize();
+      offRestore();
+      offClosed();
+    };
+  }, [api]);
+
+  return null;
 }
 
 function CustomCursorOverlay() {
@@ -456,7 +492,7 @@ function AppGate() {
         <>
           <FocusReward />
           <StaminaRecoveryLoop />
-          <div className="h-screen flex flex-col bg-background overflow-hidden">
+          <div className="h-full flex flex-col bg-background overflow-hidden">
             <HUD />
             <div className="flex-1 flex overflow-hidden">
               <SideNav />
