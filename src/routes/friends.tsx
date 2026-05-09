@@ -769,6 +769,7 @@ function EquippedItemBadge({
       <img
         src={getItemIconUrl(slug)}
         alt={name}
+        draggable={false}
         className="w-9 h-9 pixelated object-contain"
         onError={() => setIconFailed(true)}
       />

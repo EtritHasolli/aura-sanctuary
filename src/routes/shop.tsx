@@ -241,6 +241,7 @@ function ShopPage() {
                       <img
                         src={getItemIconUrl(item.slug)}
                         alt={item.name}
+                        draggable={false}
                         className="w-10 h-10 pixelated object-contain"
                         onError={(e) => {
                           e.currentTarget.style.opacity = "0";

@@ -97,6 +97,7 @@ function ForgePage() {
         <img
           src={getItemIconUrl(slug)}
           alt={name}
+          draggable={false}
           className="w-12 h-12 pixelated object-contain"
           onError={(e) => {
             e.currentTarget.style.opacity = "0";
@@ -240,6 +241,7 @@ function ForgePage() {
                     <img
                       src={getItemIconUrl(row.shop_items.slug)}
                       alt={row.shop_items.name}
+                      draggable={false}
                       className="w-8 h-8 pixelated object-contain"
                       onError={(e) => {
                         e.currentTarget.style.opacity = "0";
