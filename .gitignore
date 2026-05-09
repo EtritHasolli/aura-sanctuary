@@ -8,6 +8,13 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+
+# npm is the project package manager (package-lock.json). Ignore other lockfiles so editors don’t warn about conflicts.
+bun.lock
+
+# Local asset-pipeline (optional source sheet — keep out of commits if huge)
+items-sheet.png
+
 dist
 dist-ssr
 .output
