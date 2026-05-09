@@ -46,7 +46,13 @@ export interface FriendDetail {
     | "equip_dex_bonus"
     | "aura_path"
   >;
-  equippedItems: Array<{ id: string; name: string; category: string; rarity: string }>;
+  equippedItems: Array<{
+    id: string;
+    slug: string;
+    name: string;
+    category: string;
+    rarity: string;
+  }>;
   commonParties: Array<{ id: string; name: string }>;
   myParties: Array<{ id: string; name: string }>;
   inviteableParties: Array<{ id: string; name: string }>;
@@ -277,6 +283,7 @@ export function useFriendDetail(friendId: string | null) {
       const equippedItems = (
         (equippedRows ?? []) as Array<{
           item_id: string;
+          slug?: string | null;
           name?: string | null;
           category?: string | null;
           rarity?: string | null;
@@ -285,6 +292,7 @@ export function useFriendDetail(friendId: string | null) {
         .filter((r) => !!r.item_id)
         .map((r) => ({
           id: r.item_id,
+          slug: r.slug ?? "",
           name: r.name ?? "Item",
           category: r.category ?? "misc",
           rarity: r.rarity ?? "common",

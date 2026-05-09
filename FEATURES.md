@@ -49,6 +49,28 @@ Related migration: `20260507009500_forge_equipment_merge.sql`. Client: `forge.ts
 - **~110+ rows** upserted: many **equipment** tiers, extra **consumables**, **cosmetics**, **furniture**, **pet** items (`bulkeq-*`, `bulkcon-*`, `bulkdec-*`, `bulkroom-*`, `bulkpet-*` slugs in `20260507011000_bulk_shop_catalog_expand.sql`).
 - Dilutes forge random pools at higher tiers; widens Zen Shop assortment.
 
+## Subscription tiers (premium)
+
+- **Up to 3 admin-managed tiers** with one mandatory **free** tier (`subscription_tiers` table).
+- **Caps**: `max_parties_owned`, `max_parties_joined` enforced in `create_party`, `join_party_by_id`, `join_party_by_invite_code`. Default seed: free=3/5, adventurer=5/10, legend=10/20.
+- **Perks**: `monthly_moonshards` (server-trusted 28-day cooldown via `claim_monthly_moonshards`), `signup_bonus_moonshards` (one-shot on tier change), and free-form `perks` JSONB (`chat_history_days`, `forge_daily_attempts`, `cosmetic_borders`).
+- **Admin tooling** (`admin_users` allowlist + `is_admin()`): `admin_upsert_subscription_tier`, `admin_delete_subscription_tier` (refuses `free`), `admin_set_user_subscription` (also acts as IAP stub until real payments are wired).
+- **UI**: `/subscription` page shows three tier cards + admin editor for editing/creating/deleting tiers; subscribers see their current plan badge, party-cap usage and stipend cooldown. Auto-claim of monthly stipend handled by `useMonthlyStipendCheckIn` in `__root.tsx`.
+
+Related migration: `20260509170000_subscription_tiers.sql`. Client: `useSubscription.ts`, `SubscriptionPanel.tsx`.
+
+---
+
+## Minigames & leaderboards
+
+- Dedicated `/minigames` route with a **game-list hub** → click into a game → **Back** to return.
+- Two games: **Sudoku** (easy/medium/hard, separate leaderboards) and **2048** (single classic board).
+- Each game shows a side-by-side `Leaderboard` panel that pulls the top 25 personal-best scores via `get_minigame_leaderboard`. The current user's row is highlighted; if they aren't in the top 25, their personal best + global rank is pinned below the list.
+- Scores are stored as **personal best per (user, game, category)** in `minigame_scores`. Sudoku score = `9999 − duration_seconds`, so faster solves rank higher; the duration is preserved in `metadata.duration_seconds` for display. 2048 score = the in-game score at game-over, with `metadata.max_tile`.
+- Submission goes through `submit_minigame_score` (SECURITY DEFINER) — only updates the row when the new score is strictly higher and surfaces an `is_new_high` flag the games turn into a "NEW BEST!" badge.
+
+Related migration: `20260509180000_minigame_leaderboards.sql`. Client: `useMinigames.ts`, `components/games/{Sudoku,Game2048,Leaderboard}.tsx`, `routes/minigames.tsx`.
+
 ---
 
 ## Quick file map (frontend)

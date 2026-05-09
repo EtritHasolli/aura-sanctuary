@@ -226,10 +226,37 @@ export function useApplyReward() {
 
       const { error } = await supabase.from("profiles").update(profilePatchToDb(patch)).eq("id", user!.id);
       if (error) throw error;
+      let achievementMoonshards = 0;
+      let levelMoonshards = 0;
       try {
-        await supabase.rpc("try_unlock_achievements");
+        const { data } = await supabase.rpc("try_unlock_achievements");
+        const row = data as { moonshards_awarded?: number } | null;
+        achievementMoonshards = row?.moonshards_awarded ?? 0;
       } catch {
         // non-blocking side effect; ignore unlock check errors here
+      }
+      if (leveledUp) {
+        try {
+          const { data } = await supabase.rpc("claim_level_moonshards");
+          const row = data as { moonshards_awarded?: number } | null;
+          levelMoonshards = row?.moonshards_awarded ?? 0;
+        } catch {
+          // non-blocking — server is source of truth and the next applyReward retries
+        }
+      }
+      const totalMoonshards = achievementMoonshards + levelMoonshards;
+      if (totalMoonshards > 0) {
+        window.dispatchEvent(
+          new CustomEvent("aura:moonshards-awarded", {
+            detail: {
+              amount: totalMoonshards,
+              reasons: [
+                achievementMoonshards > 0 ? "achievement" : null,
+                levelMoonshards > 0 ? "level_milestone" : null,
+              ].filter((x): x is string => !!x),
+            },
+          }),
+        );
       }
       return patch;
     },
@@ -242,6 +269,9 @@ export function useApplyReward() {
       const key = ["profile", user?.id] as const;
       qc.setQueryData<Profile | null>(key, (prev) => (prev ? { ...prev, ...patch } : prev));
       qc.invalidateQueries({ queryKey: ["achievements"] });
+      // Server may have granted moonshards (achievement/level/quest-arc/boss);
+      // refetch so HUD balance is accurate.
+      qc.invalidateQueries({ queryKey: ["profile"] });
     },
   });
 }

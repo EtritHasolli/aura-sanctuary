@@ -87,16 +87,26 @@ function ForgePage() {
   const basketSlots = basket.map((id, i) => {
     const row = gearRows.find((r) => r.id === id);
     const name = row?.shop_items.name ?? "?";
+    const slug = row?.shop_items.slug ?? "";
     return (
       <div
         key={`${id}-${i}`}
-        className="px-2 py-2 border-2 border-border bg-secondary text-[10px] flex justify-between gap-2"
-        style={{ fontFamily: "var(--font-pixel)" }}
+        className="relative w-16 h-16 border-2 border-border bg-secondary flex items-center justify-center"
+        title={name}
       >
-        <span className="truncate">{name}</span>
+        <img
+          src={getItemIconUrl(slug)}
+          alt={name}
+          className="w-12 h-12 pixelated object-contain"
+          onError={(e) => {
+            e.currentTarget.style.opacity = "0";
+          }}
+        />
         <button
           type="button"
-          className="shrink-0 text-muted-foreground hover:text-destructive"
+          aria-label={`Remove ${name}`}
+          title={`Remove ${name}`}
+          className="absolute -top-2 -right-2 w-5 h-5 border-2 border-border bg-card text-muted-foreground hover:text-destructive hover:border-destructive flex items-center justify-center text-[10px] leading-none"
           onClick={() => setBasket((b) => [...b.slice(0, i), ...b.slice(i + 1)])}
         >
           ×
@@ -170,13 +180,22 @@ function ForgePage() {
             </button>
           </div>
         </div>
-        <div className="grid gap-2 min-h-[5.5rem]">
+        <div className="flex flex-wrap items-center gap-2 min-h-[5.5rem]">
           {basket.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">
               Tap gear below — same rarity only.
             </p>
           ) : (
-            basketSlots
+            <>
+              {basketSlots}
+              {Array.from({ length: 3 - basket.length }).map((_, idx) => (
+                <div
+                  key={`empty-${idx}`}
+                  className="w-16 h-16 border-2 border-dashed border-border/60 bg-secondary/30"
+                  aria-hidden="true"
+                />
+              ))}
+            </>
           )}
         </div>
         {basketRarity ? (

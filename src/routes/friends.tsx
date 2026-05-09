@@ -11,6 +11,7 @@ import {
   useSendFriendRequest,
   useSendFriendRequestByEmail,
 } from "@/hooks/useFriends";
+import { getItemIconUrl } from "@/hooks/useShop";
 import { CompanionSprite } from "@/components/aura/CompanionSprite";
 import { xpForLevel, type Profile } from "@/lib/aura/types";
 import { pathCharacterSpriteSrc } from "@/lib/aura/pathCharacterSprites";
@@ -510,7 +511,7 @@ function FriendsPage() {
       )}
 
       <Dialog open={!!selectedFriendId} onOpenChange={(open) => !open && setSelectedFriendId(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl w-[calc(100vw-1rem)] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle style={{ fontFamily: "var(--font-pixel)" }}>Friend Profile</DialogTitle>
           </DialogHeader>
@@ -549,7 +550,7 @@ function FriendsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <StatChip label="STR" value={effectiveStrength(selectedDetail.profile as Profile)} />
                 <StatChip label="INT" value={effectiveIntelligence(selectedDetail.profile as Profile)} />
                 <StatChip label="CON" value={effectiveConstitution(selectedDetail.profile as Profile)} />
@@ -566,11 +567,14 @@ function FriendsPage() {
                 {selectedDetail.equippedItems.length === 0 ? (
                   <div className="text-xs text-muted-foreground">No equipped items.</div>
                 ) : (
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-2">
                     {selectedDetail.equippedItems.map((it) => (
-                      <span key={it.id} className="px-2 py-1 border border-border text-xs">
-                        {it.name}
-                      </span>
+                      <EquippedItemBadge
+                        key={it.id}
+                        slug={it.slug}
+                        name={it.name}
+                        rarity={it.rarity}
+                      />
                     ))}
                   </div>
                 )}
@@ -729,6 +733,45 @@ function StatChip({ label, value }: { label: string; value: number }) {
         {label}
       </div>
       <div className="text-sm">{value}</div>
+    </div>
+  );
+}
+
+function EquippedItemBadge({
+  slug,
+  name,
+  rarity,
+}: {
+  slug: string;
+  name: string;
+  rarity: string;
+}) {
+  const [iconFailed, setIconFailed] = useState(false);
+  const showIcon = !!slug && !iconFailed;
+  const tooltip = `${name} · ${rarity.toUpperCase()}`;
+  if (!showIcon) {
+    return (
+      <span
+        className="px-2 py-1 border border-border text-xs"
+        style={{ fontFamily: "var(--font-pixel)" }}
+        title={tooltip}
+      >
+        {name}
+      </span>
+    );
+  }
+  return (
+    <div
+      className="w-12 h-12 border-2 border-border bg-secondary/40 flex items-center justify-center"
+      title={tooltip}
+      aria-label={tooltip}
+    >
+      <img
+        src={getItemIconUrl(slug)}
+        alt={name}
+        className="w-9 h-9 pixelated object-contain"
+        onError={() => setIconFailed(true)}
+      />
     </div>
   );
 }

@@ -10,9 +10,11 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TavernRouteImport } from './routes/tavern'
+import { Route as SubscriptionRouteImport } from './routes/subscription'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as QuestsRouteImport } from './routes/quests'
+import { Route as MinigamesRouteImport } from './routes/minigames'
 import { Route as FriendsRouteImport } from './routes/friends'
 import { Route as ForgeRouteImport } from './routes/forge'
 import { Route as EquipmentRouteImport } from './routes/equipment'
@@ -24,6 +26,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const TavernRoute = TavernRouteImport.update({
   id: '/tavern',
   path: '/tavern',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubscriptionRoute = SubscriptionRouteImport.update({
+  id: '/subscription',
+  path: '/subscription',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopRoute = ShopRouteImport.update({
@@ -39,6 +46,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const QuestsRoute = QuestsRouteImport.update({
   id: '/quests',
   path: '/quests',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MinigamesRoute = MinigamesRouteImport.update({
+  id: '/minigames',
+  path: '/minigames',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FriendsRoute = FriendsRouteImport.update({
@@ -85,9 +97,11 @@ export interface FileRoutesByFullPath {
   '/equipment': typeof EquipmentRoute
   '/forge': typeof ForgeRoute
   '/friends': typeof FriendsRoute
+  '/minigames': typeof MinigamesRoute
   '/quests': typeof QuestsRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
+  '/subscription': typeof SubscriptionRoute
   '/tavern': typeof TavernRoute
 }
 export interface FileRoutesByTo {
@@ -98,9 +112,11 @@ export interface FileRoutesByTo {
   '/equipment': typeof EquipmentRoute
   '/forge': typeof ForgeRoute
   '/friends': typeof FriendsRoute
+  '/minigames': typeof MinigamesRoute
   '/quests': typeof QuestsRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
+  '/subscription': typeof SubscriptionRoute
   '/tavern': typeof TavernRoute
 }
 export interface FileRoutesById {
@@ -112,9 +128,11 @@ export interface FileRoutesById {
   '/equipment': typeof EquipmentRoute
   '/forge': typeof ForgeRoute
   '/friends': typeof FriendsRoute
+  '/minigames': typeof MinigamesRoute
   '/quests': typeof QuestsRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
+  '/subscription': typeof SubscriptionRoute
   '/tavern': typeof TavernRoute
 }
 export interface FileRouteTypes {
@@ -127,9 +145,11 @@ export interface FileRouteTypes {
     | '/equipment'
     | '/forge'
     | '/friends'
+    | '/minigames'
     | '/quests'
     | '/settings'
     | '/shop'
+    | '/subscription'
     | '/tavern'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -140,9 +160,11 @@ export interface FileRouteTypes {
     | '/equipment'
     | '/forge'
     | '/friends'
+    | '/minigames'
     | '/quests'
     | '/settings'
     | '/shop'
+    | '/subscription'
     | '/tavern'
   id:
     | '__root__'
@@ -153,9 +175,11 @@ export interface FileRouteTypes {
     | '/equipment'
     | '/forge'
     | '/friends'
+    | '/minigames'
     | '/quests'
     | '/settings'
     | '/shop'
+    | '/subscription'
     | '/tavern'
   fileRoutesById: FileRoutesById
 }
@@ -167,9 +191,11 @@ export interface RootRouteChildren {
   EquipmentRoute: typeof EquipmentRoute
   ForgeRoute: typeof ForgeRoute
   FriendsRoute: typeof FriendsRoute
+  MinigamesRoute: typeof MinigamesRoute
   QuestsRoute: typeof QuestsRoute
   SettingsRoute: typeof SettingsRoute
   ShopRoute: typeof ShopRoute
+  SubscriptionRoute: typeof SubscriptionRoute
   TavernRoute: typeof TavernRoute
 }
 
@@ -180,6 +206,13 @@ declare module '@tanstack/react-router' {
       path: '/tavern'
       fullPath: '/tavern'
       preLoaderRoute: typeof TavernRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/subscription': {
+      id: '/subscription'
+      path: '/subscription'
+      fullPath: '/subscription'
+      preLoaderRoute: typeof SubscriptionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop': {
@@ -201,6 +234,13 @@ declare module '@tanstack/react-router' {
       path: '/quests'
       fullPath: '/quests'
       preLoaderRoute: typeof QuestsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/minigames': {
+      id: '/minigames'
+      path: '/minigames'
+      fullPath: '/minigames'
+      preLoaderRoute: typeof MinigamesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/friends': {
@@ -263,9 +303,11 @@ const rootRouteChildren: RootRouteChildren = {
   EquipmentRoute: EquipmentRoute,
   ForgeRoute: ForgeRoute,
   FriendsRoute: FriendsRoute,
+  MinigamesRoute: MinigamesRoute,
   QuestsRoute: QuestsRoute,
   SettingsRoute: SettingsRoute,
   ShopRoute: ShopRoute,
+  SubscriptionRoute: SubscriptionRoute,
   TavernRoute: TavernRoute,
 }
 export const routeTree = rootRouteImport

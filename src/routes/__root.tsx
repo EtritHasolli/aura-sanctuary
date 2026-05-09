@@ -338,6 +338,103 @@ function PersistentYouTubeAudio() {
   );
 }
 
+/** Calls record_daily_login at most once per calendar day per user (per device). */
+function useDailyLoginCheckIn(userId: string | null, push: (msg: string, type: "success") => void) {
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (!userId) return;
+    const storageKey = `aura:daily-login:${userId}`;
+    const today = new Date().toISOString().slice(0, 10);
+    if (typeof window !== "undefined" && window.localStorage.getItem(storageKey) === today) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await supabase.rpc("record_daily_login");
+        if (cancelled) return;
+        if (typeof window !== "undefined") window.localStorage.setItem(storageKey, today);
+        const row = data as
+          | {
+              streak?: number;
+              moonshards_awarded?: number;
+            }
+          | null;
+        const award = row?.moonshards_awarded ?? 0;
+        const streak = row?.streak ?? 0;
+        if (award > 0) {
+          toast.success(`+${award} Moonshard${award > 1 ? "s" : ""} — ${streak}-day login streak!`);
+          push(`Login streak milestone! ${streak} days · +${award} Moonshards`, "success");
+        }
+        // Refetch profile so HUD shows updated moonshards/streak.
+        qc.invalidateQueries({ queryKey: ["profile"] });
+      } catch {
+        // Silently ignore; the next session will retry.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, push, qc]);
+}
+
+/** Calls claim_monthly_moonshards at most once per day per user (server still
+ *  enforces the 28-day cooldown — the client cap is just to avoid spamming). */
+function useMonthlyStipendCheckIn(userId: string | null) {
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (!userId) return;
+    const storageKey = `aura:monthly-stipend-check:${userId}`;
+    const today = new Date().toISOString().slice(0, 10);
+    if (typeof window !== "undefined" && window.localStorage.getItem(storageKey) === today) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await supabase.rpc("claim_monthly_moonshards");
+        if (cancelled) return;
+        if (typeof window !== "undefined") window.localStorage.setItem(storageKey, today);
+        const row = data as { moonshards_awarded?: number; tier_slug?: string } | null;
+        const award = row?.moonshards_awarded ?? 0;
+        if (award > 0) {
+          toast.success(`+${award} Moonshards — ${row?.tier_slug ?? "premium"} monthly stipend!`);
+        }
+        qc.invalidateQueries({ queryKey: ["profile"] });
+        qc.invalidateQueries({ queryKey: ["subscription_limits"] });
+      } catch {
+        // Fail silently; next session retries.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, qc]);
+}
+
+/** Listens to the moonshard award event dispatched by useApplyReward. */
+function useMoonshardAwardToasts(push: (msg: string, type: "success") => void) {
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ amount?: number; reasons?: string[] }>).detail;
+      const amount = detail?.amount ?? 0;
+      if (amount <= 0) return;
+      const reasons = detail?.reasons ?? [];
+      const tag = reasons.includes("level_milestone")
+        ? "Level milestone"
+        : reasons.includes("achievement")
+          ? "Achievement"
+          : reasons.includes("quest_arc")
+            ? "Quest arc complete"
+            : reasons.includes("boss_kill")
+              ? "Boss kill"
+              : "Reward";
+      toast.success(`+${amount} Moonshard${amount > 1 ? "s" : ""} — ${tag}!`);
+      push(`+${amount} Moonshards — ${tag}`, "success");
+    };
+    window.addEventListener("aura:moonshards-awarded", handler as EventListener);
+    return () => window.removeEventListener("aura:moonshards-awarded", handler as EventListener);
+  }, [push]);
+}
+
 function AppGate() {
   const { user, loading } = useAuth();
   const { data: profile, isLoading: profileLoading } = useProfile();
@@ -366,6 +463,10 @@ function AppGate() {
       delete document.body.dataset.cursorDefault;
     };
   }, [path]);
+
+  useDailyLoginCheckIn(user?.id ?? null, push);
+  useMoonshardAwardToasts(push);
+  useMonthlyStipendCheckIn(user?.id ?? null);
 
   if (loading) {
     return (

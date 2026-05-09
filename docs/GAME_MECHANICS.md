@@ -121,7 +121,96 @@ These are now tuned to affect **task -> pending damage** and rage mitigation.
 - Leader can start boss run when inactive.
 - Active run displays pending team damage and level-aware boss status.
 
-## 9) Notes on Scope
+## 9) Moonshards (Premium Currency)
+
+Moonshards are a slow drip-feed currency on `profiles.moonshards`. They are
+deducted by `purchase_shop_item` whenever a `shop_items.currency_type` is
+`'moonshard'`. The migration `20260509150000_moonshard_acquisition.sql` adds
+the following acquisition channels — every grant goes through
+`grant_moonshards_internal()` and is recorded in `moonshard_grants_log`.
+
+| Channel | Trigger | Award | Notes |
+| --- | --- | ---: | --- |
+| Achievement unlock | `try_unlock_achievements()` detects a newly unlocked row | **+1** per new achievement | Returned in `moonshards_awarded` |
+| Boss kill | `strike_party_boss()` final blow | **+1, 25% chance** | Returned in `bonus_moonshards` |
+| Level milestone | `claim_level_moonshards()` (idempotent) | **+1 per 5 levels** | Tracks `profiles.moonshard_level_milestone` so it cannot be replay-claimed |
+| Daily login | `record_daily_login()` (called once/day on app boot) | **+1 at 7, 14, 30 day streaks** | Streak resets when broken; `login_streak_milestones_claimed[]` prevents re-claim within the same run |
+| Quest arc completion | `record_quest_arc_event()` arc-completes branch | **+3 to +5** (random) | Per arc that transitions from incomplete → completed |
+| IAP / Premium stub | `admin_grant_moonshard_bundle(user, slug)` (service_role only) | Per `moonshard_bundles.amount` | Seeded bundles: `starter-pouch` (5), `travelers-cache` (25), `lunar-vault` (75) |
+
+Server is the source of truth. Level-up grants are claimed via a separate RPC
+that reads the actual `profiles.level` row, so a tampered client cannot mint
+extra moonshards. Daily-login is keyed on `CURRENT_DATE` and idempotent within
+the same calendar day. Achievements re-check the underlying conditions and
+only grant for net-new unlock rows.
+
+Client side (`src/hooks/useProfile.ts`, `src/hooks/useShop.ts`,
+`src/routes/__root.tsx`) dispatches `aura:moonshards-awarded` events that are
+toasted via `sonner` and pushed into the in-app notifications stream.
+
+## 10) Subscription Tiers & Caps
+
+Migration `20260509170000_subscription_tiers.sql` adds an admin-managed catalogue
+of up to 3 active tiers. Each tier carries caps and perks. The free tier is
+mandatory (`is_free = true`, unique) and cannot be deleted.
+
+### Default tier seed
+
+| Slug | Name | Price | Parties owned | Parties joined | Monthly moonshards | Signup bonus |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `free` | Wanderer | $0 | 3 | 5 | 0 | 0 |
+| `adventurer` | Adventurer | $4.99 | 5 | 10 | 10 | 5 |
+| `legend` | Legend | $9.99 | 10 | 20 | 30 | 25 |
+
+Cosmetic / behavioural perks live in `subscription_tiers.perks` JSONB. Currently
+recognized keys (free-form; the client surfaces them):
+`chat_history_days` (number), `forge_daily_attempts` (number), `cosmetic_borders` (boolean).
+
+### Enforcement
+
+- **Party creation** — `create_party` raises `Party-creation cap reached…` when
+  `count(parties WHERE leader_id = me) >= max_parties_owned`. Also blocks if
+  the resulting auto-join would exceed `max_parties_joined`.
+- **Party join** — both `join_party_by_id` and `join_party_by_invite_code`
+  raise `You are already in N parties…` when
+  `count(party_members WHERE user_id = me) >= max_parties_joined`.
+  The hard 10-member-per-party cap stays untouched.
+- **Expiry fallback** — if `profiles.subscription_expires_at < now()`, the
+  effective tier is the free one regardless of `subscription_tier`.
+- **Tier deletion** — deleting a paid tier resets all subscribed profiles to
+  `free` via `ON DELETE SET DEFAULT`. `free` itself can never be deleted.
+
+### Premium perks
+
+- **Monthly stipend** — `claim_monthly_moonshards()` grants
+  `tier.monthly_moonshards` once per 28 days (server-trusted via
+  `subscription_last_stipend_at`). Auto-claimed by `AppGate` once per calendar
+  day per device; the server still enforces the 28-day window.
+- **Signup bonus** — `admin_set_user_subscription` awards
+  `tier.signup_bonus_moonshards` whenever the user moves to a new tier (one-shot
+  per tier change).
+
+### Admin surface
+
+- `admin_users` table — INSERT a row for the developer's `auth.uid()` to gain
+  admin powers. The migration ends with the required snippet.
+- `is_admin([uid])` — true when the row exists.
+- `admin_upsert_subscription_tier(...)` — upsert by slug, enforces 3-active cap,
+  cannot flip `is_free`.
+- `admin_delete_subscription_tier(slug)` — refuses to delete the free tier.
+- `admin_set_user_subscription(user_id, slug, expires_at, grant_signup_bonus)` —
+  manual assignment (also used as the IAP stub until real payments exist).
+
+### Client integration
+
+- `src/hooks/useSubscription.ts` — `useSubscriptionLimits()`,
+  `useSubscriptionTiers()`, `useIsAdmin()`, plus admin mutations.
+- `src/components/aura/SubscriptionPanel.tsx` — three tier cards + inline
+  admin editor (visible only to admins). Mounted at the top of `/settings`.
+- `src/routes/__root.tsx → useMonthlyStipendCheckIn` — auto-claims the stipend
+  once per device-day; the server enforces the real 28-day cadence.
+
+## 11) Notes on Scope
 
 - SQL functions are authoritative for skill effects, pending damage, boss scaling, and rage logic.
 - Supabase generated TypeScript types may lag behind new migrations until regenerated.

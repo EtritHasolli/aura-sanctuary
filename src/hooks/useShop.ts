@@ -110,10 +110,19 @@ export function usePurchaseShopItem() {
       if (!row) throw new Error("Purchase returned no row");
       if (goldSpentForArc > 0) {
         try {
-          await (supabase as any).rpc("record_quest_arc_event", {
+          const { data: arcData } = await (supabase as any).rpc("record_quest_arc_event", {
             p_kind: "spend_gold",
             p_amount: goldSpentForArc,
           });
+          const arcRow = arcData as { moonshards_awarded?: number; arcs_completed?: number } | null;
+          const moonshards = arcRow?.moonshards_awarded ?? 0;
+          if (moonshards > 0) {
+            window.dispatchEvent(
+              new CustomEvent("aura:moonshards-awarded", {
+                detail: { amount: moonshards, reasons: ["quest_arc"] },
+              }),
+            );
+          }
         } catch {
           // best-effort arc tracking; purchase should still succeed
         }
