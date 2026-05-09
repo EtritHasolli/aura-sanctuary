@@ -12,7 +12,8 @@ node_modules
 # npm is the project package manager (package-lock.json). Ignore other lockfiles so editors don’t warn about conflicts.
 bun.lock
 
-# Local asset-pipeline (optional source sheet — keep out of commits if huge)
+# Local asset-pipeline outputs (icons are served from CDN/storage; not bundled from here)
+cropped/
 items-sheet.png
 
 dist
