@@ -17,6 +17,7 @@ import { PomodoroProvider } from "@/components/aura/PomodoroContext";
 import { NotificationsProvider, useNotifications } from "@/components/aura/NotificationsContext";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
+import { publicAsset } from "@/lib/utils";
 
 const FOCUS_STAMINA_RESTORE = 15;
 
@@ -129,10 +130,10 @@ function CustomCursorOverlay() {
       const el = cursorRef.current;
       if (!el || !active) return;
       if (isPressedRef.current) {
-        el.src = "/click.png";
+        el.src = publicAsset("click.png");
         return;
       }
-      el.src = isInteractiveRef.current ? "/pointer.png" : "/cursor.png";
+      el.src = isInteractiveRef.current ? publicAsset("pointer.png") : publicAsset("cursor.png");
     };
 
     const move = (event: PointerEvent) => {
@@ -176,9 +177,9 @@ function CustomCursorOverlay() {
     };
 
     void Promise.all([
-      preloadImage("/cursor.png"),
-      preloadImage("/pointer.png"),
-      preloadImage("/click.png"),
+      preloadImage(publicAsset("cursor.png")),
+      preloadImage(publicAsset("pointer.png")),
+      preloadImage(publicAsset("click.png")),
     ]).then(enable);
 
     return () => {
@@ -196,7 +197,7 @@ function CustomCursorOverlay() {
   return (
     <img
       ref={cursorRef}
-      src="/cursor.png"
+      src={publicAsset("cursor.png")}
       alt=""
       aria-hidden="true"
       className="fixed left-0 top-0 z-[9999] w-8 h-8 pointer-events-none select-none opacity-0"

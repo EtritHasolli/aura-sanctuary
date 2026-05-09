@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { APP_LOGO_URL } from "@/lib/branding";
 import { AURA_PATHS, type AuraPath } from "@/lib/aura/types";
 import { toast } from "sonner";
 import swordsmanIdle from "../../characters/swordsman/idle.gif";
@@ -70,6 +71,15 @@ function AuthPage() {
       }} />
       <div className="pixel-panel p-8 w-full max-w-sm relative">
         <div className="text-center mb-6">
+          <img
+            src={APP_LOGO_URL}
+            alt=""
+            width={96}
+            height={96}
+            className="mx-auto mb-4 h-24 w-24 object-contain"
+            style={{ imageRendering: "pixelated" }}
+            decoding="async"
+          />
           <h1 className="text-2xl text-primary" style={{ fontFamily: "var(--font-pixel)" }}>AURA</h1>
           <p className="text-xs text-muted-foreground mt-2" style={{ fontFamily: "var(--font-pixel)" }}>
             The Desktop Sanctuary

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, UserPlus, Check, Mail, Flame, Info, Users, LogOut } from "lucide-react";
+import { Send, Flame, Info } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -759,7 +759,7 @@ function TavernPage() {
               style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
               title="View party players"
             >
-              <Users size={10} /> PLAYERS
+              PLAYERS
             </button>
             <button
               onClick={() => setShowEmailInvite((v) => !v)}
@@ -767,7 +767,7 @@ function TavernPage() {
               style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
               title="Invite via email"
             >
-              <Mail size={10} /> EMAIL
+              EMAIL
             </button>
             <button
               onClick={copyInvite}
@@ -775,7 +775,6 @@ function TavernPage() {
               style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
               title="Copy party ID for friends to paste in Join"
             >
-              {copied ? <Check size={10} /> : <UserPlus size={10} />}
               {copied ? "COPIED!" : "ID"}
             </button>
             <button
@@ -786,7 +785,7 @@ function TavernPage() {
               style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
               title="Leave this party"
             >
-              <LogOut size={10} /> LEAVE
+              LEAVE
             </button>
           </div>
         </div>

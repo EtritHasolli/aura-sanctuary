@@ -1,8 +1,12 @@
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, ipcMain, nativeImage, net, shell } from "electron";
 import { autoUpdater } from "electron-updater";
 import path from "node:path";
 
 const isDev = !app.isPackaged;
+
+/** Same as `src/lib/branding.ts` — keep in sync (Electron bundle is separate). */
+const APP_LOGO_URL =
+  "https://wvuoisxjuzyaoapuofrk.supabase.co/storage/v1/object/public/Logo/aura_logo.png";
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -18,6 +22,18 @@ function createWindow(): BrowserWindow {
       nodeIntegration: false,
     },
   });
+
+  void (async () => {
+    try {
+      const res = await net.fetch(APP_LOGO_URL);
+      if (!res.ok) return;
+      const buf = Buffer.from(await res.arrayBuffer());
+      const img = nativeImage.createFromBuffer(buf);
+      if (!img.isEmpty()) win.setIcon(img);
+    } catch {
+      /* offline / blocked — default window chrome */
+    }
+  })();
 
   if (isDev) {
     void win.loadURL("http://localhost:8080");

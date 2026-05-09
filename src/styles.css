@@ -40,8 +40,8 @@
 
 :root {
   --radius: 0.25rem;
-  /* Hotspots = image center @ 32×32 (matches overlay w-8 h-8 in CustomCursorOverlay) */
-  --cursor-pointer: url("/pointer.png") 16 16, auto;
+  /* Hotspots = image center @ 32×32 (matches overlay w-8 h-8 in CustomCursorOverlay). URL set in main.tsx via publicAsset() for Electron file:// */
+  --cursor-pointer: auto;
 
 
   /* Midnight Calico dark palette */
