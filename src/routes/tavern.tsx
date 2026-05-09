@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, UserPlus, Check, Mail, Flame, ArrowLeft, Info, Users } from "lucide-react";
+import { Send, UserPlus, Check, Mail, Flame, Info, Users, LogOut } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -103,6 +103,13 @@ const PARTY_CHAT_NAME_COLORS = [
   "#f43f5e",
 ];
 
+const PARTY_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function looksLikePartyUuid(value: string): boolean {
+  return PARTY_UUID_RE.test(value.trim());
+}
+
 async function refreshPartyScaled(partyId: string) {
   const { error: syncErr } = await supabase.rpc("sync_party_boss_scaling", { p_party_id: partyId });
   if (syncErr) console.warn("sync_party_boss_scaling:", syncErr.message);
@@ -155,6 +162,7 @@ function TavernPage() {
   const partyMend = useSkillPartyMend();
   const shadowStrike = useSkillShadowStrike();
   const secondWind = useSkillSecondWind();
+  const navigate = useNavigate();
   const { invite, party: partySearchId, message: messageSearchId } = Route.useSearch();
   const [myParties, setMyParties] = useState<Party[]>([]);
   const [party, setParty] = useState<Party | null>(null);
@@ -177,6 +185,7 @@ function TavernPage() {
   const [partyMemberIds, setPartyMemberIds] = useState<string[]>([]);
   const [playersLoading, setPlayersLoading] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [leavingParty, setLeavingParty] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const markMessageScopeReadRef = useRef(markMessageScopeRead);
   const INVITE_PROCESSED_KEY = "tavernInviteProcessed";
@@ -333,8 +342,15 @@ function TavernPage() {
       if (initialId) await loadParty(initialId);
       if (invite && !alreadyProcessedInvite) toast.success("Joined the party!");
       setLoading(false);
+      if (invite || partySearchId) {
+        navigate({
+          to: "/tavern",
+          search: messageSearchId ? { message: messageSearchId } : {},
+          replace: true,
+        });
+      }
     })();
-  }, [user, invite, partySearchId]);
+  }, [user, invite, partySearchId, messageSearchId, navigate]);
 
   // realtime (party state only; chat is handled by custom websocket)
   useEffect(() => {
@@ -433,9 +449,10 @@ function TavernPage() {
   const joinWithCode = async () => {
     if (!user || !joinCode.trim()) return;
     setLoading(true);
-    const { data, error } = await supabase.rpc("join_party_by_invite_code", {
-      p_code: joinCode.trim(),
-    });
+    const raw = joinCode.trim();
+    const { data, error } = looksLikePartyUuid(raw)
+      ? await supabase.rpc("join_party_by_id", { p_party_id: raw })
+      : await supabase.rpc("join_party_by_invite_code", { p_code: raw.toUpperCase() });
     if (error) {
       toast.error(error.message);
       setLoading(false);
@@ -530,10 +547,9 @@ function TavernPage() {
 
   const sendEmailInvite = () => {
     if (!party || !inviteEmail.trim()) return;
-    const link = `${window.location.origin}/tavern?invite=${party.id}`;
     const subject = encodeURIComponent("Join my party on Aura Sanctuary!");
     const body = encodeURIComponent(
-      `Hey! Come join my party on Aura Sanctuary.\n\nClick this link to join:\n${link}`,
+      `Hey! Come join my party on Aura Sanctuary.\n\nIn the app, open the Tavern and paste this party ID into Join:\n\n${party.id}`,
     );
     window.open(`mailto:${inviteEmail.trim()}?subject=${subject}&body=${body}`);
     setInviteEmail("");
@@ -543,11 +559,33 @@ function TavernPage() {
 
   const copyInvite = async () => {
     if (!party) return;
-    const link = `${window.location.origin}/tavern?invite=${party.id}`;
-    await navigator.clipboard.writeText(link);
+    await navigator.clipboard.writeText(party.id);
     setCopied(true);
-    toast.success("Invite link copied!");
+    toast.success("Party ID copied — paste in Tavern → Join");
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const leaveParty = async () => {
+    if (!party || !user || leavingParty) return;
+    if (
+      !window.confirm(
+        "Leave this party? You can rejoin with the party ID if a friend shares it. If you are the leader, the longest-standing member becomes leader.",
+      )
+    ) {
+      return;
+    }
+    setLeavingParty(true);
+    const { error } = await supabase.rpc("leave_party", { p_party_id: party.id });
+    setLeavingParty(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("You left the party.");
+    setParty(null);
+    setMessages([]);
+    setAdventure(null);
+    await loadMyParties();
   };
 
   if (loading) return <div className="p-6 text-muted-foreground">Entering the tavern...</div>;
@@ -607,9 +645,9 @@ function TavernPage() {
             <div className="flex gap-2">
               <input
                 value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                placeholder="INVITE CODE"
-                className="flex-1 px-2 py-2 bg-input border-2 border-border text-sm uppercase"
+                onChange={(e) => setJoinCode(e.target.value)}
+                placeholder="Party ID or short invite code"
+                className="flex-1 px-2 py-2 bg-input border-2 border-border text-sm"
                 style={{ fontFamily: "var(--font-pixel)" }}
               />
               <button
@@ -641,7 +679,7 @@ function TavernPage() {
               className="text-[10px] text-muted-foreground"
               style={{ fontFamily: "var(--font-pixel)" }}
             >
-              Or ask a friend to share their invite link (`/tavern?invite=` plus party id).
+              Paste the party ID (UUID) a friend copied from the tavern, or their short invite code.
             </p>
           </div>
         </div>
@@ -666,12 +704,11 @@ function TavernPage() {
                   setMessages([]);
                   setAdventure(null);
                 }}
-                className="inline-flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-xs bg-background shrink-0"
+                className="inline-flex items-center justify-center px-2 py-1 border-2 border-border hover:border-primary text-xs bg-background shrink-0"
                 style={{ fontFamily: "var(--font-pixel)" }}
                 title="Back to party list"
               >
-                <ArrowLeft size={14} />
-                <span>PARTIES</span>
+                PARTIES
               </button>
               <div className="w-full border border-primary bg-primary/10 text-xs">
                 <div className="flex items-center gap-1 px-2 py-1">
@@ -736,10 +773,20 @@ function TavernPage() {
               onClick={copyInvite}
               className="flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-muted-foreground hover:text-primary transition-colors"
               style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
-              title="Copy invite link"
+              title="Copy party ID for friends to paste in Join"
             >
               {copied ? <Check size={10} /> : <UserPlus size={10} />}
-              {copied ? "COPIED!" : "LINK"}
+              {copied ? "COPIED!" : "ID"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void leaveParty()}
+              disabled={leavingParty}
+              className="flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-destructive text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
+              style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+              title="Leave this party"
+            >
+              <LogOut size={10} /> LEAVE
             </button>
           </div>
         </div>

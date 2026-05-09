@@ -144,6 +144,12 @@ function NotificationsBell() {
     if (inviteMatch) {
       return { to: "/tavern", search: { invite: inviteMatch[1] } };
     }
+    const barePartyId = message.match(
+      /\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/i,
+    );
+    if (barePartyId) {
+      return { to: "/tavern", search: { party: barePartyId[1] } };
+    }
     if (lower.includes("friend request") || lower.includes("accepted your friend request")) {
       return { to: "/friends" };
     }
