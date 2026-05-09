@@ -1,5 +1,6 @@
 appId: app.aurasanctuary.desktop
 productName: "Aura Sanctuary"
+icon: build/icon.png
 
 directories:
   output: release
@@ -8,6 +9,9 @@ files:
   - dist/**/*
   - electron-dist/**/*
   - package.json
+
+nsis:
+  createDesktopShortcut: always
 
 win:
   target:
