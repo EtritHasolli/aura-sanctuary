@@ -13,6 +13,7 @@ import { useProfile, useApplyReward } from "@/hooks/useProfile";
 import { HUD } from "@/components/aura/HUD";
 import { SideNav } from "@/components/aura/SideNav";
 import { AiAssistant } from "@/components/aura/AiAssistant";
+import { UpdateBar } from "@/components/aura/UpdateBar";
 import { PomodoroProvider } from "@/components/aura/PomodoroContext";
 import { NotificationsProvider, useNotifications } from "@/components/aura/NotificationsContext";
 import { Toaster } from "@/components/ui/sonner";
@@ -96,6 +97,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <NotificationsProvider>
+        <UpdateBar />
         <CustomCursorOverlay />
         <PersistentYouTubeAudio />
         <AppGate />

@@ -61,6 +61,10 @@ autoUpdater.on("update-available", () => {
   BrowserWindow.getAllWindows()[0]?.webContents.send("update-available");
 });
 
+autoUpdater.on("download-progress", (progress) => {
+  BrowserWindow.getAllWindows()[0]?.webContents.send("update-download-progress", progress.percent);
+});
+
 autoUpdater.on("update-downloaded", () => {
   BrowserWindow.getAllWindows()[0]?.webContents.send("update-downloaded");
 });
