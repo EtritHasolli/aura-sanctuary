@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { RotateCcw, Trophy, Skull } from "lucide-react";
+import { Trophy, Skull } from "lucide-react";
 import { useSubmitMinigameScore } from "@/hooks/useMinigames";
 import { Leaderboard } from "./Leaderboard";
 
@@ -340,10 +340,10 @@ export function Game2048() {
           <button
             type="button"
             onClick={newGame}
-            className="w-full px-3 py-2 border-2 border-border hover:border-primary text-[10px] flex items-center justify-center gap-1"
+            className="w-full px-3 py-2 border-2 border-border hover:border-primary text-[10px] flex items-center justify-center"
             style={{ fontFamily: "var(--font-pixel)" }}
           >
-            <RotateCcw size={11} /> NEW GAME
+            NEW GAME
           </button>
         </div>
         <Leaderboard
@@ -351,12 +351,6 @@ export function Game2048() {
           category={GAME_2048_CATEGORY}
           formatScore={format2048Score}
         />
-        <p
-          className="text-[10px] text-muted-foreground text-center leading-relaxed"
-          style={{ fontFamily: "var(--font-pixel)" }}
-        >
-          ARROWS / WASD TO MOVE · SWIPE ON MOBILE · MERGE TILES TO REACH 2048
-        </p>
       </div>
     </div>
   );

@@ -49,6 +49,30 @@ export type Database = {
           },
         ]
       }
+      daily_wordle_progress: {
+        Row: {
+          day_key: string
+          guesses: string[]
+          play_started_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          day_key: string
+          guesses?: string[]
+          play_started_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          day_key?: string
+          guesses?: string[]
+          play_started_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notes: {
         Row: {
           content: string

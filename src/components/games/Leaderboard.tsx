@@ -1,3 +1,4 @@
+import { isValidElement, type ReactNode } from "react";
 import { Crown, Medal, Trophy, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -11,15 +12,67 @@ export interface LeaderboardProps {
   category?: string;
   /**
    * Optional formatter for the score column (e.g. show duration alongside).
-   * Receives the score and metadata, returns the display string for the row.
+   * Return a string for default wrapping, or JSX for custom layouts (e.g. Wordle).
    */
-  formatScore?: (score: number, metadata: Record<string, unknown> | null) => string;
-  /** Title shown above the list (e.g. "EASY · LEADERBOARD"). */
-  title?: string;
+  formatScore?: (
+    score: number,
+    metadata: Record<string, unknown> | null,
+    opts?: { isSelf?: boolean },
+  ) => ReactNode;
+  /**
+   * Title shown above the list. If a string contains ` · `, it is shown as two lines
+   * without the dot (e.g. EASY / LEADERBOARD).
+   */
+  title?: ReactNode;
 }
 
-const fallbackFormat = (score: number) =>
+function TitleContent({ title }: { title: ReactNode }) {
+  if (typeof title === "string" && title.includes(" · ")) {
+    const idx = title.indexOf(" · ");
+    const line1 = title.slice(0, idx).trim();
+    const line2 = title.slice(idx + 3).trim();
+    return (
+      <>
+        <span className="block leading-tight">{line1}</span>
+        <span className="block leading-tight">{line2}</span>
+      </>
+    );
+  }
+  return title;
+}
+
+const fallbackFormat = (score: number): ReactNode =>
   Number.isFinite(score) ? Math.round(score).toLocaleString() : "—";
+
+function ScoreDisplay({
+  node,
+  isSelf,
+}: {
+  node: ReactNode;
+  isSelf: boolean;
+}) {
+  if (typeof node === "string" || typeof node === "number") {
+    return (
+      <span
+        className={`text-xs tabular-nums shrink-0 ${isSelf ? "text-primary" : "text-foreground"}`}
+        style={{ fontFamily: "var(--font-pixel)" }}
+      >
+        {node}
+      </span>
+    );
+  }
+  if (isValidElement(node)) {
+    return node;
+  }
+  return (
+    <span
+      className={`text-xs shrink-0 ${isSelf ? "text-primary" : "text-foreground"}`}
+      style={{ fontFamily: "var(--font-pixel)" }}
+    >
+      {node}
+    </span>
+  );
+}
 
 export function Leaderboard({
   gameSlug,
@@ -41,7 +94,7 @@ export function Leaderboard({
           className="text-sm text-primary uppercase tracking-wide"
           style={{ fontFamily: "var(--font-pixel)" }}
         >
-          {title}
+          <TitleContent title={title} />
         </h3>
       </div>
 
@@ -91,12 +144,10 @@ export function Leaderboard({
                 You
               </span>
             </div>
-            <span
-              className="text-xs text-primary"
-              style={{ fontFamily: "var(--font-pixel)" }}
-            >
-              {formatScore(personalBest.score, personalBest.metadata)}
-            </span>
+            <ScoreDisplay
+              node={formatScore(personalBest.score, personalBest.metadata, { isSelf: true })}
+              isSelf
+            />
           </div>
         </>
       )}
@@ -111,7 +162,11 @@ function LeaderboardRowView({
 }: {
   row: LeaderboardRow;
   isSelf: boolean;
-  formatScore: (score: number, metadata: Record<string, unknown> | null) => string;
+  formatScore: (
+    score: number,
+    metadata: Record<string, unknown> | null,
+    opts?: { isSelf?: boolean },
+  ) => ReactNode;
 }) {
   const rankIcon =
     row.rank === 1 ? (
@@ -150,9 +205,9 @@ function LeaderboardRowView({
           <User size={12} className="text-muted-foreground" />
         )}
       </div>
-      <div className="flex-1 min-w-0 flex items-center gap-1">
+      <div className="flex-1 min-w-0 flex items-center gap-1.5">
         <span
-          className={`text-xs truncate ${isSelf ? "text-primary" : "text-foreground"}`}
+          className={`text-xs truncate min-w-0 ${isSelf ? "text-primary" : "text-foreground"}`}
           style={{ fontFamily: "var(--font-display)" }}
         >
           {row.display_name ?? "Adventurer"}
@@ -160,20 +215,18 @@ function LeaderboardRowView({
         </span>
         {row.level != null && (
           <span
-            className="text-[9px] text-muted-foreground"
+            className="shrink-0 text-[9px] text-muted-foreground tabular-nums"
             style={{ fontFamily: "var(--font-pixel)" }}
           >
             L{row.level}
           </span>
         )}
-        {rankIcon}
+        {rankIcon && <span className="shrink-0">{rankIcon}</span>}
       </div>
-      <span
-        className={`text-xs tabular-nums ${isSelf ? "text-primary" : "text-foreground"}`}
-        style={{ fontFamily: "var(--font-pixel)" }}
-      >
-        {formatScore(row.score, row.metadata)}
-      </span>
+      <ScoreDisplay
+        node={formatScore(row.score, row.metadata, { isSelf })}
+        isSelf={isSelf}
+      />
     </li>
   );
 }

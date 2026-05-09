@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Info } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,10 +15,7 @@ export interface GameRulesButtonProps {
   buttonLabel?: string;
 }
 
-/**
- * Small `i`-icon button that opens a dialog explaining the game's rules.
- * Designed to sit in a game header next to a BACK button.
- */
+/** Rules button opens a centered-title dialog with per-game copy. */
 export function GameRulesButton({
   title,
   children,
@@ -34,26 +30,25 @@ export function GameRulesButton({
         onClick={() => setOpen(true)}
         title={buttonLabel}
         aria-label={buttonLabel}
-        className="flex items-center gap-1 px-3 py-1.5 border-2 border-border hover:border-primary text-[10px]"
+        className="flex items-center justify-center px-3 py-1.5 border-2 border-border hover:border-primary text-[10px]"
         style={{ fontFamily: "var(--font-pixel)" }}
       >
-        <Info size={12} />
-        <span className="hidden sm:inline">RULES</span>
+        Rules
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md w-[calc(100vw-1rem)] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-          <DialogHeader>
+        <DialogContent className="max-w-lg w-[calc(100vw-1rem)] max-h-[90vh] overflow-y-auto p-5 sm:p-7 gap-5">
+          <DialogHeader className="text-center sm:text-center">
             <DialogTitle
-              className="flex items-center gap-2 text-primary"
+              className="flex flex-col items-center justify-center gap-1.5 text-primary text-xl sm:text-2xl leading-tight text-center px-8"
               style={{ fontFamily: "var(--font-pixel)" }}
             >
-              <Info size={16} />
-              {title.toUpperCase()} · HOW TO PLAY
+              <span className="block">HOW TO PLAY</span>
+              <span className="block">{title.toUpperCase()}</span>
             </DialogTitle>
           </DialogHeader>
           <div
-            className="text-sm text-foreground space-y-3 leading-snug"
+            className="text-lg sm:text-xl text-foreground space-y-4 leading-relaxed [&_ul]:space-y-2 [&_li]:text-lg sm:[&_li]:text-xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
             {children}

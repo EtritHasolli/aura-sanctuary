@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Eraser, RotateCcw, Sparkles, Trophy } from "lucide-react";
+import { Sparkles, Trophy } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import { useSubmitMinigameScore } from "@/hooks/useMinigames";
+import {
+  readSudokuUserSettings,
+  SUDOKU_SETTINGS_CHANGED_EVENT,
+  type SudokuUserSettings,
+} from "@/lib/games/sudokuUserSettings";
 import { Leaderboard } from "./Leaderboard";
 
 type Difficulty = "easy" | "medium" | "hard";
@@ -56,6 +62,10 @@ function parsePuzzle(puzzle: string): Cell[] {
     const n = Number(c);
     return { value: Number.isFinite(n) && n >= 1 && n <= 9 ? n : 0, given: n >= 1 };
   });
+}
+
+function emptyBoard(): Cell[] {
+  return Array.from({ length: 81 }, () => ({ value: 0, given: false }));
 }
 
 function pickPuzzle(difficulty: Difficulty): string {
@@ -114,13 +124,33 @@ function isComplete(cells: Cell[]) {
 }
 
 export function Sudoku() {
+  const { user } = useAuth();
+  const settingsUserId = user?.id ?? null;
+  const [userSettings, setUserSettings] = useState<SudokuUserSettings>(() =>
+    readSudokuUserSettings(settingsUserId),
+  );
+
+  useEffect(() => {
+    setUserSettings(readSudokuUserSettings(settingsUserId));
+  }, [settingsUserId]);
+
+  useEffect(() => {
+    const onSettingsChanged = (e: Event) => {
+      const ce = e as CustomEvent<SudokuUserSettings>;
+      if (ce.detail) setUserSettings(ce.detail);
+      else setUserSettings(readSudokuUserSettings(settingsUserId));
+    };
+    window.addEventListener(SUDOKU_SETTINGS_CHANGED_EVENT, onSettingsChanged);
+    return () => window.removeEventListener(SUDOKU_SETTINGS_CHANGED_EVENT, onSettingsChanged);
+  }, [settingsUserId]);
+
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [seed, setSeed] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
-  const [cells, setCells] = useState<Cell[]>(() => parsePuzzle(pickPuzzle("easy")));
+  const [cells, setCells] = useState<Cell[]>(() => emptyBoard());
+  /** False in the lobby (empty grid); true after Start loads a puzzle. */
+  const [sessionActive, setSessionActive] = useState(false);
   const [solved, setSolved] = useState(false);
-  // startedAt is null until the player makes their first real input;
-  // the timer only starts ticking from that moment.
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [completedAt, setCompletedAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -138,8 +168,9 @@ export function Sudoku() {
   }, [completedAt, startedAt]);
 
   useEffect(() => {
-    setCells(parsePuzzle(pickPuzzle(difficulty)));
+    setCells(emptyBoard());
     setSelected(null);
+    setSessionActive(false);
     setSolved(false);
     setStartedAt(null);
     setCompletedAt(null);
@@ -149,36 +180,62 @@ export function Sudoku() {
 
   const conflicts = useMemo(() => findConflicts(cells), [cells]);
 
-  const startTimerIfNeeded = useCallback(() => {
-    setStartedAt((s) => s ?? Date.now());
-  }, []);
+  /** Count of each digit 1–9 on the board (a full grid has nine of each). */
+  const digitCounts = useMemo(() => {
+    const counts = new Array<number>(10).fill(0);
+    for (const cell of cells) {
+      if (cell.value >= 1 && cell.value <= 9) counts[cell.value]++;
+    }
+    return counts;
+  }, [cells]);
+
+  const startGame = useCallback(() => {
+    if (sessionActive) return;
+    setCells(parsePuzzle(pickPuzzle(difficulty)));
+    setSelected(null);
+    setSolved(false);
+    setCompletedAt(null);
+    setSubmitResult(null);
+    submittedKey.current = null;
+    const t = Date.now();
+    setStartedAt(t);
+    setNow(t);
+    setSessionActive(true);
+  }, [difficulty, sessionActive]);
 
   const place = useCallback(
     (value: number) => {
+      if (!sessionActive || solved) return;
       if (selected == null) return;
       const cell = cells[selected];
       if (cell.given) return;
-      startTimerIfNeeded();
+      if (cell.value === value) return;
+      if (userSettings.removeFilledDigitsFromPad) {
+        const alreadyElsewhere = cells.filter(
+          (c, i) => i !== selected && c.value === value,
+        ).length;
+        if (alreadyElsewhere >= 9) return;
+      }
       setCells((prev) => {
         const next = prev.slice();
         next[selected] = { ...prev[selected], value };
         return next;
       });
     },
-    [selected, cells, startTimerIfNeeded],
+    [selected, cells, sessionActive, solved, userSettings.removeFilledDigitsFromPad],
   );
 
   const erase = useCallback(() => {
+    if (!sessionActive || solved) return;
     if (selected == null) return;
     const cell = cells[selected];
     if (cell.given) return;
-    startTimerIfNeeded();
     setCells((prev) => {
       const next = prev.slice();
       next[selected] = { ...prev[selected], value: 0 };
       return next;
     });
-  }, [selected, cells, startTimerIfNeeded]);
+  }, [selected, cells, sessionActive, solved]);
 
   useEffect(() => {
     if (!solved && isComplete(cells)) {
@@ -217,6 +274,7 @@ export function Sudoku() {
   // Keyboard input
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!sessionActive || solved) return;
       if (selected == null) return;
       if (e.key >= "1" && e.key <= "9") {
         place(Number(e.key));
@@ -234,7 +292,7 @@ export function Sudoku() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selected, place, erase]);
+  }, [selected, place, erase, sessionActive, solved]);
 
   const elapsedSeconds =
     startedAt == null
@@ -242,7 +300,7 @@ export function Sudoku() {
       : Math.max(0, Math.floor(((completedAt ?? now) - startedAt) / 1000));
   const mm = Math.floor(elapsedSeconds / 60).toString().padStart(2, "0");
   const ss = (elapsedSeconds % 60).toString().padStart(2, "0");
-  const timerActive = startedAt != null;
+  const timerVisible = sessionActive && startedAt != null;
 
   return (
     <div className="grid xl:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] gap-4">
@@ -252,41 +310,61 @@ export function Sudoku() {
             cells={cells}
             selected={selected}
             conflicts={conflicts}
+            interactive={sessionActive && !solved}
             onSelect={setSelected}
+            highlightHouses={userSettings.highlightHouses}
+            highlightSameNumbers={userSettings.highlightSameNumbers}
           />
           <div className="flex flex-col gap-2 w-full lg:w-auto">
             <div className="grid grid-cols-3 gap-1 w-full max-w-[180px] mx-auto">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => place(n)}
-                  className="aspect-square border-2 border-border hover:border-primary text-base"
-                  style={{ fontFamily: "var(--font-pixel)" }}
-                >
-                  {n}
-                </button>
-              ))}
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9]
+                .filter((n) => !userSettings.removeFilledDigitsFromPad || digitCounts[n] < 9)
+                .map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    disabled={!sessionActive || solved}
+                    onClick={() => place(n)}
+                    className="aspect-square border-2 border-border hover:border-primary text-base disabled:opacity-40 disabled:pointer-events-none disabled:hover:border-border"
+                    style={{ fontFamily: "var(--font-pixel)" }}
+                  >
+                    {n}
+                  </button>
+                ))}
             </div>
             <button
               type="button"
+              disabled={!sessionActive || solved}
               onClick={erase}
-              className="px-3 py-2 border-2 border-border hover:border-destructive text-[10px] flex items-center justify-center gap-1"
+              className="px-3 py-2 border-2 border-border hover:border-destructive text-[10px] flex items-center justify-center disabled:opacity-40 disabled:pointer-events-none disabled:hover:border-border"
               style={{ fontFamily: "var(--font-pixel)" }}
             >
-              <Eraser size={12} /> ERASE
+              ERASE
             </button>
-            <div
-              className={`px-3 py-2 border-2 text-[11px] flex items-center justify-center gap-1 ${
-                timerActive
-                  ? "border-border text-foreground"
-                  : "border-border/60 text-muted-foreground/70 italic"
-              }`}
-              style={{ fontFamily: "var(--font-pixel)" }}
-              title={timerActive ? undefined : "Make a move to start the timer"}
-            >
-              ⌛ {timerActive ? `${mm}:${ss}` : "--:--"}
-            </div>
+            {timerVisible ? (
+              userSettings.showTimer ? (
+                <div
+                  className="px-3 py-2 border-2 border-border text-[11px] flex items-center justify-center gap-1 text-foreground"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
+                  ⌛ {mm}:{ss}
+                </div>
+              ) : (
+                <div
+                  className="min-h-[38px] border-2 border-transparent"
+                  aria-hidden
+                />
+              )
+            ) : (
+              <button
+                type="button"
+                onClick={startGame}
+                className="px-3 py-2 border-2 border-primary bg-primary/10 hover:bg-primary/20 text-[11px] flex items-center justify-center gap-1 text-primary"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                START
+              </button>
+            )}
           </div>
         </div>
 
@@ -329,10 +407,10 @@ export function Sudoku() {
           <button
             type="button"
             onClick={() => setSeed((s) => s + 1)}
-            className="w-full px-3 py-2 border-2 border-border hover:border-primary text-[10px] flex items-center justify-center gap-1"
+            className="w-full px-3 py-2 border-2 border-border hover:border-primary text-[10px] flex items-center justify-center"
             style={{ fontFamily: "var(--font-pixel)" }}
           >
-            <RotateCcw size={11} /> NEW PUZZLE
+            NEW PUZZLE
           </button>
         </div>
         <Leaderboard
@@ -341,12 +419,6 @@ export function Sudoku() {
           formatScore={formatSudokuScore}
           title={`${difficulty.toUpperCase()} · LEADERBOARD`}
         />
-        <p
-          className="text-[10px] text-muted-foreground text-center leading-relaxed"
-          style={{ fontFamily: "var(--font-pixel)" }}
-        >
-          TAP A CELL · TYPE 1-9 ON KEYBOARD OR USE THE PAD · BACKSPACE TO ERASE · ARROWS TO NAVIGATE
-        </p>
       </div>
     </div>
   );
@@ -356,12 +428,18 @@ function SudokuBoard({
   cells,
   selected,
   conflicts,
+  interactive,
   onSelect,
+  highlightHouses,
+  highlightSameNumbers,
 }: {
   cells: Cell[];
   selected: number | null;
   conflicts: Set<number>;
+  interactive: boolean;
   onSelect: (i: number) => void;
+  highlightHouses: boolean;
+  highlightSameNumbers: boolean;
 }) {
   const selectedValue = selected != null ? cells[selected].value : 0;
   return (
@@ -370,9 +448,11 @@ function SudokuBoard({
         const r = rowOf(i);
         const c = colOf(i);
         const isSelected = i === selected;
-        const isPeer =
-          selected != null &&
-          (rowOf(selected) === r || colOf(selected) === c || boxOf(selected) === boxOf(i));
+        // Highlight the selected cell's row, column, and 3×3 box (classic Sudoku “houses”).
+        const inSameRow = selected != null && rowOf(selected) === r;
+        const inSameCol = selected != null && colOf(selected) === c;
+        const inSameBox = selected != null && boxOf(selected) === boxOf(i);
+        const isPeer = inSameRow || inSameCol || inSameBox;
         const sameValue =
           selectedValue > 0 && cell.value === selectedValue && i !== selected;
         const isConflict = conflicts.has(i);
@@ -380,10 +460,11 @@ function SudokuBoard({
         const borderTop = r % 3 === 0 && r !== 0 ? "border-t-2 border-t-primary/70" : "";
         const borderLeft = c % 3 === 0 && c !== 0 ? "border-l-2 border-l-primary/70" : "";
 
+        // Layer: house (row/col/box) tint, then matching digits, then selection (strongest).
         let bg = "";
-        if (isSelected) bg = "bg-primary/30";
-        else if (sameValue) bg = "bg-primary/15";
-        else if (isPeer) bg = "bg-secondary/40";
+        if (isSelected) bg = "bg-primary/40";
+        else if (highlightSameNumbers && sameValue) bg = "bg-primary/28";
+        else if (highlightHouses && isPeer) bg = "bg-primary/16";
 
         const valueColor = cell.given
           ? "text-foreground"
@@ -395,8 +476,9 @@ function SudokuBoard({
           <button
             key={i}
             type="button"
-            onClick={() => onSelect(i)}
-            className={`relative aspect-square flex items-center justify-center text-lg border border-border/50 transition-colors ${borderTop} ${borderLeft} ${bg}`}
+            disabled={!interactive}
+            onClick={() => interactive && onSelect(i)}
+            className={`relative aspect-square flex items-center justify-center text-lg border border-border/50 transition-colors disabled:cursor-default disabled:opacity-60 ${borderTop} ${borderLeft} ${bg}`}
             style={{ fontFamily: "var(--font-pixel)" }}
           >
             <span className={valueColor}>{cell.value === 0 ? "" : cell.value}</span>

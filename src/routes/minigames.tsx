@@ -1,16 +1,27 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, ChevronRight, Gamepad2, Grid3x3, Hash, Trophy } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronRight,
+  Gamepad2,
+  Grid3x3,
+  Hash,
+  Search,
+  Trophy,
+} from "lucide-react";
 import { Sudoku } from "@/components/games/Sudoku";
 import { Game2048 } from "@/components/games/Game2048";
+import { DailyWordle } from "@/components/games/DailyWordle";
+import { WordSearchGame } from "@/components/games/WordSearchGame";
 import { GameRulesButton } from "@/components/games/GameRules";
+import { SudokuSettingsButton } from "@/components/games/SudokuSettingsButton";
 
 export const Route = createFileRoute("/minigames")({
   head: () => ({ meta: [{ title: "Minigames — Aura" }] }),
   component: MinigamesPage,
 });
 
-type GameKey = "sudoku" | "2048";
+type GameKey = "sudoku" | "2048" | "daily-wordle" | "word-search";
 
 interface GameMeta {
   key: GameKey;
@@ -20,6 +31,8 @@ interface GameMeta {
   icon: React.ComponentType<{ size?: number; className?: string }>;
   accent: string;
   rules: React.ReactNode;
+  /** When false, hide the leaderboard badge (game is offline / daily). */
+  leaderboard?: boolean;
 }
 
 const SUDOKU_RULES = (
@@ -31,16 +44,21 @@ const SUDOKU_RULES = (
     </p>
     <ul className="list-disc list-inside space-y-1">
       <li>
+        The board starts <strong>empty</strong>. Choose a difficulty, then tap{" "}
+        <strong>START</strong> to load a puzzle (givens appear) and begin the timer. The number
+        pad is off until then.
+      </li>
+      <li>
         Pre-filled (given) cells are part of the puzzle and can&apos;t be
         changed.
       </li>
       <li>
-        Tap or click a cell to select it, then either tap a number on the on-
-        screen keypad or press <strong>1-9</strong> on your keyboard.
+        After <strong>START</strong>, tap or click a cell to select it, then either tap a number on
+        the on-screen keypad or press <strong>1-9</strong> on your keyboard.
       </li>
       <li>
-        Use <strong>Backspace</strong> / <strong>Delete</strong> or the ERASE
-        button to clear a cell. Arrow keys move the selection.
+        Use <strong>Backspace</strong> / <strong>Delete</strong> or the ERASE button to clear a
+        cell. Arrow keys move the selection (same session — inactive before <strong>START</strong>).
       </li>
       <li>
         Conflicts (the same digit twice in a row, column, or box) are
@@ -48,10 +66,79 @@ const SUDOKU_RULES = (
       </li>
     </ul>
     <p className="text-muted-foreground">
-      <strong>Scoring:</strong> the timer starts on your first move. Faster
-      solves earn higher scores. Each difficulty (Easy / Medium / Hard) has its
-      own leaderboard.
+      <strong>Flow:</strong> choose a difficulty, then tap <strong>START</strong> to load a
+      puzzle and begin the timer. Faster solves earn higher scores. Each difficulty (Easy /
+      Medium / Hard) has its own leaderboard.
     </p>
+  </>
+);
+
+const DAILY_WORDLE_RULES = (
+  <>
+    <p>
+      Guess the <strong>five-letter word</strong> in six tries. Each guess must be a valid word
+      from the game dictionary.
+    </p>
+    <p>
+      <strong>One puzzle per day</strong> (your local calendar date).{" "}
+      <strong>Everyone gets the same word</strong> on a given day.
+    </p>
+    <ul className="list-disc list-inside space-y-1">
+      <li>
+        <strong>Green</strong> means the letter is correct in that spot.
+      </li>
+      <li>
+        <strong>Yellow</strong> means the letter appears in the word but not in that spot.
+      </li>
+      <li>
+        <strong>Gray</strong> means the letter does not appear in the word (or extra copies
+        are already used).
+      </li>
+      <li>
+        When signed in, your <strong>guesses are saved on the server</strong> for that day
+        (switch devices or browsers and your progress follows you). Guests only have progress
+        on this browser; clearing site data resets a guest game.
+      </li>
+      <li>
+        The <strong>daily leaderboard</strong> is for signed-in players only. You are ranked by{" "}
+        <strong>fewest guesses</strong> first; ties break on <strong>fastest time</strong> from
+        your first guess to the winning word. <strong>One best score per day</strong> while
+        signed in.
+      </li>
+    </ul>
+    <p className="text-muted-foreground">
+      Use the on-screen keyboard or type letters on your keyboard; Enter submits, Backspace
+      deletes. Use <strong>Reset today</strong> above the leaderboard to clear today&apos;s
+      puzzle (and your cloud save when signed in).
+    </p>
+  </>
+);
+
+const WORD_SEARCH_RULES = (
+  <>
+    <p>
+      Find every hidden word in the letter grid. Words read in straight lines:{" "}
+      <strong>horizontal, vertical, or diagonal</strong>, forward or backward.
+    </p>
+    <ul className="list-disc list-inside space-y-1">
+      <li>
+        <strong>Tap</strong> one letter, then <strong>tap</strong> another at the end of the word
+        along a straight line — horizontal, vertical, or diagonal, like drawing a ruler from start to
+        end. Words can read <strong>forward or backward</strong>.
+      </li>
+      <li>
+        Words come from the shared dictionary: mostly five letters, plus shorter and longer
+        words (about four to nine letters) for variety.
+      </li>
+      <li>
+        Use <strong>Today&apos;s grid</strong> for a deterministic daily layout, or{" "}
+        <strong>New puzzle</strong> for a fresh random grid.
+      </li>
+      <li>
+        The <strong>leaderboard</strong> only counts completions of Today&apos;s grid (same
+        puzzle for everyone). Sign in to save your best time.
+      </li>
+    </ul>
   </>
 );
 
@@ -103,6 +190,26 @@ const GAMES: GameMeta[] = [
     icon: Hash,
     accent: "text-accent",
     rules: GAME_2048_RULES,
+  },
+  {
+    key: "daily-wordle",
+    name: "Daily Wordle",
+    blurb: "One five-letter word per day — same answer for everyone.",
+    longBlurb:
+      "Classic Wordle-style play: daily leaderboard, local stats, six guesses.",
+    icon: CalendarDays,
+    accent: "text-green-600 dark:text-green-400",
+    rules: DAILY_WORDLE_RULES,
+  },
+  {
+    key: "word-search",
+    name: "Word Search",
+    blurb: "Hunt words in every direction on a letter grid.",
+    longBlurb:
+      "Mixed word lengths on the grid; today’s puzzle has a speed leaderboard and random grids are practice.",
+    icon: Search,
+    accent: "text-sky-600 dark:text-sky-400",
+    rules: WORD_SEARCH_RULES,
   },
 ];
 
@@ -170,13 +277,15 @@ function GameList({ onSelect }: { onSelect: (k: GameKey) => void }) {
                   {g.longBlurb}
                 </p>
               </div>
-              <div
-                className="mt-auto flex items-center gap-1 text-[10px] text-accent"
-                style={{ fontFamily: "var(--font-pixel)" }}
-              >
-                <Trophy size={11} />
-                <span>LEADERBOARD ENABLED</span>
-              </div>
+              {g.leaderboard !== false && (
+                <div
+                  className="mt-auto flex items-center gap-1 text-[10px] text-accent"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
+                  <Trophy size={11} />
+                  <span>LEADERBOARD ENABLED</span>
+                </div>
+              )}
             </button>
           );
         })}
@@ -194,12 +303,11 @@ function GameView({ meta, onBack }: { meta: GameMeta; onBack: () => void }) {
           <button
             type="button"
             onClick={onBack}
-            className="flex items-center gap-1 px-3 py-1.5 border-2 border-border hover:border-primary text-[10px]"
+            className="flex items-center px-3 py-1.5 border-2 border-border hover:border-primary text-[10px]"
             style={{ fontFamily: "var(--font-pixel)" }}
             aria-label="Back to minigames"
           >
-            <ArrowLeft size={12} />
-            <span>BACK</span>
+            BACK
           </button>
           <div className="min-w-0">
             <h1
@@ -209,17 +317,22 @@ function GameView({ meta, onBack }: { meta: GameMeta; onBack: () => void }) {
               <Icon size={20} className={meta.accent} />
               <span className="truncate">{meta.name.toUpperCase()}</span>
             </h1>
-            <p className="text-xs text-muted-foreground truncate">{meta.blurb}</p>
+            <p className="text-sm text-muted-foreground truncate leading-snug">{meta.blurb}</p>
           </div>
         </div>
-        <GameRulesButton title={meta.name} buttonLabel={`How to play ${meta.name}`}>
-          {meta.rules}
-        </GameRulesButton>
+        <div className="flex items-center gap-2 shrink-0">
+          {meta.key === "sudoku" && <SudokuSettingsButton />}
+          <GameRulesButton title={meta.name} buttonLabel={`How to play ${meta.name}`}>
+            {meta.rules}
+          </GameRulesButton>
+        </div>
       </div>
 
       <div className="pixel-panel p-4 sm:p-6">
         {meta.key === "sudoku" && <Sudoku />}
         {meta.key === "2048" && <Game2048 />}
+        {meta.key === "daily-wordle" && <DailyWordle />}
+        {meta.key === "word-search" && <WordSearchGame />}
       </div>
     </div>
   );
