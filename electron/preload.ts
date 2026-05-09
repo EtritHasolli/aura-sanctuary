@@ -18,4 +18,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   installUpdate: () => ipcRenderer.send("install-update"),
+
+  onUpdateError: (cb: (message: string) => void) => {
+    const handler = (_: unknown, message: string) => cb(message);
+    ipcRenderer.on("update-error", handler);
+    return () => ipcRenderer.removeListener("update-error", handler);
+  },
 });

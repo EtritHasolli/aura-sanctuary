@@ -53,25 +53,25 @@ ipcMain.on("install-update", () => {
 
 // --- Auto-updater events ---
 
-autoUpdater.on("update-available", () => {
-  BrowserWindow.getAllWindows()[0]?.webContents.send("update-available");
-});
+function sendToRenderer(channel: string, ...args: unknown[]) {
+  BrowserWindow.getAllWindows()[0]?.webContents.send(channel, ...args);
+}
 
-autoUpdater.on("download-progress", (progress) => {
-  BrowserWindow.getAllWindows()[0]?.webContents.send("update-download-progress", progress.percent);
-});
-
-autoUpdater.on("update-downloaded", () => {
-  BrowserWindow.getAllWindows()[0]?.webContents.send("update-downloaded");
-});
+autoUpdater.on("update-available", () => sendToRenderer("update-available"));
+autoUpdater.on("download-progress", (p) => sendToRenderer("update-download-progress", p.percent));
+autoUpdater.on("update-downloaded", () => sendToRenderer("update-downloaded"));
+autoUpdater.on("error", (err) => sendToRenderer("update-error", err.message));
 
 // --- App lifecycle ---
 
 app.whenReady().then(() => {
-  createWindow();
+  const win = createWindow();
 
   if (!isDev) {
-    autoUpdater.checkForUpdatesAndNotify();
+    // Wait for renderer to load so IPC listeners are registered before events fire
+    win.webContents.once("did-finish-load", () => {
+      autoUpdater.checkForUpdatesAndNotify();
+    });
   }
 
   app.on("activate", () => {

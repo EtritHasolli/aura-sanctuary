@@ -7,6 +7,7 @@ declare global {
       onDownloadProgress: (cb: (percent: number) => void) => () => void;
       onUpdateDownloaded: (cb: () => void) => () => void;
       installUpdate: () => void;
+      onUpdateError: (cb: (message: string) => void) => () => void;
     };
   }
 }

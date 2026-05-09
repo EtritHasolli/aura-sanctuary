@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 type Phase = "idle" | "downloading" | "ready";
 
@@ -21,11 +22,15 @@ export function UpdateBar() {
       setPhase("ready");
       setPercent(100);
     });
+    const offError = api.onUpdateError((message) => {
+      toast.error(`Update check failed: ${message}`);
+    });
 
     return () => {
       offAvailable();
       offProgress();
       offDownloaded();
+      offError();
     };
   }, []);
 
