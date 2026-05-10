@@ -17,8 +17,8 @@
     "test:coverage": "vitest run --coverage",
     "build:electron": "vite build --config vite.electron.config.ts",
     "electron:dev": "npm run build:electron && concurrently -k \"vite dev\" \"wait-on http://localhost:8080 && electron .\"",
-    "package": "npm run build && npm run build:electron && electron-builder",
-    "package:dir": "npm run build && npm run build:electron && electron-builder --dir"
+    "package": "npm run build && npm run build:electron && electron-builder --config electron-builder.cjs",
+    "package:dir": "npm run build && npm run build:electron && electron-builder --dir --config electron-builder.cjs"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
