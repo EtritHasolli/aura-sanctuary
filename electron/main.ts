@@ -1,6 +1,9 @@
 import { app, BrowserWindow, ipcMain, nativeImage, screen, shell } from "electron";
 import { autoUpdater } from "electron-updater";
+import dotenv from "dotenv";
 import path from "node:path";
+
+dotenv.config();
 
 const isDev = !app.isPackaged;
 
@@ -165,6 +168,10 @@ ipcMain.on("install-update", () => {
   autoUpdater.quitAndInstall();
 });
 
+if (process.env.GH_TOKEN) {
+  autoUpdater.addAuthHeader(`Bearer ${process.env.GH_TOKEN}`);
+}
+
 // --- Auto-updater events ---
 
 function sendToRenderer(channel: string, ...args: unknown[]) {
@@ -177,9 +184,13 @@ autoUpdater.on("update-available", () => sendToRenderer("update-available"));
 autoUpdater.on("download-progress", (p) => sendToRenderer("update-download-progress", p.percent));
 autoUpdater.on("update-downloaded", () => sendToRenderer("update-downloaded"));
 autoUpdater.on("error", (err) => {
-  // Private repo: GitHub returns 404 for unauthenticated release checks — not actionable by user
-  if (err.message?.includes("404")) return;
-  sendToRenderer("update-error", err.message);
+  const msg = err.message || String(err);
+  // Suppress 404/403 errors which happen on private repos without a token
+  if (msg.includes("404") || msg.includes("403") || msg.includes("Not Found")) {
+    console.warn("[Updater] Silent failure (Private Repo/Auth):", msg);
+    return;
+  }
+  sendToRenderer("update-error", msg);
 });
 
 // --- App lifecycle ---
@@ -189,7 +200,9 @@ app.whenReady().then(() => {
 
   if (!isDev) {
     mainWin.webContents.once("did-finish-load", () => {
-      autoUpdater.checkForUpdatesAndNotify();
+      autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+        console.error("[Updater] Failed to check for updates:", err);
+      });
     });
   }
 
