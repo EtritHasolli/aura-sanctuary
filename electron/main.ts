@@ -1,7 +1,23 @@
-import { app, BrowserWindow, ipcMain, nativeImage, screen, shell } from "electron";
+import { app, BrowserWindow, ipcMain, nativeImage, net, protocol, screen, shell } from "electron";
 import { autoUpdater } from "electron-updater";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
+
+// Register custom protocol so the packaged app has a proper web origin
+// (YouTube embeds refuse to load from file:// origins — Error 153)
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "app",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+]);
 
 // Load .env manually (dotenv gets broken by Vite bundling)
 try {
@@ -60,7 +76,7 @@ function createWindow(): BrowserWindow {
     void win.loadURL("http://localhost:8080");
     win.webContents.openDevTools();
   } else {
-    void win.loadFile(path.join(app.getAppPath(), "dist/index.html"));
+    void win.loadURL("app://localhost/index.html");
   }
 
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -215,6 +231,14 @@ autoUpdater.on("error", (err) => {
 // --- App lifecycle ---
 
 app.whenReady().then(() => {
+  // Serve packaged files via app:// so the renderer has a real web origin
+  // (fixes YouTube embed Error 153 caused by file:// restrictions)
+  protocol.handle("app", (request) => {
+    const { pathname } = new URL(request.url);
+    const filePath = path.join(app.getAppPath(), "dist", pathname);
+    return net.fetch(pathToFileURL(filePath).toString());
+  });
+
   mainWin = createWindow();
 
   if (!isDev) {
