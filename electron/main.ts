@@ -1,9 +1,21 @@
 import { app, BrowserWindow, ipcMain, nativeImage, screen, shell } from "electron";
 import { autoUpdater } from "electron-updater";
-import dotenv from "dotenv";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
-dotenv.config({ path: path.join(app.getAppPath(), ".env") });
+// Load .env manually (dotenv gets broken by Vite bundling)
+try {
+  const envPath = path.join(app.getAppPath(), ".env");
+  const envContent = readFileSync(envPath, "utf-8");
+  for (const line of envContent.split(/\r?\n/)) {
+    const match = line.match(/^\s*([\w.-]+)\s*=\s*"?(.*?)"?\s*$/);
+    if (match && !process.env[match[1]]) {
+      process.env[match[1]] = match[2];
+    }
+  }
+} catch {
+  // .env not found — expected when running without bundled env
+}
 
 const isDev = !app.isPackaged;
 
@@ -169,7 +181,14 @@ ipcMain.on("install-update", () => {
 });
 
 if (process.env.GH_TOKEN) {
-  autoUpdater.addAuthHeader(`token ${process.env.GH_TOKEN}`);
+  process.env.GITHUB_TOKEN = process.env.GH_TOKEN;
+  autoUpdater.setFeedURL({
+    provider: "github",
+    owner: "EtritHasolli",
+    repo: "aura-sanctuary",
+    private: true,
+    token: process.env.GH_TOKEN,
+  });
 }
 
 // --- Auto-updater events ---

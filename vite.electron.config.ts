@@ -30,6 +30,7 @@ export default defineConfig({
       external: [
         "electron",
         "electron-updater",
+        "dotenv",
         "node:path",
         "node:url",
         "node:fs",
