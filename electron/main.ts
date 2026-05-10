@@ -3,7 +3,7 @@ import { autoUpdater } from "electron-updater";
 import dotenv from "dotenv";
 import path from "node:path";
 
-dotenv.config();
+dotenv.config({ path: path.join(app.getAppPath(), ".env") });
 
 const isDev = !app.isPackaged;
 
@@ -169,7 +169,7 @@ ipcMain.on("install-update", () => {
 });
 
 if (process.env.GH_TOKEN) {
-  autoUpdater.addAuthHeader(`Bearer ${process.env.GH_TOKEN}`);
+  autoUpdater.addAuthHeader(`token ${process.env.GH_TOKEN}`);
 }
 
 // --- Auto-updater events ---
