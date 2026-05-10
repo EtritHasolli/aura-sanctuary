@@ -618,7 +618,7 @@ function SettingsPage() {
           </div>
         </section>
 
-        <section className="pixel-panel p-5 space-y-4">
+        <section className="pixel-panel p-5 space-y-4 min-w-0">
           <div className="flex items-center gap-2">
             <Bell size={18} className="text-primary" />
             <h2 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
@@ -644,26 +644,24 @@ function SettingsPage() {
           <div className="text-sm text-muted-foreground">
             {notifications.length} total notifications, {unread} unread.
           </div>
-          <div className="flex items-center justify-between gap-2 flex-nowrap">
-            <div className="flex items-center gap-2 flex-nowrap">
-              <button
-                onClick={markAllRead}
-                className="px-2.5 py-2 border-2 border-border hover:border-primary text-sm whitespace-nowrap"
-                style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
-              >
-                MARK ALL READ
-              </button>
-              <button
-                onClick={clear}
-                className="px-2.5 py-2 border-2 border-border hover:border-destructive text-sm whitespace-nowrap"
-                style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
-              >
-                CLEAR ALL
-              </button>
-            </div>
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <button
+              onClick={markAllRead}
+              className="px-2.5 py-2 border-2 border-border hover:border-primary text-sm whitespace-nowrap"
+              style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
+            >
+              MARK ALL READ
+            </button>
+            <button
+              onClick={clear}
+              className="px-2.5 py-2 border-2 border-border hover:border-destructive text-sm whitespace-nowrap"
+              style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
+            >
+              CLEAR ALL
+            </button>
             <button
               onClick={saveNotificationPrefs}
-              className="px-4 py-2 bg-primary text-primary-foreground text-sm whitespace-nowrap shrink-0"
+              className="px-4 py-2 bg-primary text-primary-foreground text-sm whitespace-nowrap sm:ml-auto"
               style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
             >
               SAVE

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Swords, Save } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useNotes, useCreateNote, useUpdateNote, useDeleteNote } from "@/hooks/useNotes";
 import { useCreateTask } from "@/hooks/useTasks";
@@ -99,11 +99,11 @@ function ArchivesPage() {
                 <button onClick={() => setPreview((p) => !p)} className="text-xs px-2 py-1.5 border-2 border-border" style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
                   {preview ? "EDIT" : "PREVIEW"}
                 </button>
-                <button onClick={save} className="text-xs px-2 py-1.5 bg-primary text-primary-foreground flex items-center gap-1" style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
-                  <Save size={10} /> SAVE
+                <button onClick={save} className="text-xs px-2 py-1.5 bg-primary text-primary-foreground" style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
+                  SAVE
                 </button>
-                <button onClick={convertToTask} className="text-xs px-2 py-1.5 bg-accent text-accent-foreground flex items-center gap-1" style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
-                  <Swords size={10} /> CONVERT TO TASK
+                <button onClick={convertToTask} className="text-xs px-2 py-1.5 bg-accent text-accent-foreground" style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
+                  CONVERT TO TASK
                 </button>
                 <button onClick={() => { del.mutate(selected.id); setSelectedId(null); }} className="text-xs px-2 py-1.5 bg-destructive/20 text-destructive border-2 border-destructive">
                   <Trash2 size={12} />

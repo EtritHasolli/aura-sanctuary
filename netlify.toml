@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Client-side routes (TanStack Router uses browser history on the web)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
