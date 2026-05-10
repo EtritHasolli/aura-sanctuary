@@ -650,21 +650,21 @@ function SettingsPage() {
               className="px-2.5 py-2 border-2 border-border hover:border-primary text-sm whitespace-nowrap"
               style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
             >
-              MARK ALL READ
+              Read All
             </button>
             <button
               onClick={clear}
               className="px-2.5 py-2 border-2 border-border hover:border-destructive text-sm whitespace-nowrap"
               style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
             >
-              CLEAR ALL
+              Clear All
             </button>
             <button
               onClick={saveNotificationPrefs}
               className="px-4 py-2 bg-primary text-primary-foreground text-sm whitespace-nowrap sm:ml-auto"
               style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
             >
-              SAVE
+              Save
             </button>
           </div>
         </section>
@@ -873,23 +873,28 @@ function SettingsPage() {
           setPathModalOpen(next);
         }}
       >
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] max-w-7xl gap-4 sm:gap-6 p-4 sm:p-6 lg:p-8">
           <DialogHeader>
-            <DialogTitle style={{ fontFamily: "var(--font-pixel)" }}>Choose Your Path</DialogTitle>
+            <DialogTitle
+              className="text-xl sm:text-2xl lg:text-3xl pr-8"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              Choose Your Path
+            </DialogTitle>
           </DialogHeader>
-          <p className="text-xs sm:text-sm text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground">
             {profile.aura_path
               ? "Reshape your role for testing. Pick a path card, then save."
               : "You must choose one path to continue. This choice is permanent unless testing override is enabled."}
           </p>
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3">
+          <div className="grid grid-cols-1 min-[520px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0">
             {AURA_PATHS.map((path) => (
               <button
                 key={path.id}
                 type="button"
                 onClick={() => setAuraPath(path.id)}
                 aria-pressed={selectedPathId === path.id}
-                className={`relative text-left pixel-panel p-2 sm:p-3 border-2 transition-all duration-150 ${
+                className={`relative text-left pixel-panel min-w-0 p-3 sm:p-4 border-2 transition-all duration-150 ${
                   selectedPathId === path.id
                     ? "!border-primary !bg-primary/10 shadow-[0_0_0_2px_rgba(217,150,48,0.9),0_0_24px_rgba(217,150,48,0.55)]"
                     : "border-border hover:!border-primary hover:shadow-[0_0_16px_rgba(217,150,48,0.45)]"
@@ -897,30 +902,35 @@ function SettingsPage() {
               >
                 {selectedPathId === path.id && (
                   <span
-                    className="absolute top-1.5 right-1.5 px-1 py-0.5 text-[8px] sm:text-[9px] bg-primary text-primary-foreground"
+                    className="absolute top-2 right-2 px-1.5 py-0.5 text-[9px] sm:text-[10px] bg-primary text-primary-foreground"
                     style={{ fontFamily: "var(--font-pixel)" }}
                   >
                     SELECTED
                   </span>
                 )}
-                <div className="w-full h-24 sm:h-28 border-2 border-border bg-secondary/40 mb-2 flex items-center justify-center overflow-hidden">
+                <div className="w-full h-32 min-[520px]:h-36 sm:h-40 lg:h-44 border-2 border-border bg-secondary/40 mb-3 flex items-center justify-center overflow-hidden">
                   <img
                     src={selectedPathId === path.id ? PATH_GIFS[path.id].stance : PATH_GIFS[path.id].idle}
                     alt={`${path.label} preview`}
-                    className="h-full w-auto object-contain"
+                    className="h-full w-auto max-w-full object-contain"
                   />
                 </div>
-                <div className="text-primary mb-1 text-xs sm:text-sm" style={{ fontFamily: "var(--font-pixel)" }}>
+                <div
+                  className="text-primary mb-1.5 text-sm sm:text-base"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
                   {path.label}
                 </div>
-                <p className="text-xs text-muted-foreground">{path.fantasy}</p>
-                <p className="text-xs text-accent mt-0.5">{path.growth}</p>
-                <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Skill: {path.skill}</p>
-                <p className="text-xs text-foreground/80 italic mt-1 hidden lg:block">{dramaticByPath[path.id]}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">{path.fantasy}</p>
+                <p className="text-xs sm:text-sm text-accent mt-1">{path.growth}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-1">Skill: {path.skill}</p>
+                <p className="text-xs sm:text-sm text-foreground/80 italic mt-2 leading-relaxed">
+                  {dramaticByPath[path.id]}
+                </p>
               </button>
             ))}
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2 pt-1">
             {profile.aura_path && (
               <button
                 type="button"
