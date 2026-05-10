@@ -37,3 +37,5 @@ publish:
   owner: EtritHasolli
   repo: aura-sanctuary
   releaseType: release
+  private: true
+  token: ${GH_TOKEN}
