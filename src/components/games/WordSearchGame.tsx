@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent,
+} from "react";
 import { Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -15,6 +23,70 @@ import { useSubmitMinigameScore } from "@/hooks/useMinigames";
 import { Leaderboard } from "./Leaderboard";
 
 const WORD_SEARCH_GAME_SLUG = "word-search";
+
+const WS_PROGRESS_KEY = (seed: number) => `aura:word-search-progress:${seed}`;
+
+type WordSearchStoredProgress = {
+  v?: number;
+  found: string[];
+  startedAt: number;
+  completedAt: number | null;
+  dailySubmitDone?: boolean;
+};
+
+function readWordSearchProgress(seed: number, validWords: string[]) {
+  try {
+    const raw = localStorage.getItem(WS_PROGRESS_KEY(seed));
+    if (!raw) return null;
+    const data = JSON.parse(raw) as WordSearchStoredProgress;
+    if (!data || !Array.isArray(data.found)) return null;
+    const allowed = new Set(validWords);
+    const found = new Set<string>();
+    for (const w of data.found) {
+      if (typeof w === "string" && allowed.has(w)) found.add(w);
+    }
+    const startedAt =
+      typeof data.startedAt === "number" && Number.isFinite(data.startedAt)
+        ? data.startedAt
+        : Date.now();
+    let completedAt =
+      typeof data.completedAt === "number" && Number.isFinite(data.completedAt)
+        ? data.completedAt
+        : null;
+    if (found.size >= validWords.length && completedAt == null) {
+      completedAt = Date.now();
+    }
+    const dailySubmitDone = data.dailySubmitDone === true;
+    return { found, startedAt, completedAt, dailySubmitDone };
+  } catch {
+    return null;
+  }
+}
+
+function writeWordSearchProgress(
+  seed: number,
+  payload: {
+    found: Set<string>;
+    startedAt: number;
+    completedAt: number | null;
+    dailySubmitDone: boolean;
+  },
+) {
+  try {
+    localStorage.setItem(
+      WS_PROGRESS_KEY(seed),
+      JSON.stringify({
+        v: 1,
+        found: [...payload.found].sort(),
+        startedAt: payload.startedAt,
+        completedAt: payload.completedAt,
+        dailySubmitDone: payload.dailySubmitDone,
+      }),
+    );
+  } catch {
+    // ignore quota / private mode
+  }
+}
 
 /** Higher = better (faster finish). Same shape as Sudoku time-derived scores. */
 function wordSearchScore(durationSeconds: number) {
@@ -33,6 +105,19 @@ function randomSeed() {
   return Math.floor(Math.random() * 0x7fffffff);
 }
 
+function wordHue(word: string) {
+  let h = 0;
+  for (let i = 0; i < word.length; i++) h = (h * 31 + word.charCodeAt(i)) >>> 0;
+  return h % 360;
+}
+
+function cellsAlongPlacement(p: { word: string; r0: number; c0: number; dr: number; dc: number }) {
+  return Array.from({ length: p.word.length }, (_, k) => ({
+    r: p.r0 + p.dr * k,
+    c: p.c0 + p.dc * k,
+  }));
+}
+
 export function WordSearchGame() {
   const { user } = useAuth();
   const submitMutation = useSubmitMinigameScore();
@@ -45,20 +130,92 @@ export function WordSearchGame() {
   );
   const [found, setFound] = useState<Set<string>>(() => new Set());
   const [anchor, setAnchor] = useState<{ r: number; c: number } | null>(null);
+  const dragAnchorRef = useRef<{ r: number; c: number } | null>(null);
+  const gridBoardRef = useRef<HTMLDivElement | null>(null);
+  const [dragClient, setDragClient] = useState<{ x: number; y: number } | null>(null);
+  const [dragHoverCell, setDragHoverCell] = useState<{ r: number; c: number } | null>(null);
+  const [dragOverlay, setDragOverlay] = useState<{
+    polylinePoints: string;
+    tail: { x1: number; y1: number; x2: number; y2: number } | null;
+    validDir: boolean;
+  } | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [completedAt, setCompletedAt] = useState<number | null>(null);
   const [lbNotice, setLbNotice] = useState<string | null>(null);
   const submitSigRef = useRef<string | null>(null);
+  const dailySubmitDoneRef = useRef(false);
+  const persistSkipRef = useRef(true);
 
   const isDailyPuzzle = seed === dailySeed;
+  const wordListKey = useMemo(() => [...puzzle.words].sort().join("\0"), [puzzle.words]);
 
-  useEffect(() => {
-    setStartedAt(Date.now());
-    setCompletedAt(null);
-    submitSigRef.current = null;
-  }, [seed]);
+  const settledCellStyles = useMemo(() => {
+    const map = new Map<string, { hue: number; word: string }>();
+    for (const p of puzzle.placements) {
+      if (!found.has(p.word)) continue;
+      const hue = wordHue(p.word);
+      for (const { r, c } of cellsAlongPlacement(p)) {
+        map.set(`${r},${c}`, { hue, word: p.word });
+      }
+    }
+    return map;
+  }, [found, puzzle.placements]);
+
+  const endSelection = useCallback(() => {
+    dragAnchorRef.current = null;
+    setAnchor(null);
+    setDragClient(null);
+    setDragHoverCell(null);
+    setDragOverlay(null);
+  }, []);
+
+  useLayoutEffect(() => {
+    persistSkipRef.current = true;
+    endSelection();
+    if (typeof window === "undefined") {
+      setFound(new Set());
+      setStartedAt(Date.now());
+      setCompletedAt(null);
+      dailySubmitDoneRef.current = false;
+      submitSigRef.current = null;
+      return;
+    }
+    const loaded = readWordSearchProgress(seed, puzzle.words);
+    if (loaded) {
+      setFound(loaded.found);
+      setStartedAt(loaded.startedAt);
+      setCompletedAt(loaded.completedAt);
+      dailySubmitDoneRef.current = loaded.dailySubmitDone;
+      if (loaded.dailySubmitDone && seed === dailySeed) {
+        submitSigRef.current = `${dayKey}:${seed}`;
+      } else {
+        submitSigRef.current = null;
+      }
+    } else {
+      setFound(new Set());
+      setStartedAt(Date.now());
+      setCompletedAt(null);
+      dailySubmitDoneRef.current = false;
+      submitSigRef.current = null;
+    }
+  }, [seed, wordListKey, dayKey, dailySeed, endSelection]);
 
   const done = found.size >= puzzle.words.length;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (persistSkipRef.current) {
+      persistSkipRef.current = false;
+      return;
+    }
+    if (startedAt == null) return;
+    writeWordSearchProgress(seed, {
+      found,
+      startedAt,
+      completedAt,
+      dailySubmitDone: dailySubmitDoneRef.current,
+    });
+  }, [seed, found, startedAt, completedAt]);
 
   useEffect(() => {
     if (!done || !isDailyPuzzle || startedAt == null) return;
@@ -82,6 +239,13 @@ export function WordSearchGame() {
       {
         onSuccess: (res) => {
           setLbNotice(res.is_new_high ? "New personal best on today's grid!" : null);
+          dailySubmitDoneRef.current = true;
+          writeWordSearchProgress(seed, {
+            found,
+            startedAt,
+            completedAt,
+            dailySubmitDone: true,
+          });
         },
         onError: () => {
           submitSigRef.current = null;
@@ -100,20 +264,85 @@ export function WordSearchGame() {
     submitMutation,
   ]);
 
-  const onCellPointerDown = (r: number, c: number) => {
+  useLayoutEffect(() => {
+    const board = gridBoardRef.current;
+    if (!board || !anchor || !dragClient) {
+      setDragOverlay(null);
+      return;
+    }
+    const br = board.getBoundingClientRect();
+    const cellCenter = (r: number, c: number) => {
+      const el = board.querySelector<HTMLElement>(
+        `[data-word-search-cell][data-row="${r}"][data-col="${c}"]`,
+      );
+      if (!el) return null;
+      const er = el.getBoundingClientRect();
+      return { x: er.left + er.width / 2 - br.left, y: er.top + er.height / 2 - br.top };
+    };
+
+    const cursorLocal = { x: dragClient.x - br.left, y: dragClient.y - br.top };
+    const previewLine =
+      dragHoverCell != null
+        ? lineLetters(puzzle.grid, anchor.r, anchor.c, dragHoverCell.r, dragHoverCell.c)
+        : null;
+    const validDir = previewLine != null && previewLine.cells.length > 1;
+
+    if (validDir && previewLine) {
+      const pts = previewLine.cells
+        .map(({ r, c }) => cellCenter(r, c))
+        .filter((p): p is { x: number; y: number } => p != null);
+      const polylinePoints = pts.map((p) => `${p.x},${p.y}`).join(" ");
+      const last = pts[pts.length - 1] ?? null;
+      const tail = last
+        ? { x1: last.x, y1: last.y, x2: cursorLocal.x, y2: cursorLocal.y }
+        : null;
+      setDragOverlay({ polylinePoints, tail, validDir: true });
+      return;
+    }
+
+    const startPt = cellCenter(anchor.r, anchor.c);
+    if (startPt) {
+      setDragOverlay({
+        polylinePoints: `${startPt.x},${startPt.y}`,
+        tail: { x1: startPt.x, y1: startPt.y, x2: cursorLocal.x, y2: cursorLocal.y },
+        validDir: false,
+      });
+    } else {
+      setDragOverlay(null);
+    }
+  }, [anchor, dragClient, dragHoverCell, puzzle.grid]);
+
+  const previewHighlightKeys = useMemo(() => {
+    if (!anchor || !dragHoverCell) return new Set<string>();
+    const line = lineLetters(puzzle.grid, anchor.r, anchor.c, dragHoverCell.r, dragHoverCell.c);
+    if (!line || line.cells.length < 2) return new Set<string>();
+    return new Set(line.cells.map(({ r, c }) => `${r},${c}`));
+  }, [anchor, dragHoverCell, puzzle.grid]);
+
+  const onCellPointerDown = (r: number, c: number, e: PointerEvent<HTMLButtonElement>) => {
     if (done) return;
+    dragAnchorRef.current = { r, c };
     setAnchor({ r, c });
+    setDragClient({ x: e.clientX, y: e.clientY });
+    setDragHoverCell({ r, c });
+  };
+
+  const onCellPointerMove = (e: PointerEvent<HTMLButtonElement>) => {
+    if (dragAnchorRef.current == null) return;
+    setDragClient({ x: e.clientX, y: e.clientY });
+    const cell = resolveCellFromPointer(e.clientX, e.clientY);
+    if (cell) setDragHoverCell(cell);
   };
 
   const tryComplete = useCallback(
     (r: number, c: number) => {
       if (!anchor) return;
       if (anchor.r === r && anchor.c === c) {
-        setAnchor(null);
+        endSelection();
         return;
       }
       const line = lineLetters(puzzle.grid, anchor.r, anchor.c, r, c);
-      setAnchor(null);
+      endSelection();
       if (!line) return;
       const w = matchesPlacedWord(line.letters, puzzle.placements);
       if (!w) return;
@@ -122,23 +351,33 @@ export function WordSearchGame() {
         return new Set([...prev, w]);
       });
     },
-    [anchor, puzzle.grid, puzzle.placements],
+    [anchor, puzzle.grid, puzzle.placements, endSelection],
   );
 
-  const onCellPointerUp = (r: number, c: number) => {
-    tryComplete(r, c);
+  const resolveCellFromPointer = (clientX: number, clientY: number) => {
+    const under = document.elementFromPoint(clientX, clientY);
+    const cell = under?.closest("[data-word-search-cell]") as HTMLElement | null;
+    const row = cell?.dataset.row;
+    const col = cell?.dataset.col;
+    if (row == null || col == null) return null;
+    const r = Number(row);
+    const c = Number(col);
+    return Number.isFinite(r) && Number.isFinite(c) ? { r, c } : null;
+  };
+
+  const onCellPointerUp = (e: PointerEvent<HTMLButtonElement>, fallbackR: number, fallbackC: number) => {
+    const end = resolveCellFromPointer(e.clientX, e.clientY);
+    tryComplete(end?.r ?? fallbackR, end?.c ?? fallbackC);
   };
 
   const newRandomPuzzle = () => {
-    setFound(new Set());
-    setAnchor(null);
+    endSelection();
     setLbNotice(null);
     setSeed(randomSeed());
   };
 
   const todaysPuzzle = () => {
-    setFound(new Set());
-    setAnchor(null);
+    endSelection();
     setLbNotice(null);
     setSeed(getDailyWordSearchSeedForDayKey(getLocalDayKey()));
   };
@@ -168,42 +407,112 @@ export function WordSearchGame() {
 
         <div
           className="w-full max-w-full overflow-x-auto pb-2 select-none flex justify-center xl:justify-start"
-          onPointerLeave={() => setAnchor(null)}
+          onPointerLeave={() => {
+            if (dragAnchorRef.current) endSelection();
+          }}
         >
-          <div
-            className="inline-grid gap-0 border-2 border-border p-2 bg-card shrink-0"
-            style={{
-              gridTemplateColumns: `repeat(${puzzle.size}, minmax(0, 1fr))`,
-            }}
-          >
-            {puzzle.grid.map((row, r) =>
-              row.map((ch, c) => {
-                const isAnchor = anchor?.r === r && anchor?.c === c;
-                return (
-                  <button
-                    key={`${r}-${c}`}
-                    type="button"
-                    className={cn(
-                      "w-8 h-8 sm:w-9 sm:h-9 xl:w-10 xl:h-10 flex items-center justify-center text-xs sm:text-sm xl:text-base font-semibold uppercase border border-border/60 hover:bg-primary/15 active:bg-primary/25",
-                      isAnchor && "bg-primary/30 ring-1 ring-primary",
-                    )}
-                    style={{ fontFamily: "ui-monospace, monospace" }}
-                    onPointerDown={(e) => {
-                      e.currentTarget.setPointerCapture(e.pointerId);
-                      onCellPointerDown(r, c);
-                    }}
-                    onPointerUp={(e) => {
-                      try {
-                        onCellPointerUp(r, c);
-                      } finally {
-                        e.currentTarget.releasePointerCapture(e.pointerId);
-                      }
-                    }}
-                  >
-                    {ch}
-                  </button>
-                );
-              }),
+          <div ref={gridBoardRef} className="relative shrink-0 inline-block">
+            <div
+              className="inline-grid gap-0 border-2 border-border p-2 bg-card"
+              style={{
+                gridTemplateColumns: `repeat(${puzzle.size}, minmax(0, 1fr))`,
+              }}
+            >
+              {puzzle.grid.map((row, r) =>
+                row.map((ch, c) => {
+                  const isAnchor = anchor?.r === r && anchor?.c === c;
+                  const settled = settledCellStyles.get(`${r},${c}`);
+                  const onPreview = previewHighlightKeys.has(`${r},${c}`);
+                  return (
+                    <button
+                      key={`${r}-${c}`}
+                      type="button"
+                      data-word-search-cell
+                      data-row={r}
+                      data-col={c}
+                      className={cn(
+                        "relative z-[1] w-8 h-8 sm:w-9 sm:h-9 xl:w-10 xl:h-10 flex items-center justify-center text-xs sm:text-sm xl:text-base font-semibold uppercase border border-border/60 hover:bg-primary/15 active:bg-primary/25 transition-[background-color,box-shadow] duration-150",
+                        isAnchor && "bg-primary/35 ring-2 ring-primary z-[2]",
+                        settled && !isAnchor && "ring-1 ring-inset",
+                        onPreview && !settled && "bg-primary/25",
+                      )}
+                      style={{
+                        fontFamily: "ui-monospace, monospace",
+                        ...(settled && !isAnchor
+                          ? {
+                              backgroundColor: `hsla(${settled.hue}, 62%, 52%, 0.38)`,
+                              boxShadow: `inset 0 0 0 2px hsla(${settled.hue}, 75%, 42%, 0.65)`,
+                            }
+                          : undefined),
+                      }}
+                      onPointerDown={(e) => {
+                        e.currentTarget.setPointerCapture(e.pointerId);
+                        onCellPointerDown(r, c, e);
+                      }}
+                      onPointerMove={onCellPointerMove}
+                      onPointerUp={(e) => {
+                        try {
+                          onCellPointerUp(e, r, c);
+                        } finally {
+                          if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                            e.currentTarget.releasePointerCapture(e.pointerId);
+                          }
+                        }
+                      }}
+                      onPointerCancel={(e) => {
+                        endSelection();
+                        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                          e.currentTarget.releasePointerCapture(e.pointerId);
+                        }
+                      }}
+                    >
+                      {ch}
+                    </button>
+                  );
+                }),
+              )}
+            </div>
+            {dragOverlay && (
+              <svg
+                className="pointer-events-none absolute left-0 top-0 z-[3] overflow-visible"
+                width="100%"
+                height="100%"
+                aria-hidden
+              >
+                {dragOverlay.polylinePoints.includes(" ") ? (
+                  <polyline
+                    points={dragOverlay.polylinePoints}
+                    fill="none"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={0.85}
+                    className="drop-shadow-[0_0_6px_hsl(var(--primary)/0.55)]"
+                  />
+                ) : (
+                  <circle
+                    cx={Number(dragOverlay.polylinePoints.split(",")[0])}
+                    cy={Number(dragOverlay.polylinePoints.split(",")[1])}
+                    r={3}
+                    fill="hsl(var(--primary))"
+                    opacity={0.9}
+                  />
+                )}
+                {dragOverlay.tail && (
+                  <line
+                    x1={dragOverlay.tail.x1}
+                    y1={dragOverlay.tail.y1}
+                    x2={dragOverlay.tail.x2}
+                    y2={dragOverlay.tail.y2}
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={dragOverlay.validDir ? 3 : 2}
+                    strokeLinecap="round"
+                    strokeDasharray={dragOverlay.validDir ? "6 5" : "5 6"}
+                    opacity={dragOverlay.validDir ? 0.55 : 0.35}
+                  />
+                )}
+              </svg>
             )}
           </div>
         </div>
