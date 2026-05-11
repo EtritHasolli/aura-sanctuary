@@ -202,7 +202,7 @@ if (process.env.GH_TOKEN) {
     provider: "github",
     owner: "EtritHasolli",
     repo: "aura-sanctuary",
-    private: true,
+    private: false,
     token: process.env.GH_TOKEN,
   });
 }
