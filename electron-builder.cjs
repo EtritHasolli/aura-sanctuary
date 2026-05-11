@@ -25,8 +25,6 @@ module.exports = {
     owner: "EtritHasolli",
     repo: "aura-sanctuary",
     releaseType: "release",
-    private: true,
-    // Read at build time — gets embedded in app-update.yml inside the package
-    token: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
+    private: false,
   },
 };
