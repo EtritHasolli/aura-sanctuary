@@ -6,7 +6,7 @@ module.exports = {
 
   directories: { output: "release" },
 
-  files: ["dist/**/*", "electron-dist/**/*", "package.json", ".env"],
+  files: ["dist/**/*", "electron-dist/**/*", "package.json"],
 
   nsis: { createDesktopShortcut: "always" },
 
