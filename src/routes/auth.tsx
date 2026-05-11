@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { APP_LOGO_URL } from "@/lib/branding";
 import { AURA_PATHS, type AuraPath } from "@/lib/aura/types";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { motion } from "framer-motion";
 import swordsmanIdle from "../../characters/swordsman/idle.gif";
 import swordsmanStance from "../../characters/swordsman/stance.gif";
 import mageIdle from "../../characters/mage/idle.gif";
@@ -24,13 +26,38 @@ const PATH_GIFS: Record<AuraPath, { idle: string; stance: string }> = {
   rogue: { idle: rogueIdle, stance: rogueStance },
 };
 
+const dramaticByPath: Record<AuraPath, string> = {
+  swordsman:
+    "Steel sings in your hands. You break enemy lines and turn discipline into momentum.",
+  mage:
+    "Arcane equations bend in your favor. You mend the party and outthink the battlefield.",
+  tank: "You are the wall that does not fall. Threat shatters on your guard and resolve.",
+  rogue:
+    "You strike from the blind angle. Precision, pace, and timing become your true weapons.",
+};
+
 function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [path, setPath] = useState<AuraPath>("swordsman");
+  const [path, setPath] = useState<AuraPath | "">("");
   const [loading, setLoading] = useState(false);
+  const [pathModalOpen, setPathModalOpen] = useState(false);
+  const [pathCardGifMode, setPathCardGifMode] = useState<"idle" | "stance">("idle");
+
+  useEffect(() => {
+    if (!path) return;
+    setPathCardGifMode("idle");
+  }, [path]);
+
+  useEffect(() => {
+    if (!path) return;
+    const timer = window.setInterval(() => {
+      setPathCardGifMode((m) => (m === "idle" ? "stance" : "idle"));
+    }, 15_000);
+    return () => window.clearInterval(timer);
+  }, [path]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,7 +73,7 @@ function AuthPage() {
           options: {
             data: {
               display_name: name || email.split("@")[0],
-              aura_path: path,
+              aura_path: path as AuraPath,
             },
             emailRedirectTo: `${window.location.origin}/`,
           },
@@ -99,43 +126,42 @@ function AuthPage() {
               />
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground block">Choose your path</label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {AURA_PATHS.map((p) => {
-                    const selected = p.id === path;
-                    const sprite = selected ? PATH_GIFS[p.id].stance : PATH_GIFS[p.id].idle;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setPath(p.id)}
-                        className={`border-2 p-1.5 text-left transition-colors ${
-                          selected
-                            ? "border-primary bg-primary/10"
-                            : "border-border bg-secondary/30 hover:border-primary/60"
-                        }`}
-                      >
-                        <div className="w-full h-16 sm:h-20 mb-1.5 border border-border bg-black/20 flex items-center justify-center overflow-hidden">
-                          <img src={sprite} alt={`${p.label} preview`} className="h-full w-auto object-contain" />
-                        </div>
-                        <div className="text-primary text-[10px] sm:text-xs" style={{ fontFamily: "var(--font-pixel)" }}>
-                          {p.label}
-                        </div>
-                        <div className="text-muted-foreground text-[10px] sm:text-xs">{p.skill}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="border border-border bg-secondary/40 p-2 text-xs">
-                  {AURA_PATHS.filter((p) => p.id === path).map((p) => (
-                    <div key={p.id} className="space-y-1">
+                {path ? (
+                  <button
+                    type="button"
+                    onClick={() => setPathModalOpen(true)}
+                    className="relative w-full overflow-hidden border-2 border-border bg-secondary/40 p-3 text-sm text-left hover:border-primary hover:shadow-[0_0_14px_rgba(217,150,48,0.35)]"
+                  >
+                    <motion.img
+                      key={`${path}-${pathCardGifMode}`}
+                      aria-hidden
+                      alt=""
+                      src={PATH_GIFS[path as AuraPath][pathCardGifMode]}
+                      className="pointer-events-none absolute right-2 top-2 z-0 h-[96px] w-auto max-w-[min(44%,140px)] object-contain object-top sm:h-[112px]"
+                      style={{ imageRendering: "pixelated" }}
+                      initial={false}
+                      animate={{ y: [0, -2, 0] }}
+                      transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                    <div className="relative z-[1] space-y-1 min-w-0 pr-[calc(96px+0.75rem)] sm:pr-[calc(112px+1rem)]">
                       <div className="text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
-                        {p.label}
+                        {AURA_PATHS.find((p) => p.id === path)?.label}
                       </div>
-                      <div className="text-muted-foreground">{p.fantasy}</div>
-                      <div className="text-accent">{p.growth}</div>
+                      <p className="text-muted-foreground">{AURA_PATHS.find((p) => p.id === path)?.fantasy}</p>
+                      <p className="text-accent">{AURA_PATHS.find((p) => p.id === path)?.growth}</p>
+                      <p className="text-muted-foreground">Skill: {AURA_PATHS.find((p) => p.id === path)?.skill}</p>
+                      <p className="text-sm text-foreground/90 italic">{dramaticByPath[path as AuraPath]}</p>
                     </div>
-                  ))}
-                </div>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setPathModalOpen(true)}
+                    className="w-full border-2 border-border bg-secondary/40 p-3 text-sm text-left hover:border-primary text-muted-foreground"
+                  >
+                    Click to choose your path
+                  </button>
+                )}
               </div>
             </>
           )}
@@ -166,6 +192,76 @@ function AuthPage() {
           {mode === "signin" ? "» Create account" : "» I have an account"}
         </button>
       </div>
+
+      <Dialog open={pathModalOpen} onOpenChange={setPathModalOpen}>
+        <DialogContent className="w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] max-w-7xl gap-4 sm:gap-6 p-4 sm:p-6 lg:p-8 max-h-[90dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle
+              className="text-xl sm:text-2xl lg:text-3xl pr-8"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              Choose Your Path
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            You must choose one path to continue. This choice is permanent.
+          </p>
+          <div className="grid grid-cols-1 min-[520px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0">
+            {AURA_PATHS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPath(p.id)}
+                aria-pressed={path === p.id}
+                className={`relative text-left pixel-panel min-w-0 p-3 sm:p-4 border-2 transition-all duration-150 ${
+                  path === p.id
+                    ? "!border-primary !bg-primary/10 shadow-[0_0_0_2px_rgba(217,150,48,0.9),0_0_24px_rgba(217,150,48,0.55)]"
+                    : "border-border hover:!border-primary hover:shadow-[0_0_16px_rgba(217,150,48,0.45)]"
+                }`}
+              >
+                {path === p.id && (
+                  <span
+                    className="absolute top-2 right-2 px-1.5 py-0.5 text-[9px] sm:text-[10px] bg-primary text-primary-foreground"
+                    style={{ fontFamily: "var(--font-pixel)" }}
+                  >
+                    SELECTED
+                  </span>
+                )}
+                <div className="w-full h-32 min-[520px]:h-36 sm:h-40 lg:h-44 border-2 border-border bg-secondary/40 mb-3 flex items-center justify-center overflow-hidden">
+                  <img
+                    src={path === p.id ? PATH_GIFS[p.id].stance : PATH_GIFS[p.id].idle}
+                    alt={`${p.label} preview`}
+                    className="h-full w-auto max-w-full object-contain"
+                  />
+                </div>
+                <div
+                  className="text-primary mb-1.5 text-sm sm:text-base"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
+                  {p.label}
+                </div>
+                <p className="text-xs sm:text-sm text-muted-foreground">{p.fantasy}</p>
+                <p className="text-xs sm:text-sm text-accent mt-1">{p.growth}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-1">Skill: {p.skill}</p>
+                <p className="text-xs sm:text-sm text-foreground/80 italic mt-2 leading-relaxed">
+                  {dramaticByPath[p.id]}
+                </p>
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setPathModalOpen(false)}
+              disabled={!path}
+              className="px-4 py-2.5 bg-primary text-primary-foreground disabled:opacity-50"
+              style={{ fontFamily: "var(--font-pixel)", fontSize: 14 }}
+            >
+              CONFIRM PATH
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
