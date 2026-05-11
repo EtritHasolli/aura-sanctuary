@@ -76,8 +76,14 @@ function createWindow(): BrowserWindow {
     void win.loadURL("http://localhost:8080");
     win.webContents.openDevTools();
   } else {
+    // Open DevTools even in production for debugging the blank screen
+    win.webContents.openDevTools();
     void win.loadURL("app://localhost/index.html");
   }
+
+  win.webContents.on("did-fail-load", (e, code, desc, url) => {
+    console.error(`Failed to load: ${url} (${code}: ${desc})`);
+  });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
@@ -236,6 +242,7 @@ app.whenReady().then(() => {
   protocol.handle("app", (request) => {
     const { pathname } = new URL(request.url);
     const filePath = path.join(app.getAppPath(), "dist", pathname);
+    console.log(`[Protocol] Loading ${pathname} from ${filePath}`);
     return net.fetch(pathToFileURL(filePath).toString());
   });
 
