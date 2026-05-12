@@ -161,6 +161,7 @@ export type Database = {
           constitution: number
           created_at: string
           display_name: string
+          friend_code: string
           equip_con_bonus: number
           equip_gold_bonus_pct: number
           equip_int_bonus: number
@@ -187,6 +188,7 @@ export type Database = {
           constitution?: number
           created_at?: string
           display_name?: string
+          friend_code?: string
           equip_con_bonus?: number
           equip_gold_bonus_pct?: number
           equip_int_bonus?: number

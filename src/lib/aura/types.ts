@@ -76,6 +76,8 @@ export interface Profile {
   character_name: string;
   /** Pomodoro-driven pose for friend cards / profile (stored as `pet_state` in DB). */
   character_state: CharacterState;
+  /** Unique 8-digit code (may include leading zeros) for friend requests. Server-assigned, not editable. */
+  friend_code?: string;
 }
 
 export interface Tag {
@@ -177,7 +179,7 @@ export function profileFromDbRow(row: Database["public"]["Tables"]["profiles"]["
 export function profilePatchToDb(
   patch: Partial<Profile>,
 ): Partial<Database["public"]["Tables"]["profiles"]["Update"]> {
-  const { character_name, character_state, ...rest } = patch;
+  const { character_name, character_state, friend_code: _fc, ...rest } = patch;
   const out: Partial<Database["public"]["Tables"]["profiles"]["Update"]> = { ...rest };
   if (character_name !== undefined) out.pet_name = character_name;
   if (character_state !== undefined) out.pet_state = character_state;

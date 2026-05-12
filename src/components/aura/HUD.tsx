@@ -129,12 +129,15 @@ function NotificationsBell() {
     if (friendMatch) {
       const params = new URLSearchParams(friendMatch[1]);
       const invite = params.get("invite") ?? undefined;
+      const friendCodeRaw = params.get("friendCode") ?? "";
+      const friendCode = /^\d{8}$/.test(friendCodeRaw) ? friendCodeRaw : undefined;
       const friend = params.get("friend") ?? undefined;
       const msg = params.get("message") ?? undefined;
       return {
         to: "/friends",
         search: {
           ...(invite ? { invite } : {}),
+          ...(friendCode ? { friendCode } : {}),
           ...(friend ? { friend } : {}),
           ...(msg ? { message: msg } : {}),
         },

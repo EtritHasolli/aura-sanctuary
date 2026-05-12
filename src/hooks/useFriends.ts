@@ -189,6 +189,24 @@ export function useSendFriendRequestByEmail() {
   });
 }
 
+export function useSendFriendRequestByFriendCode() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (code: string) => {
+      const { data, error } = await supabase.rpc("send_friend_request_by_friend_code", {
+        p_code: code,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["friends", user?.id] });
+      qc.invalidateQueries({ queryKey: ["friendRequests", user?.id] });
+    },
+  });
+}
+
 export function usePendingFriendRequests() {
   const { user } = useAuth();
   return useQuery({

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
-import { Check, Link2, Mail, PlusCircle, Users } from "lucide-react";
+import { Check, Copy, Mail, PlusCircle, Users } from "lucide-react";
 import {
   useAcceptFriendRequest,
   useFriendDetail,
@@ -10,6 +10,7 @@ import {
   usePendingFriendRequests,
   useSendFriendRequest,
   useSendFriendRequestByEmail,
+  useSendFriendRequestByFriendCode,
 } from "@/hooks/useFriends";
 import { getItemIconUrl } from "@/hooks/useShop";
 import { CompanionSprite } from "@/components/aura/CompanionSprite";
@@ -22,6 +23,7 @@ import {
   effectiveStrength,
 } from "@/lib/aura/equipmentBonuses";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { useMarkMessageScopeRead } from "@/hooks/useMessageUnreadCounts";
 import { useNotifications } from "@/components/aura/NotificationsContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -40,6 +42,8 @@ export const Route = createFileRoute("/friends")({
   head: () => ({ meta: [{ title: "Friends — Aura" }] }),
   validateSearch: z.object({
     invite: z.string().uuid().optional(),
+    /** Target's 8-digit friend code (same role as `invite` UUID deep link). */
+    friendCode: z.string().regex(/^\d{8}$/).optional(),
     friend: z.string().uuid().optional(),
     message: z.string().uuid().optional(),
   }),
@@ -82,7 +86,9 @@ function Meter({
 
 function FriendsPage() {
   const { user } = useAuth();
-  const { invite, friend: friendSearchId, message: messageSearchId } = Route.useSearch();
+  const { data: myProfile, isFetched: profileFetched } = useProfile();
+  const { invite, friendCode, friend: friendSearchId, message: messageSearchId } =
+    Route.useSearch();
   const { data: friends = [], isLoading } = useFriends();
   const {
     data: pending = [],
@@ -91,12 +97,14 @@ function FriendsPage() {
   } = usePendingFriendRequests();
   const sendFriendRequest = useSendFriendRequest();
   const sendFriendRequestByEmail = useSendFriendRequestByEmail();
+  const sendFriendRequestByFriendCode = useSendFriendRequestByFriendCode();
   const acceptFriendRequest = useAcceptFriendRequest();
   const markMessageScopeRead = useMarkMessageScopeRead();
   const { notifications, markFriendMessagesRead } = useNotifications();
-  const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
   const [showEmailInvite, setShowEmailInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [friendCodeInput, setFriendCodeInput] = useState("");
   const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null);
   const { data: selectedDetail } = useFriendDetail(selectedFriendId);
   const inviteFriendToParty = useInviteFriendToParty();
@@ -107,6 +115,7 @@ function FriendsPage() {
   const markMessageScopeReadRef = useRef(markMessageScopeRead);
   const markFriendMessagesReadRef = useRef(markFriendMessagesRead);
   const INVITE_PROCESSED_KEY = "friendInviteProcessed";
+  const FRIEND_CODE_PROCESSED_KEY = "friendCodeInviteProcessed";
 
   useEffect(() => {
     markMessageScopeReadRef.current = markMessageScopeRead;
@@ -135,6 +144,31 @@ function FriendsPage() {
   }, [invite, sendFriendRequest, user]);
 
   useEffect(() => {
+    if (!user || !friendCode || !profileFetched) return;
+    if (myProfile?.friend_code === friendCode) {
+      const processKey = `${user.id}:fc:${friendCode}`;
+      sessionStorage.setItem(`${FRIEND_CODE_PROCESSED_KEY}:${processKey}`, "1");
+      toast.error("That is your own friend code.");
+      return;
+    }
+    const processKey = `${user.id}:fc:${friendCode}`;
+    if (sessionStorage.getItem(`${FRIEND_CODE_PROCESSED_KEY}:${processKey}`) === "1") return;
+    sessionStorage.setItem(`${FRIEND_CODE_PROCESSED_KEY}:${processKey}`, "1");
+    sendFriendRequestByFriendCode
+      .mutateAsync(friendCode)
+      .then(() => toast.success("Friend request sent."))
+      .catch((e: unknown) =>
+        toast.error(e instanceof Error ? e.message : "Could not send request."),
+      );
+  }, [
+    friendCode,
+    myProfile?.friend_code,
+    profileFetched,
+    sendFriendRequestByFriendCode,
+    user,
+  ]);
+
+  useEffect(() => {
     if (friendSearchId) setSelectedFriendId(friendSearchId);
   }, [friendSearchId]);
 
@@ -156,13 +190,33 @@ function FriendsPage() {
     });
   }, [friendMessages, messageSearchId]);
 
-  const copyInviteLink = async () => {
-    if (!user) return;
-    const link = `${window.location.origin}/friends?invite=${user.id}`;
-    await navigator.clipboard.writeText(link);
-    setCopied(true);
-    toast.success("Friend invite link copied.");
-    setTimeout(() => setCopied(false), 1500);
+  const copyMyFriendCode = async () => {
+    const code = myProfile?.friend_code?.trim();
+    if (!code) {
+      toast.error("Friend code not loaded yet. Try again in a moment.");
+      return;
+    }
+    await navigator.clipboard.writeText(code);
+    setCopiedCode(true);
+    toast.success("Friend code copied.");
+    setTimeout(() => setCopiedCode(false), 1500);
+  };
+
+  const submitFriendCode = () => {
+    const digits = friendCodeInput.replace(/\D/g, "");
+    if (digits.length !== 8) {
+      toast.error("Enter your friend's 8-digit code.");
+      return;
+    }
+    sendFriendRequestByFriendCode
+      .mutateAsync(digits)
+      .then(() => {
+        setFriendCodeInput("");
+        toast.success("Friend request sent.");
+      })
+      .catch((e: unknown) =>
+        toast.error(e instanceof Error ? e.message : "Could not send request."),
+      );
   };
 
   const sendEmailInvite = () => {
@@ -265,33 +319,63 @@ function FriendsPage() {
         </h1>
       </div>
 
-      <div className="pixel-panel p-3 space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
-            Invite by link or email.
-          </p>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setShowEmailInvite((v) => !v)}
-              className="flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-xs"
-              style={{ fontFamily: "var(--font-pixel)" }}
-            >
-              <Mail size={11} /> EMAIL
-            </button>
-            <button
-              type="button"
-              onClick={() => void copyInviteLink()}
-              className="flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-xs"
-              style={{ fontFamily: "var(--font-pixel)" }}
-            >
-              {copied ? <Check size={11} /> : <Link2 size={11} />}
-              {copied ? "COPIED" : "LINK"}
-            </button>
+      <div className="pixel-panel p-3 space-y-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1 min-w-0">
+            <p className="text-xs text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
+              Share your 8-digit code or add someone using theirs.
+            </p>
+            <div className="flex flex-wrap items-center gap-2 text-xs" style={{ fontFamily: "var(--font-pixel)" }}>
+              <span className="text-muted-foreground">YOUR CODE</span>
+              <span className="text-primary tracking-widest tabular-nums text-sm">
+                {myProfile?.friend_code ?? "········"}
+              </span>
+              <button
+                type="button"
+                onClick={() => void copyMyFriendCode()}
+                disabled={!myProfile?.friend_code}
+                className="flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary disabled:opacity-50 text-xs"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                {copiedCode ? <Check size={11} /> : <Copy size={11} />}
+                {copiedCode ? "COPIED" : "COPY"}
+              </button>
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setShowEmailInvite((v) => !v)}
+            className="flex items-center justify-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-xs shrink-0 self-start sm:self-center"
+            style={{ fontFamily: "var(--font-pixel)" }}
+          >
+            <Mail size={11} /> EMAIL
+          </button>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={8}
+            value={friendCodeInput}
+            onChange={(e) => setFriendCodeInput(e.target.value.replace(/\D/g, "").slice(0, 8))}
+            onKeyDown={(e) => e.key === "Enter" && submitFriendCode()}
+            placeholder="Friend's 8-digit code"
+            className="w-full sm:max-w-[12rem] px-2 py-1.5 bg-input border-2 border-border tracking-widest tabular-nums"
+            style={{ fontFamily: "var(--font-pixel)" }}
+          />
+          <button
+            type="button"
+            onClick={submitFriendCode}
+            disabled={friendCodeInput.replace(/\D/g, "").length !== 8 || sendFriendRequestByFriendCode.isPending}
+            className="px-3 py-1.5 bg-primary text-primary-foreground disabled:opacity-50 text-xs shrink-0"
+            style={{ fontFamily: "var(--font-pixel)" }}
+          >
+            {sendFriendRequestByFriendCode.isPending ? "SENDING..." : "ADD FRIEND"}
+          </button>
         </div>
         {showEmailInvite && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 pt-1 border-t border-border">
             <input
               type="email"
               value={inviteEmail}
