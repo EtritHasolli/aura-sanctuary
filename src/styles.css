@@ -232,7 +232,7 @@
     font-size: 16px !important;
     line-height: 1.35;
   }
-  /* Catch tiny inline styles used in TSX (fontSize: 9/10/11). */
+  /* Catch tiny inline styles used in TSX (fontSize: 9/10/11). Does not match rem (e.g. auth inputs). */
   [style*="font-size: 9px"],
   [style*="font-size: 10px"],
   [style*="font-size: 11px"] {

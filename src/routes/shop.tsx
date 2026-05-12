@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Coins, Shirt, ShoppingBag, Sparkles } from "lucide-react";
+import { Coins, ShoppingBag, Sparkles } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { useShopItems, usePurchaseShopItem, getItemIconUrl } from "@/hooks/useShop";
 import { InventoryBag } from "@/components/aura/InventoryBag";
@@ -197,16 +197,16 @@ function ShopPage() {
                 <button
                   type="button"
                   onClick={() => setTab("general")}
-                  className={`px-3 py-1.5 flex items-center gap-1 ${tab === "general" ? "bg-primary text-primary-foreground" : "bg-card"}`}
+                  className={`px-3 py-1.5 ${tab === "general" ? "bg-primary text-primary-foreground" : "bg-card"}`}
                 >
-                  <ShoppingBag size={12} /> General
+                  General
                 </button>
                 <button
                   type="button"
                   onClick={() => setTab("equipment")}
-                  className={`px-3 py-1.5 flex items-center gap-1 border-l-2 border-border ${tab === "equipment" ? "bg-primary text-primary-foreground" : "bg-card"}`}
+                  className={`px-3 py-1.5 border-l-2 border-border ${tab === "equipment" ? "bg-primary text-primary-foreground" : "bg-card"}`}
                 >
-                  <Shirt size={12} /> Equipment
+                  Equipment
                 </button>
               </div>
             </div>

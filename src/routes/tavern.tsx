@@ -667,7 +667,7 @@ function TavernPage() {
               className="px-4 py-2 border-2 border-border hover:border-primary disabled:opacity-50"
               style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
             >
-              {creating ? "CREATING..." : "+ CREATE PARTY"}
+              {creating ? "CREATING..." : "CREATE PARTY"}
             </button>
             <input
               value={newPartyName}

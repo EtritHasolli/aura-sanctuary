@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Clock3, Plus, Save, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { Bell, Clock3, Plus, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
 import { useNotifications } from "@/components/aura/NotificationsContext";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
@@ -610,10 +610,10 @@ function SettingsPage() {
             <button
               onClick={saveProfile}
               disabled={updateProfile.isPending}
-              className="px-4 py-2.5 bg-primary text-primary-foreground flex items-center gap-2 disabled:opacity-60"
+              className="px-4 py-2.5 bg-primary text-primary-foreground disabled:opacity-60"
               style={{ fontFamily: "var(--font-pixel)", fontSize: 14 }}
             >
-              <Save size={14} /> {updateProfile.isPending ? "SAVING..." : "SAVE PROFILE"}
+              {updateProfile.isPending ? "SAVING..." : "SAVE PROFILE"}
             </button>
           </div>
         </section>

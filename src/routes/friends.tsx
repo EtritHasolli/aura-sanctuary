@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
-import { Check, Copy, Mail, PlusCircle, Users } from "lucide-react";
+import { PlusCircle, Users } from "lucide-react";
 import {
   useAcceptFriendRequest,
   useFriendDetail,
@@ -198,7 +198,7 @@ function FriendsPage() {
     }
     await navigator.clipboard.writeText(code);
     setCopiedCode(true);
-    toast.success("Friend code copied.");
+    toast.success("Id copied.");
     setTimeout(() => setCopiedCode(false), 1500);
   };
 
@@ -319,52 +319,50 @@ function FriendsPage() {
         </h1>
       </div>
 
-      <div className="pixel-panel p-3 space-y-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1 min-w-0">
-            <p className="text-xs text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
-              Share your 8-digit code or add someone using theirs.
-            </p>
-            <div className="flex flex-wrap items-center gap-2 text-xs" style={{ fontFamily: "var(--font-pixel)" }}>
-              <span className="text-muted-foreground">YOUR CODE</span>
-              <span className="text-primary tracking-widest tabular-nums text-sm">
-                {myProfile?.friend_code ?? "········"}
-              </span>
-              <button
-                type="button"
-                onClick={() => void copyMyFriendCode()}
-                disabled={!myProfile?.friend_code}
-                className="flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary disabled:opacity-50 text-xs"
-                style={{ fontFamily: "var(--font-pixel)" }}
-              >
-                {copiedCode ? <Check size={11} /> : <Copy size={11} />}
-                {copiedCode ? "COPIED" : "COPY"}
-              </button>
-            </div>
+      <div className="pixel-panel p-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
+            Invite by email or id.
+          </p>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowEmailInvite((v) => !v)}
+              className="px-2 py-1 border-2 border-border hover:border-primary text-xs"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              EMAIL
+            </button>
+            <button
+              type="button"
+              onClick={() => void copyMyFriendCode()}
+              disabled={!myProfile?.friend_code}
+              className="px-2 py-1 border-2 border-border hover:border-primary text-xs disabled:opacity-50"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              {copiedCode ? "COPIED" : "ID"}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowEmailInvite((v) => !v)}
-            className="flex items-center justify-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-xs shrink-0 self-start sm:self-center"
-            style={{ fontFamily: "var(--font-pixel)" }}
-          >
-            <Mail size={11} /> EMAIL
-          </button>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <input
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            maxLength={8}
-            value={friendCodeInput}
-            onChange={(e) => setFriendCodeInput(e.target.value.replace(/\D/g, "").slice(0, 8))}
-            onKeyDown={(e) => e.key === "Enter" && submitFriendCode()}
-            placeholder="Friend's 8-digit code"
-            className="w-full sm:max-w-[12rem] px-2 py-1.5 bg-input border-2 border-border tracking-widest tabular-nums"
-            style={{ fontFamily: "var(--font-pixel)" }}
-          />
-          <button
+        <div className="space-y-1">
+          <p className="text-[10px] text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
+            Add a friend: enter their id (8 digits).
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={8}
+              value={friendCodeInput}
+              onChange={(e) => setFriendCodeInput(e.target.value.replace(/\D/g, "").slice(0, 8))}
+              onKeyDown={(e) => e.key === "Enter" && submitFriendCode()}
+              placeholder=""
+              aria-label="Friend id to add, 8 digits"
+              className="w-full flex-1 min-w-0 px-2 py-1.5 bg-input border-2 border-border tracking-widest tabular-nums"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            />
+            <button
             type="button"
             onClick={submitFriendCode}
             disabled={friendCodeInput.replace(/\D/g, "").length !== 8 || sendFriendRequestByFriendCode.isPending}
@@ -374,8 +372,9 @@ function FriendsPage() {
             {sendFriendRequestByFriendCode.isPending ? "SENDING..." : "ADD FRIEND"}
           </button>
         </div>
+        </div>
         {showEmailInvite && (
-          <div className="flex gap-2 pt-1 border-t border-border">
+          <div className="flex gap-2">
             <input
               type="email"
               value={inviteEmail}

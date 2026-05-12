@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { animate, motion, useMotionValue } from "framer-motion";
 import {
-  Play,
   Pause,
   RotateCcw,
   Music,
@@ -739,10 +738,10 @@ function SanctuaryPage() {
               {!running ? (
                 <button
                   onClick={start}
-                  className="px-4 py-2 bg-primary text-primary-foreground flex items-center gap-2"
+                  className="px-4 py-2 bg-primary text-primary-foreground"
                   style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
                 >
-                  <Play size={14} /> START
+                  START
                 </button>
               ) : (
                 <button

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Hammer, Shirt, X, Info } from "lucide-react";
+import { Hammer, Shirt, Info } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useUserItems, useForgeThreeEquipment, getItemIconUrl } from "@/hooks/useShop";
 import type { UserItemRow } from "@/hooks/useShop";
@@ -174,10 +174,10 @@ function ForgePage() {
               type="button"
               onClick={clearBasket}
               disabled={basket.length === 0}
-              className="px-2 py-1 border-2 border-border text-[10px] disabled:opacity-40 flex items-center gap-1"
+              className="px-2 py-1 border-2 border-border text-[10px] disabled:opacity-40"
               style={{ fontFamily: "var(--font-pixel)" }}
             >
-              <X size={10} /> CLEAR
+              CLEAR
             </button>
           </div>
         </div>

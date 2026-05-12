@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { APP_LOGO_URL } from "@/lib/branding";
 import { AURA_PATHS, type AuraPath } from "@/lib/aura/types";
@@ -36,8 +36,11 @@ const dramaticByPath: Record<AuraPath, string> = {
     "You strike from the blind angle. Precision, pace, and timing become your true weapons.",
 };
 
+type SignupPhase = "credentials" | "awaiting_path" | "profile";
+
 function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [signupPhase, setSignupPhase] = useState<SignupPhase>("credentials");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -45,6 +48,10 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [pathModalOpen, setPathModalOpen] = useState(false);
   const [pathCardGifMode, setPathCardGifMode] = useState<"idle" | "stance">("idle");
+  /** True when path modal was closed via CONFIRM PATH during signup path step. */
+  const awaitingPathConfirmedRef = useRef(false);
+  /** True when modal was opened from profile step (change path), so dismiss returns to profile. */
+  const pathModalFromProfileRef = useRef(false);
 
   useEffect(() => {
     if (!path) return;
@@ -59,20 +66,69 @@ function AuthPage() {
     return () => window.clearInterval(timer);
   }, [path]);
 
+  useEffect(() => {
+    if (pathModalOpen || mode !== "signup" || signupPhase !== "awaiting_path") return;
+    if (awaitingPathConfirmedRef.current) {
+      awaitingPathConfirmedRef.current = false;
+      pathModalFromProfileRef.current = false;
+      setSignupPhase("profile");
+      return;
+    }
+    if (pathModalFromProfileRef.current) {
+      pathModalFromProfileRef.current = false;
+      setSignupPhase("profile");
+      return;
+    }
+    setSignupPhase("credentials");
+    setPath("");
+  }, [pathModalOpen, mode, signupPhase]);
+
+  function openPathModalForSignup() {
+    awaitingPathConfirmedRef.current = false;
+    pathModalFromProfileRef.current = false;
+    setPath("");
+    setSignupPhase("awaiting_path");
+    setPathModalOpen(true);
+  }
+
+  function confirmPathFromModal() {
+    if (!path) {
+      toast.error("Choose a path to begin your adventure.");
+      return;
+    }
+    awaitingPathConfirmedRef.current = true;
+    setPathModalOpen(false);
+  }
+
+  function cancelPathModalSignup() {
+    awaitingPathConfirmedRef.current = false;
+    setPathModalOpen(false);
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     try {
-      if (mode === "signup") {
+      if (mode === "signup" && signupPhase === "credentials") {
+        if (!email.trim() || password.length < 6) {
+          toast.error("Enter a valid email and password (6+ characters).");
+          return;
+        }
+        openPathModalForSignup();
+        return;
+      }
+
+      if (mode === "signup" && signupPhase === "profile") {
         if (!path) {
           toast.error("Choose a path to begin your adventure.");
           return;
         }
         const { error } = await supabase.auth.signUp({
-          email, password,
+          email: email.trim(),
+          password,
           options: {
             data: {
-              display_name: name || email.split("@")[0],
+              display_name: name.trim() || email.split("@")[0],
               aura_path: path as AuraPath,
             },
             emailRedirectTo: `${window.location.origin}/`,
@@ -80,10 +136,14 @@ function AuthPage() {
         });
         if (error) throw error;
         toast.success("Welcome, adventurer! Check your email to verify.");
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        return;
       }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) throw error;
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed");
     } finally {
@@ -91,11 +151,26 @@ function AuthPage() {
     }
   }
 
+  function setAuthMode(next: "signin" | "signup") {
+    setMode(next);
+    setSignupPhase("credentials");
+    setPath("");
+    awaitingPathConfirmedRef.current = false;
+    pathModalFromProfileRef.current = false;
+    setPathModalOpen(false);
+  }
+
+  const signupOnProfile = mode === "signup" && signupPhase === "profile";
+  const signupOnCredentials = mode === "signup" && signupPhase === "credentials";
+
   return (
     <div className="min-h-full flex items-start sm:items-center justify-center bg-background p-4 relative overflow-y-auto">
-      <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
-        background: "radial-gradient(circle at 50% 40%, var(--color-primary), transparent 60%)"
-      }} />
+      <div
+        className="absolute inset-0 opacity-20 pointer-events-none"
+        style={{
+          background: "radial-gradient(circle at 50% 40%, var(--color-primary), transparent 60%)",
+        }}
+      />
       <div className="pixel-panel p-4 sm:p-8 w-full max-w-sm relative my-auto">
         <div className="text-center mb-4 sm:mb-6">
           <img
@@ -107,29 +182,49 @@ function AuthPage() {
             style={{ imageRendering: "pixelated" }}
             decoding="async"
           />
-          <h1 className="text-xl sm:text-2xl text-primary" style={{ fontFamily: "var(--font-pixel)" }}>AURA</h1>
+          <h1 className="text-xl sm:text-2xl text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+            AURA
+          </h1>
           <p className="text-xs text-muted-foreground mt-1 sm:mt-2" style={{ fontFamily: "var(--font-pixel)" }}>
             The Desktop Sanctuary
           </p>
         </div>
 
-        {/* Google OAuth disabled — will be re-enabled for desktop app */}
-
         <form onSubmit={submit} className="space-y-3">
-          {mode === "signup" && (
+          {signupOnProfile && (
+            <p className="text-[10px] text-muted-foreground break-all" style={{ fontFamily: "var(--font-pixel)" }}>
+              {email.trim()}
+            </p>
+          )}
+          {signupOnProfile && (
             <>
+              <label className="text-xs text-muted-foreground block" style={{ fontFamily: "var(--font-pixel)" }}>
+                Hero name
+              </label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Hero name"
-                className="w-full px-3 py-2 bg-input border-2 border-border focus:border-primary outline-none text-sm"
+                className="w-full px-3 py-2.5 bg-input border-2 border-border focus:border-primary outline-none leading-snug"
+                style={{
+                  fontFamily: "var(--font-pixel)",
+                  /* rem avoids styles.css floor that forces inline 9–11px to 14px */
+                  fontSize: "0.5625rem",
+                }}
               />
               <div className="space-y-2">
-                <label className="text-xs text-muted-foreground block">Choose your path</label>
+                <label className="text-xs text-muted-foreground block" style={{ fontFamily: "var(--font-pixel)" }}>
+                  Your path
+                </label>
                 {path ? (
                   <button
                     type="button"
-                    onClick={() => setPathModalOpen(true)}
+                    onClick={() => {
+                      awaitingPathConfirmedRef.current = false;
+                      pathModalFromProfileRef.current = true;
+                      setSignupPhase("awaiting_path");
+                      setPathModalOpen(true);
+                    }}
                     className="relative w-full overflow-hidden border-2 border-border bg-secondary/40 p-3 text-sm text-left hover:border-primary hover:shadow-[0_0_14px_rgba(217,150,48,0.35)]"
                   >
                     <motion.img
@@ -153,39 +248,61 @@ function AuthPage() {
                       <p className="text-sm text-foreground/90 italic">{dramaticByPath[path as AuraPath]}</p>
                     </div>
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setPathModalOpen(true)}
-                    className="w-full border-2 border-border bg-secondary/40 p-3 text-sm text-left hover:border-primary text-muted-foreground"
-                  >
-                    Click to choose your path
-                  </button>
-                )}
+                ) : null}
               </div>
             </>
           )}
-          <input
-            type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-            placeholder="email"
-            className="w-full px-3 py-2 bg-input border-2 border-border focus:border-primary outline-none text-sm"
-          />
-          <input
-            type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)}
-            placeholder="password"
-            className="w-full px-3 py-2 bg-input border-2 border-border focus:border-primary outline-none text-sm"
-          />
+
+          {(mode === "signin" || signupOnCredentials) && (
+            <>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="email"
+                className="w-full px-3 py-2.5 bg-input border-2 border-border focus:border-primary outline-none leading-snug"
+                style={{
+                  fontFamily: "var(--font-pixel)",
+                  /* rem avoids styles.css floor that forces inline 9–11px to 14px */
+                  fontSize: "0.5625rem",
+                }}
+              />
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="password"
+                className="w-full px-3 py-2.5 bg-input border-2 border-border focus:border-primary outline-none leading-snug"
+                style={{
+                  fontFamily: "var(--font-pixel)",
+                  /* rem avoids styles.css floor that forces inline 9–11px to 14px */
+                  fontSize: "0.5625rem",
+                }}
+              />
+            </>
+          )}
+
           <button
-            type="submit" disabled={loading}
+            type="submit"
+            disabled={loading || (mode === "signup" && signupPhase === "awaiting_path")}
             className="w-full py-3 bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50"
             style={{ fontFamily: "var(--font-pixel)", fontSize: 12 }}
           >
-            {loading ? "..." : mode === "signin" ? "ENTER" : "BEGIN QUEST"}
+            {loading
+              ? "..."
+              : mode === "signin"
+                ? "ENTER"
+                : signupOnCredentials
+                  ? "CONTINUE"
+                  : "BEGIN QUEST"}
           </button>
         </form>
 
         <button
-          onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+          onClick={() => setAuthMode(mode === "signin" ? "signup" : "signin")}
           className="mt-4 w-full text-xs text-muted-foreground hover:text-primary"
           style={{ fontFamily: "var(--font-pixel)" }}
         >
@@ -193,8 +310,34 @@ function AuthPage() {
         </button>
       </div>
 
-      <Dialog open={pathModalOpen} onOpenChange={setPathModalOpen}>
-        <DialogContent className="w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] max-w-7xl gap-4 sm:gap-6 p-4 sm:p-6 lg:p-8 max-h-[90dvh] overflow-y-auto">
+      <Dialog
+        open={pathModalOpen}
+        onOpenChange={(open) => {
+          if (open) {
+            setPathModalOpen(true);
+            return;
+          }
+          if (mode === "signup" && signupPhase === "awaiting_path") {
+            setPathModalOpen(false);
+            return;
+          }
+          setPathModalOpen(false);
+        }}
+      >
+        <DialogContent
+          className="w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] max-w-7xl gap-4 sm:gap-6 p-4 sm:p-6 lg:p-8 max-h-[90dvh] overflow-y-auto"
+          onPointerDownOutside={(e) => {
+            if (mode === "signup" && signupPhase === "awaiting_path") {
+              e.preventDefault();
+            }
+          }}
+          onEscapeKeyDown={(e) => {
+            if (mode === "signup" && signupPhase === "awaiting_path") {
+              e.preventDefault();
+              cancelPathModalSignup();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle
               className="text-xl sm:text-2xl lg:text-3xl pr-8"
@@ -250,9 +393,19 @@ function AuthPage() {
             ))}
           </div>
           <div className="flex flex-wrap justify-end gap-2 pt-1">
+            {mode === "signup" && signupPhase === "awaiting_path" && (
+              <button
+                type="button"
+                onClick={cancelPathModalSignup}
+                className="px-4 py-2.5 border-2 border-border"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 14 }}
+              >
+                BACK
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => setPathModalOpen(false)}
+              onClick={confirmPathFromModal}
               disabled={!path}
               className="px-4 py-2.5 bg-primary text-primary-foreground disabled:opacity-50"
               style={{ fontFamily: "var(--font-pixel)", fontSize: 14 }}
