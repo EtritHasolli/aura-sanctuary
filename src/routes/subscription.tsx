@@ -12,7 +12,7 @@ export const Route = createFileRoute("/subscription")({
 
 function SubscriptionPage() {
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-5">
+    <div className="p-3 md:p-6 max-w-6xl mx-auto space-y-5">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
           <Crown className="text-primary shrink-0" size={24} />

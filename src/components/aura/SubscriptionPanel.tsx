@@ -233,7 +233,7 @@ function TierCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h3
-            className="text-lg text-primary truncate"
+            className="text-base text-primary truncate"
             style={{ fontFamily: "var(--font-pixel)" }}
           >
             {tier.name}
@@ -293,7 +293,7 @@ function TierCard({
           <button
             type="button"
             disabled
-            className="px-3 py-2.5 border-2 border-primary text-primary text-xs disabled:opacity-100"
+            className="w-full px-3 py-2.5 border-2 border-primary text-primary text-xs disabled:opacity-100"
             style={{ fontFamily: "var(--font-pixel)" }}
           >
             ACTIVE
@@ -302,7 +302,7 @@ function TierCard({
           <button
             type="button"
             onClick={onAssign}
-            className="px-3 py-2.5 border-2 border-border hover:border-primary text-xs"
+            className="w-full px-3 py-2.5 border-2 border-border hover:border-primary text-xs"
             style={{ fontFamily: "var(--font-pixel)" }}
           >
             DOWNGRADE
@@ -313,8 +313,8 @@ function TierCard({
               type="button"
               disabled
               title="Real payments are not wired yet — admins can assign for testing."
-              className="px-3 py-2.5 bg-primary/40 text-primary-foreground text-xs cursor-not-allowed"
-              style={{ fontFamily: "var(--font-pixel)" }}
+              className="w-full px-2 py-2.5 bg-primary/40 text-primary-foreground text-xs cursor-not-allowed"
+              style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
             >
               SUBSCRIBE (SOON)
             </button>

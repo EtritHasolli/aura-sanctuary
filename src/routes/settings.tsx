@@ -698,7 +698,7 @@ function SettingsPage() {
               <Info size={16} />
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-base">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-base">
             <Stat label="Level" value={profile.level} />
             <Stat label="Gold" value={profile.gold} />
             <Stat label="HP" value={`${profile.hp}/${profile.max_hp}`} />
@@ -712,7 +712,7 @@ function SettingsPage() {
           </div>
           {showStatsInfo && (
             <div
-              className="fixed inset-0 z-[130] bg-black/50 p-4 flex items-center justify-center"
+              className="fixed inset-0 z-130 bg-black/50 p-4 flex items-center justify-center"
               onClick={() => setShowStatsInfo(false)}
             >
               <div
@@ -758,7 +758,7 @@ function SettingsPage() {
         </section>
 
         <section className="pixel-panel p-5 space-y-4">
-          <div className="flex items-center justify-between gap-2">
+          <div className="space-y-2 md:space-y-0 md:flex md:items-center md:justify-between md:gap-2">
             <div className="flex items-center gap-2">
               <Clock3 size={18} className="text-primary" />
               <h2 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
@@ -768,8 +768,8 @@ function SettingsPage() {
             <button
               type="button"
               onClick={addSessionDraft}
-              className="px-2 py-1 border-2 border-border hover:border-primary text-[11px]"
-              style={{ fontFamily: "var(--font-pixel)" }}
+              className="px-2 py-1 border-2 border-border hover:border-primary"
+              style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
             >
               ADD SESSION
             </button>
@@ -836,9 +836,9 @@ function SettingsPage() {
                 type="button"
                 onClick={saveSessionPlan}
                 className="px-4 py-2.5 bg-primary text-primary-foreground"
-                style={{ fontFamily: "var(--font-pixel)", fontSize: 14 }}
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
               >
-                SAVE POMODORO SESSION
+                SAVE POMODORO
               </button>
             </div>
           </div>
@@ -986,24 +986,25 @@ function SettingsPage() {
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap justify-end gap-2 pt-1">
-            {profile.aura_path && (
+          <div className="flex justify-between gap-2 pt-1">
+            {profile.aura_path ? (
               <button
                 type="button"
                 onClick={() => setPathModalOpen(false)}
                 className="px-3 py-1.5 border-2 border-border"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
               >
                 Close
               </button>
-            )}
+            ) : <div />}
             <button
               type="button"
               onClick={() => void saveProfile()}
               disabled={!auraPath || updateProfile.isPending}
               className="px-4 py-2.5 bg-primary text-primary-foreground disabled:opacity-60"
-              style={{ fontFamily: "var(--font-pixel)", fontSize: 14 }}
+              style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
             >
-              {updateProfile.isPending ? "BINDING PATH..." : "CONFIRM PATH"}
+              {updateProfile.isPending ? "BINDING..." : "Confirm"}
             </button>
           </div>
         </DialogContent>
@@ -1014,11 +1015,11 @@ function SettingsPage() {
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="border-2 border-border bg-secondary/40 px-3 py-2.5">
-      <div className="text-xs text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
+    <div className="border-2 border-border bg-secondary/40 px-2 py-2 min-w-0 overflow-hidden">
+      <div className="text-[9px] text-muted-foreground truncate" style={{ fontFamily: "var(--font-pixel)" }}>
         {label}
       </div>
-      <div className="text-lg text-foreground">{value}</div>
+      <div className="text-base text-foreground truncate">{value}</div>
     </div>
   );
 }

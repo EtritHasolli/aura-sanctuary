@@ -43,13 +43,14 @@ export function HabiticaTaskBadge({ task }: HabiticaTaskBadgeProps) {
 
 interface HabiticaTaskDetailsProps {
   task: Task;
+  onCounterChange?: (counterUp: number, counterDown: number) => void;
 }
 
 /**
  * Habitica detail section for the quest dialog: frequency, due date, history
  * spark, and remote checklist.
  */
-export function HabiticaTaskDetails({ task }: HabiticaTaskDetailsProps) {
+export function HabiticaTaskDetails({ task, onCounterChange }: HabiticaTaskDetailsProps) {
   const meta = task.habitica_meta ?? null;
   const repeatDays = useMemo(() => {
     const r = meta?.repeat ?? {};
@@ -69,52 +70,72 @@ export function HabiticaTaskDetails({ task }: HabiticaTaskDetailsProps) {
   const recentHistory = (meta.history ?? []).slice(-14);
   const dueDate = meta.date ? new Date(meta.date) : null;
 
+  const counterUp = meta.counterUp ?? 0;
+  const counterDown = meta.counterDown ?? 0;
+
   return (
     <div className="border-2 border-border bg-background/30 p-2 space-y-2">
       <div
         className="text-[10px] text-primary flex items-center gap-1"
         style={{ fontFamily: "var(--font-pixel)" }}
       >
-        <Link2 size={10} /> HABITICA · {meta.type ?? "task"}
+        <Link2 size={10} /> {meta.type ?? "task"}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] text-muted-foreground">
+      {/* VALUE + STREAK on one line */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
         {typeof meta.value === "number" && (
-          <div>
-            <div style={{ fontFamily: "var(--font-pixel)" }}>VALUE</div>
-            <div className="text-foreground">{meta.value.toFixed(1)}</div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px]" style={{ fontFamily: "var(--font-pixel)" }}>VALUE</span>
+            <span className="text-foreground text-sm">{meta.value.toFixed(1)}</span>
           </div>
         )}
         {meta.type === "daily" && typeof meta.streak === "number" && (
-          <div>
-            <div style={{ fontFamily: "var(--font-pixel)" }}>STREAK</div>
-            <div className="text-foreground flex items-center gap-1">
-              <Flame size={11} className="text-[color:var(--color-gold)]" /> {meta.streak}
-            </div>
-          </div>
-        )}
-        {meta.type === "habit" && (
-          <>
-            <div>
-              <div style={{ fontFamily: "var(--font-pixel)" }}>+ COUNT</div>
-              <div className="text-foreground">{meta.counterUp ?? 0}</div>
-            </div>
-            <div>
-              <div style={{ fontFamily: "var(--font-pixel)" }}>- COUNT</div>
-              <div className="text-foreground">{meta.counterDown ?? 0}</div>
-            </div>
-          </>
-        )}
-        {meta.frequency && (
-          <div>
-            <div style={{ fontFamily: "var(--font-pixel)" }}>FREQUENCY</div>
-            <div className="text-foreground capitalize">
-              {meta.frequency}
-              {meta.everyX && meta.everyX > 1 ? ` · every ${meta.everyX}` : ""}
-            </div>
+          <div className="flex items-center gap-1">
+            <span style={{ fontFamily: "var(--font-pixel)" }}>STREAK</span>
+            <span className="text-foreground flex items-center gap-0.5">
+              <Flame size={10} className="text-[color:var(--color-gold)]" />{meta.streak}
+            </span>
           </div>
         )}
       </div>
+
+      {/* + / − count with editable inputs for habits */}
+      {meta.type === "habit" && (
+        <div className="flex gap-3 text-[10px]">
+          <div className="flex items-center gap-1">
+            <span
+              className="text-primary"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >+</span>
+            <input
+              type="number"
+              min={0}
+              value={counterUp}
+              onChange={(e) => onCounterChange?.(Math.max(0, Number(e.target.value)), counterDown)}
+              className="w-14 px-1 py-0.5 bg-input border border-border text-center text-foreground"
+              style={{ fontFamily: "var(--font-pixel)" }}
+              aria-label="Positive count"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <span
+              className="text-destructive"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >−</span>
+            <input
+              type="number"
+              min={0}
+              value={counterDown}
+              onChange={(e) => onCounterChange?.(counterUp, Math.max(0, Number(e.target.value)))}
+              className="w-14 px-1 py-0.5 bg-input border border-border text-center text-foreground"
+              style={{ fontFamily: "var(--font-pixel)" }}
+              aria-label="Negative count"
+            />
+          </div>
+        </div>
+      )}
+
 
       {meta.type === "daily" && repeatDays.some((d) => d.on) && (
         <div>
@@ -182,7 +203,7 @@ export function HabiticaTaskDetails({ task }: HabiticaTaskDetailsProps) {
       {recentHistory.length > 0 && <HabiticaHistorySpark history={recentHistory} />}
 
       {meta.refreshedAt && (
-        <div className="text-[9px] text-muted-foreground/70">
+        <div className="text-[10px] text-muted-foreground/70">
           Snapshot {new Date(meta.refreshedAt).toLocaleString()}
         </div>
       )}
@@ -212,12 +233,12 @@ function HabiticaHistorySpark({ history }: { history: HabiticaTaskMeta["history"
   return (
     <div>
       <div
-        className="text-[10px] text-muted-foreground mb-1"
+        className="text-xs text-muted-foreground mb-1"
         style={{ fontFamily: "var(--font-pixel)" }}
       >
         VALUE TREND
       </div>
-      <svg width={w} height={h} className="block">
+      <svg width={160} height={36} viewBox={`0 0 ${w} ${h}`} className="block w-40 h-9" preserveAspectRatio="none">
         <path d={path} fill="none" stroke={stroke} strokeWidth={1.5} />
       </svg>
     </div>

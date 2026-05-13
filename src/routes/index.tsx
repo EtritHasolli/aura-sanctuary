@@ -524,15 +524,15 @@ function SanctuaryPage() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-3 md:p-6 max-w-6xl mx-auto">
       <div className="mb-3 flex items-center justify-end">
         <div className="px-2 py-1 border border-border bg-secondary/30 text-xs text-muted-foreground capitalize">
           Path: {profile?.aura_path ? `${profile.aura_path}` : "unbound"}
         </div>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* The Sanctuary room */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 hidden md:block">
           <div
             className="relative aspect-[16/10] pixel-panel overflow-hidden scanlines"
             style={{
@@ -626,8 +626,8 @@ function SanctuaryPage() {
               }}
             />
 
-            {/* Path character — idle stroll via pan MV; tap = 2s stance (motion stops), then resume */}
-            <div className="absolute bottom-[21%] left-1/2 -translate-x-1/2 overflow-visible px-10">
+            {/* Path character — hidden on mobile, visible on md+ */}
+            <div className="absolute bottom-[21%] left-1/2 -translate-x-1/2 overflow-visible px-10 hidden md:block">
               <motion.div
                 className={`flex flex-col items-center rounded-sm outline-none ${
                   pathCharacterClickable
@@ -660,7 +660,7 @@ function SanctuaryPage() {
                           ? `${pathLabel} falling asleep`
                           : `${pathLabel} sleeping`
                       }
-                      className="h-[140px] w-auto object-contain"
+                      className="h-22.5 md:h-35 w-auto object-contain"
                       style={{ imageRendering: "pixelated" }}
                     />
                   ) : (
@@ -668,7 +668,7 @@ function SanctuaryPage() {
                       key={sanctuarySpriteUrl}
                       src={sanctuarySpriteUrl}
                       alt={`${pathLabel} character`}
-                      className="h-[140px] w-auto object-contain"
+                      className="h-22.5 md:h-35 w-auto object-contain"
                       style={{ imageRendering: "pixelated" }}
                       initial={false}
                       animate={
@@ -693,11 +693,7 @@ function SanctuaryPage() {
                       }}
                     />
                   )
-                ) : (
-                  <div className="h-[140px] w-[120px] border-2 border-border bg-secondary/30 flex items-center justify-center text-sm text-muted-foreground">
-                    Choose path
-                  </div>
-                )}
+                ) : null}
                 <p
                   className="text-center mt-2 text-primary whitespace-nowrap"
                   style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
@@ -712,7 +708,7 @@ function SanctuaryPage() {
 
         {/* Pomodoro */}
         <div className="space-y-4">
-          <div className="pixel-panel p-6 text-center">
+          <div className="pixel-panel p-4 md:p-6 text-center">
             <p
               className="text-xs text-muted-foreground mb-2"
               style={{ fontFamily: "var(--font-pixel)" }}
@@ -861,17 +857,17 @@ function SanctuaryPage() {
               {muted ? "Silence." : `♪ ${trackLabel}`}
             </p>
             <div className="mt-2 space-y-2">
-              <div className="flex gap-1">
+              <div className="flex flex-col gap-1">
                 <input
                   value={youtubeUrlInput}
                   onChange={(e) => setYoutubeUrlInput(e.target.value)}
                   placeholder="Paste YouTube URL..."
-                  className="flex-1 bg-input border-2 border-border px-3 py-2 text-sm focus:border-primary outline-none"
+                  className="w-full bg-input border-2 border-border px-3 py-2 text-sm focus:border-primary outline-none"
                 />
                 <button
                   onClick={loadYouTubeTrack}
-                  className="px-3 py-2 bg-primary text-primary-foreground text-sm"
-                  style={{ fontFamily: "var(--font-pixel)" }}
+                  className="w-full px-3 py-2 bg-primary text-primary-foreground text-sm"
+                  style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
                 >
                   LOAD
                 </button>

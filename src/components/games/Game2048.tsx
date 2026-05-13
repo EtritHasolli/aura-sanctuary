@@ -315,11 +315,11 @@ export function Game2048() {
 
         <div className="grid grid-cols-3 gap-1 max-w-[200px] mx-auto sm:hidden">
           <div />
-          <DirButton onClick={() => handleMove("up")} label="↑" />
+          <DirButton onClick={() => handleMove("up")} label="▲" />
           <div />
-          <DirButton onClick={() => handleMove("left")} label="←" />
-          <DirButton onClick={() => handleMove("down")} label="↓" />
-          <DirButton onClick={() => handleMove("right")} label="→" />
+          <DirButton onClick={() => handleMove("left")} label="◀" />
+          <DirButton onClick={() => handleMove("down")} label="▼" />
+          <DirButton onClick={() => handleMove("right")} label="▶" />
         </div>
       </div>
 

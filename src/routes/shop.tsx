@@ -126,7 +126,7 @@ function ShopPage() {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-3 md:p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <ShoppingBag className="text-primary" size={28} />
@@ -234,7 +234,7 @@ function ShopPage() {
               return (
                 <li
                   key={item.id}
-                  className="pixel-panel p-3 flex items-start gap-3 justify-between"
+                  className="pixel-panel p-3 flex flex-col sm:flex-row sm:items-start gap-3"
                 >
                   <div className="flex gap-3 min-w-0 flex-1">
                     <div className="w-12 h-12 bg-background/50 border-2 border-border flex items-center justify-center shrink-0">
@@ -275,7 +275,7 @@ function ShopPage() {
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-1 shrink-0">
+                <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 sm:shrink-0 flex-wrap">
                     <span
                       className="text-sm text-[color:var(--color-gold)]"
                       style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
@@ -296,7 +296,7 @@ function ShopPage() {
                         </>
                       )}
                     </span>
-                    <div className="flex flex-wrap justify-end gap-1">
+                    <div className="flex flex-wrap justify-between sm:justify-end gap-1">
                       <button
                         type="button"
                         disabled={!canAfford || purchase.isPending}

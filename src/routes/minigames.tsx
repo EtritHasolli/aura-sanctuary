@@ -226,7 +226,7 @@ function MinigamesPage() {
 
 function GameList({ onSelect }: { onSelect: (k: GameKey) => void }) {
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-5">
+    <div className="p-3 md:p-6 max-w-6xl mx-auto space-y-5">
       <div className="flex items-center gap-3">
         <Gamepad2 className="text-primary" size={24} />
         <div>
@@ -296,9 +296,11 @@ function GameList({ onSelect }: { onSelect: (k: GameKey) => void }) {
 
 function GameView({ meta, onBack }: { meta: GameMeta; onBack: () => void }) {
   const Icon = meta.icon;
+  const hasSudokuSettings = meta.key === "sudoku";
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+    <div className="p-3 md:p-6 max-w-6xl mx-auto space-y-4">
+      {/* Desktop: single row — BACK · title · buttons */}
+      <div className="hidden md:flex md:items-center md:justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
@@ -320,12 +322,40 @@ function GameView({ meta, onBack }: { meta: GameMeta; onBack: () => void }) {
             <p className="text-sm text-muted-foreground truncate leading-snug">{meta.blurb}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {meta.key === "sudoku" && <SudokuSettingsButton />}
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {hasSudokuSettings && <SudokuSettingsButton />}
           <GameRulesButton title={meta.name} buttonLabel={`How to play ${meta.name}`}>
             {meta.rules}
           </GameRulesButton>
         </div>
+      </div>
+
+      {/* Mobile: BACK + (Settings if Sudoku) + Rules on top row; game name below */}
+      <div className="md:hidden space-y-1">
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex items-center px-3 py-1.5 border-2 border-border hover:border-primary text-[10px]"
+            style={{ fontFamily: "var(--font-pixel)" }}
+            aria-label="Back to minigames"
+          >
+            BACK
+          </button>
+          <div className="flex items-center gap-2">
+            {hasSudokuSettings && <SudokuSettingsButton />}
+            <GameRulesButton title={meta.name} buttonLabel="RULES">
+              {meta.rules}
+            </GameRulesButton>
+          </div>
+        </div>
+        <h1
+          className="text-lg text-primary flex items-center gap-2"
+          style={{ fontFamily: "var(--font-pixel)" }}
+        >
+          <Icon size={16} className={meta.accent} />
+          <span>{meta.name.toUpperCase()}</span>
+        </h1>
       </div>
 
       <div className="pixel-panel p-4 sm:p-6">

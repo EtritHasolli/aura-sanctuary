@@ -313,7 +313,7 @@ function FriendsPage() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-4">
+    <div className="p-3 md:p-6 max-w-6xl mx-auto space-y-4">
       <div className="flex items-center gap-2">
         <Users className="text-primary" size={22} />
         <h1 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
@@ -322,11 +322,12 @@ function FriendsPage() {
       </div>
 
       <div className="pixel-panel p-3 space-y-2">
-        <div className="flex items-center justify-between gap-2">
+        {/* Mobile layout */}
+        <div className="md:hidden space-y-2">
           <p className="text-xs text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
-            Invite by email or id.
+            Invite by email or Id
           </p>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center justify-between">
             <button
               type="button"
               onClick={() => setShowEmailInvite((v) => !v)}
@@ -345,12 +346,7 @@ function FriendsPage() {
               {copiedCode ? "COPIED" : "ID"}
             </button>
           </div>
-        </div>
-        <div className="space-y-1">
-          <p className="text-[10px] text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
-            Add a friend: enter their id (8 digits).
-          </p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2">
             <input
               type="text"
               inputMode="numeric"
@@ -359,21 +355,73 @@ function FriendsPage() {
               value={friendCodeInput}
               onChange={(e) => setFriendCodeInput(e.target.value.replace(/\D/g, "").slice(0, 8))}
               onKeyDown={(e) => e.key === "Enter" && submitFriendCode()}
-              placeholder=""
+              placeholder="Enter friend's Id..."
               aria-label="Friend id to add, 8 digits"
-              className="w-full flex-1 min-w-0 px-2 py-1.5 bg-input border-2 border-border tracking-widest tabular-nums"
-              style={{ fontFamily: "var(--font-pixel)" }}
+              className="flex-1 min-w-0 px-2 py-1.5 bg-input border-2 border-border tracking-widest tabular-nums"
+              style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
             />
             <button
-            type="button"
-            onClick={submitFriendCode}
-            disabled={friendCodeInput.replace(/\D/g, "").length !== 8 || sendFriendRequestByFriendCode.isPending}
-            className="px-3 py-1.5 bg-primary text-primary-foreground disabled:opacity-50 text-xs shrink-0"
-            style={{ fontFamily: "var(--font-pixel)" }}
-          >
-            {sendFriendRequestByFriendCode.isPending ? "SENDING..." : "ADD FRIEND"}
-          </button>
+              type="button"
+              onClick={submitFriendCode}
+              disabled={friendCodeInput.replace(/\D/g, "").length !== 8 || sendFriendRequestByFriendCode.isPending}
+              className="px-3 py-1.5 bg-primary text-primary-foreground disabled:opacity-50 text-xs shrink-0"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              {sendFriendRequestByFriendCode.isPending ? "SENDING..." : "ADD FRIEND"}
+            </button>
+          </div>
         </div>
+
+        {/* Desktop layout — two rows */}
+        <div className="hidden md:block space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
+              Invite by email or Id
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowEmailInvite((v) => !v)}
+                className="px-2 py-1 border-2 border-border hover:border-primary text-xs"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                EMAIL
+              </button>
+              <button
+                type="button"
+                onClick={() => void copyMyFriendCode()}
+                disabled={!myProfile?.friend_code}
+                className="px-2 py-1 border-2 border-border hover:border-primary text-xs disabled:opacity-50"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                {copiedCode ? "COPIED" : "ID"}
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={8}
+              value={friendCodeInput}
+              onChange={(e) => setFriendCodeInput(e.target.value.replace(/\D/g, "").slice(0, 8))}
+              onKeyDown={(e) => e.key === "Enter" && submitFriendCode()}
+              placeholder="Enter friend's Id..."
+              aria-label="Friend id to add, 8 digits"
+              className="flex-1 min-w-0 px-2 py-1.5 bg-input border-2 border-border tracking-widest tabular-nums"
+              style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+            />
+            <button
+              type="button"
+              onClick={submitFriendCode}
+              disabled={friendCodeInput.replace(/\D/g, "").length !== 8 || sendFriendRequestByFriendCode.isPending}
+              className="px-3 py-1.5 bg-primary text-primary-foreground disabled:opacity-50 text-xs shrink-0"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              {sendFriendRequestByFriendCode.isPending ? "SENDING..." : "ADD FRIEND"}
+            </button>
+          </div>
         </div>
         {showEmailInvite && (
           <div className="flex gap-2">
@@ -465,8 +513,8 @@ function FriendsPage() {
               className="w-full text-left p-3 hover:bg-secondary/30 transition-colors"
               onClick={() => setSelectedFriendId(f.id)}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 border-2 border-border bg-secondary overflow-hidden">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-border bg-secondary overflow-hidden shrink-0">
                   {f.profile.avatar_url ? (
                     <img
                       src={f.profile.avatar_url}
@@ -475,7 +523,7 @@ function FriendsPage() {
                     />
                   ) : null}
                 </div>
-                <div className="relative h-12 w-12 shrink-0 overflow-hidden">
+                <div className="relative h-10 w-10 sm:h-12 sm:w-12 shrink-0 overflow-hidden hidden sm:block">
                   {f.profile.aura_path ? (
                     <img
                       key={`${f.id}-${f.profile.aura_path}`}
@@ -531,7 +579,7 @@ function FriendsPage() {
                     {f.companionLabel ? ` · ${f.companionLabel}` : ""}
                   </div>
                 </div>
-                <div className="w-56 space-y-1.5 pr-2">
+                <div className="hidden sm:block w-56 space-y-1.5 pr-2 shrink-0">
                   <Meter
                     label="HP"
                     value={f.profile.hp}

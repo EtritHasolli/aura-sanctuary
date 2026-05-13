@@ -387,13 +387,13 @@ export function Sudoku() {
 
       <div className="min-w-0 space-y-3">
         <div className="pixel-panel p-3 space-y-2">
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid grid-cols-3">
             {(["easy", "medium", "hard"] as const).map((d) => (
               <button
                 key={d}
                 type="button"
                 onClick={() => setDifficulty(d)}
-                className={`px-1 py-1.5 border-2 text-[10px] uppercase ${
+                className={`px-1 py-1.5 border-2 text-[9px] uppercase truncate ${
                   difficulty === d
                     ? "border-primary text-primary bg-primary/10"
                     : "border-border text-muted-foreground hover:border-primary/60"

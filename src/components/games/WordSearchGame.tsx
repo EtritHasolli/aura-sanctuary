@@ -406,14 +406,14 @@ export function WordSearchGame() {
         )}
 
         <div
-          className="w-full max-w-full overflow-x-auto pb-2 select-none flex justify-center xl:justify-start"
+          className="w-full select-none flex justify-center xl:justify-start"
           onPointerLeave={() => {
             if (dragAnchorRef.current) endSelection();
           }}
         >
-          <div ref={gridBoardRef} className="relative shrink-0 inline-block">
+          <div ref={gridBoardRef} className="relative w-full max-w-[min(100%,480px)] xl:w-auto xl:max-w-none xl:shrink-0 xl:inline-block">
             <div
-              className="inline-grid gap-0 border-2 border-border p-2 bg-card"
+              className="grid gap-0 border-2 border-border p-1 sm:p-2 bg-card w-full xl:w-auto xl:inline-grid"
               style={{
                 gridTemplateColumns: `repeat(${puzzle.size}, minmax(0, 1fr))`,
               }}
@@ -431,7 +431,7 @@ export function WordSearchGame() {
                       data-row={r}
                       data-col={c}
                       className={cn(
-                        "relative z-[1] w-8 h-8 sm:w-9 sm:h-9 xl:w-10 xl:h-10 flex items-center justify-center text-xs sm:text-sm xl:text-base font-semibold uppercase border border-border/60 hover:bg-primary/15 active:bg-primary/25 transition-[background-color,box-shadow] duration-150",
+                        "relative z-[1] aspect-square xl:w-10 xl:h-10 flex items-center justify-center text-[9px] sm:text-xs xl:text-base font-semibold uppercase border border-border/60 hover:bg-primary/15 active:bg-primary/25 transition-[background-color,box-shadow] duration-150",
                         isAnchor && "bg-primary/35 ring-2 ring-primary z-[2]",
                         settled && !isAnchor && "ring-1 ring-inset",
                         onPreview && !settled && "bg-primary/25",

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Settings } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   readSudokuUserSettings,
@@ -73,7 +74,8 @@ export function SudokuSettingsButton() {
         className="flex items-center justify-center px-3 py-1.5 border-2 border-border hover:border-primary text-[10px]"
         style={{ fontFamily: "var(--font-pixel)" }}
       >
-        Settings
+        <Settings size={14} className="md:hidden" />
+        <span className="hidden md:inline">Settings</span>
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>

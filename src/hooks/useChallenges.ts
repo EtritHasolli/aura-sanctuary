@@ -61,18 +61,14 @@ export function useCreateChallengeTemplate() {
           sacred_days: input.type === "daily" ? (input.sacred_days ?? 127) : 127,
         },
       ];
-      const { data, error } = await supabase
-        .from("challenge_templates")
-        .insert({
-          name: input.name.trim(),
-          description: input.description.trim(),
-          duration_days: input.duration_days,
-          task_blueprint: blueprint,
-        })
-        .select("*")
-        .single();
+      const { data, error } = await supabase.rpc("create_custom_challenge_template", {
+        p_name: input.name.trim(),
+        p_description: input.description.trim(),
+        p_duration: input.duration_days,
+        p_blueprint: blueprint,
+      });
       if (error) throw error;
-      return data as ChallengeTemplate;
+      return data as { template_id: string };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["challengeTemplates"] });

@@ -117,42 +117,42 @@ function ForgePage() {
   });
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <Hammer className="text-primary" size={28} />
-          <div className="min-w-0">
+    <div className="p-3 md:p-6 max-w-3xl mx-auto space-y-6">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <Hammer className="text-primary shrink-0" size={28} />
             <h1 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
               MYSTIC FORGE
             </h1>
-            <p
-              className="text-sm text-muted-foreground leading-relaxed"
-              style={{ fontFamily: "var(--font-display)" }}
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <Link
+              to="/equipment"
+              className="flex items-center gap-1 text-[10px] text-primary hover:underline"
+              style={{ fontFamily: "var(--font-pixel)" }}
             >
-              Offer <strong className="text-foreground font-medium">three unequipped</strong> pieces
-              of gear of the <strong className="text-foreground font-medium">same rarity</strong>;
-              receive <strong className="text-foreground font-medium">one random</strong> item of
-              the next tier. {RARITY_LADDER}
-            </p>
+              <Shirt size={14} /> GEAR
+            </Link>
+            <button
+              type="button"
+              onClick={() => setShowInfo(true)}
+              className="text-muted-foreground hover:text-primary"
+              title="Forge tips"
+            >
+              <Info size={16} />
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <Link
-            to="/equipment"
-            className="flex items-center gap-1 text-[10px] text-primary hover:underline"
-            style={{ fontFamily: "var(--font-pixel)" }}
-          >
-            <Shirt size={14} /> GEAR
-          </Link>
-          <button
-            type="button"
-            onClick={() => setShowInfo(true)}
-            className="text-muted-foreground hover:text-primary"
-            title="Forge tips"
-          >
-            <Info size={16} />
-          </button>
-        </div>
+        <p
+          className="text-sm text-muted-foreground leading-relaxed"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          Offer <strong className="text-foreground font-medium">three unequipped</strong> pieces
+          of gear of the <strong className="text-foreground font-medium">same rarity</strong>;
+          receive <strong className="text-foreground font-medium">one random</strong> item of
+          the next tier. {RARITY_LADDER}
+        </p>
       </div>
 
       <section className="pixel-panel p-4 space-y-3">
@@ -293,7 +293,7 @@ function ForgePage() {
       </section>
       {showInfo && (
         <div
-          className="fixed inset-0 z-[130] bg-black/50 p-4 flex items-center justify-center"
+          className="fixed inset-0 z-130 bg-black/50 p-4 flex items-center justify-center"
           onClick={() => setShowInfo(false)}
         >
           <div

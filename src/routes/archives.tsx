@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { MoreVertical } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useNotes, useCreateNote, useUpdateNote, useDeleteNote } from "@/hooks/useNotes";
 import { useCreateTask } from "@/hooks/useTasks";
@@ -35,6 +35,17 @@ function ArchivesPage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [preview, setPreview] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const handle = (e: PointerEvent) => {
+      if (!moreRef.current?.contains(e.target as Node)) setMoreOpen(false);
+    };
+    document.addEventListener("pointerdown", handle);
+    return () => document.removeEventListener("pointerdown", handle);
+  }, [moreOpen]);
 
   useEffect(() => {
     setTitle(selected?.title ?? "");
@@ -60,7 +71,7 @@ function ArchivesPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto h-full">
+    <div className="p-3 md:p-6 max-w-7xl mx-auto h-full">
       <h1 className="text-lg text-primary mb-4" style={{ fontFamily: "var(--font-pixel)" }}>ARCHIVES</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4 h-[calc(100%-3rem)]">
@@ -94,7 +105,7 @@ function ArchivesPage() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Title"
-                  className="flex-1 min-w-[200px] bg-input border-2 border-border px-2 py-1.5 text-sm focus:border-primary outline-none"
+                  className="flex-1 min-w-50 bg-input border-2 border-border px-2 py-1.5 text-sm focus:border-primary outline-none"
                 />
                 <button onClick={() => setPreview((p) => !p)} className="text-xs px-2 py-1.5 border-2 border-border" style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
                   {preview ? "EDIT" : "PREVIEW"}
@@ -102,12 +113,33 @@ function ArchivesPage() {
                 <button onClick={save} className="text-xs px-2 py-1.5 bg-primary text-primary-foreground" style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
                   SAVE
                 </button>
-                <button onClick={convertToTask} className="text-xs px-2 py-1.5 bg-accent text-accent-foreground" style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
-                  CONVERT TO TASK
-                </button>
-                <button onClick={() => { del.mutate(selected.id); setSelectedId(null); }} className="text-xs px-2 py-1.5 bg-destructive/20 text-destructive border-2 border-destructive">
-                  <Trash2 size={12} />
-                </button>
+                <div ref={moreRef} className="relative">
+                  <button
+                    onClick={() => setMoreOpen((v) => !v)}
+                    className="text-xs px-2 py-1.5 border-2 border-border hover:border-primary"
+                    title="More actions"
+                  >
+                    <MoreVertical size={12} />
+                  </button>
+                  {moreOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-card border-2 border-border min-w-36 flex flex-col">
+                      <button
+                        onClick={() => { convertToTask(); setMoreOpen(false); }}
+                        className="text-left px-3 py-2 text-xs hover:bg-secondary"
+                        style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
+                      >
+                        Convert to task
+                      </button>
+                      <button
+                        onClick={() => { del.mutate(selected.id); setSelectedId(null); setMoreOpen(false); }}
+                        className="text-left px-3 py-2 text-xs text-destructive hover:bg-destructive/10"
+                        style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
               {preview ? (
                 <div className="flex-1 overflow-y-auto prose prose-invert max-w-none px-2 text-sm" style={{ fontFamily: "var(--font-display)" }}>

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Plus, Minus, Check, Trash2, Flame, Info, ChevronDown } from "lucide-react";
+import { Plus, Minus, Check, Trash2, Flame, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -89,7 +89,7 @@ function QuestsPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-4">
+    <div className="p-3 md:p-6 max-w-7xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
           QUEST LOG
@@ -216,28 +216,30 @@ function Column({
             // toast handled in hook onError
           }
         }}
-        className="flex gap-1 mb-3"
+        className="flex flex-col gap-1 mb-3"
       >
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="New quest..."
-          className="flex-1 px-2 py-1.5 bg-input border-2 border-border focus:border-primary outline-none text-sm"
+          className="w-full px-2 py-1.5 bg-input border-2 border-border focus:border-primary outline-none text-sm"
         />
-        <select
-          value={diff}
-          onChange={(e) => setDiff(e.target.value as Difficulty)}
-          className="bg-input border-2 border-border text-sm px-1"
-          title={diff}
-        >
-          <option value="trivial">★</option>
-          <option value="easy">★★</option>
-          <option value="medium">★★★</option>
-          <option value="hard">★★★★</option>
-        </select>
-        <button className="px-2 bg-primary text-primary-foreground">
-          <Plus size={14} />
-        </button>
+        <div className="flex gap-1">
+          <select
+            value={diff}
+            onChange={(e) => setDiff(e.target.value as Difficulty)}
+            className="flex-1 bg-input border-2 border-border text-sm px-1 py-2"
+            title={diff}
+          >
+            <option value="trivial">★ Trivial</option>
+            <option value="easy">★★ Easy</option>
+            <option value="medium">★★★ Medium</option>
+            <option value="hard">★★★★ Hard</option>
+          </select>
+          <button className="px-3 bg-primary text-primary-foreground">
+            <Plus size={14} />
+          </button>
+        </div>
       </form>
 
       <div className="space-y-2 overflow-y-auto">
@@ -656,57 +658,86 @@ function TaskRow({
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle
-              className="flex items-center gap-2"
-              style={{ fontFamily: "var(--font-pixel)" }}
-            >
-              <input
-                value={titleText}
-                onChange={(e) => setTitleText(e.target.value)}
-                onBlur={(e) => saveTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur();
-                }}
-                className="w-full max-w-sm bg-input border border-border px-2 py-1 text-sm"
-                aria-label="Quest title"
-              />
-              <button
-                type="button"
-                onClick={() => setConfirmDeleteOpen(true)}
-                className="text-destructive hover:opacity-80"
-                title="Delete task"
-              >
-                <Trash2 size={14} />
-              </button>
-            </DialogTitle>
-            <DialogDescription>
-              {task.type.toUpperCase()} · {DIFF_STARS[task.difficulty]}
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent
+          className="max-w-2xl"
+          hideClose
+          stickyHeader={
+            <div className="flex flex-col border-b border-border">
+              <div className="flex items-center gap-2 px-3 py-1.5">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="shrink-0 flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-primary transition-colors"
+                  aria-label="Close without saving"
+                  title="Back"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square">
+                    <polyline points="9,2 4,7 9,12" />
+                  </svg>
+                </button>
+                <div className="flex-1" />
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteOpen(true)}
+                  className="shrink-0 text-destructive hover:opacity-80 text-[9px] px-2 py-1 border border-destructive"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
+                  DELETE
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { saveTitle(titleText); saveNotes(notesText); setOpen(false); }}
+                  className="shrink-0 text-primary hover:opacity-80 text-[9px] px-2 py-1 border border-primary"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
+                  SAVE
+                </button>
+              </div>
+              <div className="px-3 pb-2">
+                <input
+                  value={titleText}
+                  onChange={(e) => setTitleText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                  className="w-full bg-input border border-border px-2 py-1.5 text-sm"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                  aria-label="Quest title"
+                />
+              </div>
+            </div>
+          }
+        >
           <div className="space-y-2">
             <div
               className="text-[10px] text-muted-foreground"
               style={{ fontFamily: "var(--font-pixel)" }}
             >
               Difficulty:
-              <div className="mt-1 relative w-fit">
-                <select
-                  value={task.difficulty}
-                  onChange={(e) => patchDifficulty(e.target.value as Difficulty)}
-                  className="h-8 min-w-[170px] px-2 pr-7 bg-input border border-border text-xs leading-none appearance-none"
-                  style={{ fontFamily: "var(--font-pixel)" }}
-                >
-                  <option value="trivial">★ Trivial</option>
-                  <option value="easy">★★ Easy</option>
-                  <option value="medium">★★★ Medium</option>
-                  <option value="hard">★★★★ Hard</option>
-                </select>
-                <ChevronDown
-                  size={16}
-                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
-                />
+              <div className="mt-1 grid grid-cols-2 gap-1">
+                {(["trivial", "easy", "medium", "hard"] as Difficulty[]).map((d) => {
+                  const labels: Record<Difficulty, { name: string; stars: string }> = {
+                    trivial: { name: "Trivial", stars: "★" },
+                    easy:    { name: "Easy",    stars: "★★" },
+                    medium:  { name: "Medium",  stars: "★★★" },
+                    hard:    { name: "Hard",    stars: "★★★★" },
+                  };
+                  const active = task.difficulty === d;
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => patchDifficulty(d)}
+                      className={`flex items-center justify-between px-2 py-2 border-2 text-left ${
+                        active
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-border bg-input text-muted-foreground hover:border-primary/60"
+                      }`}
+                      style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
+                    >
+                      <span>{labels[d].name}</span>
+                      <span style={{ color: "var(--color-gold)" }}>{labels[d].stars}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
             {task.type === "daily" && (
@@ -714,9 +745,8 @@ function TaskRow({
                 className="text-[10px] text-muted-foreground"
                 style={{ fontFamily: "var(--font-pixel)" }}
               >
-                Repeat:
-                <div className="flex gap-1 mt-1 items-center">
-                  <span>Every</span>
+                Repeat Every:
+                <div className="flex gap-1 mt-1">
                   <input
                     type="number"
                     min={1}
@@ -724,12 +754,12 @@ function TaskRow({
                     onChange={(e) =>
                       patchRepeat({ repeat_every: Math.max(1, Number(e.target.value || 1)) })
                     }
-                    className="w-16 px-1 py-0.5 bg-input border border-border text-xs"
+                    className="w-16 shrink-0 px-1 py-0.5 bg-input border border-border text-xs"
                   />
                   <select
                     value={(task.repeat_unit as RepeatUnit) ?? "day"}
                     onChange={(e) => patchRepeat({ repeat_unit: e.target.value as RepeatUnit })}
-                    className="px-1 py-0.5 bg-input border border-border text-xs"
+                    className="flex-1 min-w-0 px-1 py-0.5 bg-input border border-border text-xs"
                   >
                     <option value="day">day(s)</option>
                     <option value="week">week(s)</option>
@@ -836,7 +866,19 @@ function TaskRow({
                 </button>
               </div>
             )}
-            <HabiticaTaskDetails task={task} />
+            <HabiticaTaskDetails
+              task={task}
+              onCounterChange={(counterUp, counterDown) => {
+                update.mutate({
+                  id: task.id,
+                  patch: {
+                    habitica_meta: task.habitica_meta
+                      ? { ...task.habitica_meta, counterUp, counterDown }
+                      : null,
+                  },
+                });
+              }}
+            />
             <textarea
               placeholder="Notes..."
               value={notesText}

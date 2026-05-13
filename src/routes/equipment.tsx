@@ -82,7 +82,7 @@ function EquipmentPage() {
   const [showInfo, setShowInfo] = useState(false);
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div className="p-3 md:p-6 max-w-3xl mx-auto space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <Shirt className="text-primary" size={28} />
@@ -125,20 +125,21 @@ function EquipmentPage() {
                 LOADOUT TOTALS
               </h2>
               <div
-                className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs"
+                className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[10px]"
                 style={{ fontFamily: "var(--font-pixel)" }}
               >
                 <div>STR {effectiveStrength(profile)}</div>
                 <div>INT {effectiveIntelligence(profile)}</div>
                 <div>CON {effectiveConstitution(profile)}</div>
                 <div>DEX {effectiveDexterity(profile)}</div>
-                <div>
-                  STA max {effectiveMaxStamina(profile)}
+                <div className="col-span-2 sm:col-span-1 leading-tight">
+                  STA {effectiveMaxStamina(profile)}
                   <span className="text-muted-foreground"> (base {profile.max_stamina})</span>
                 </div>
-                <div className="col-span-2 sm:col-span-1">
-                  Task XP +{clampBonusPct(profile.equip_xp_bonus_pct)}% · Gold +
-                  {clampBonusPct(profile.equip_gold_bonus_pct)}%
+                <div className="col-span-2 sm:col-span-1 leading-tight">
+                  XP +{clampBonusPct(profile.equip_xp_bonus_pct)}%
+                  <span className="text-muted-foreground"> · </span>
+                  Gold +{clampBonusPct(profile.equip_gold_bonus_pct)}%
                 </div>
               </div>
             </div>
@@ -162,12 +163,12 @@ function EquipmentPage() {
                 <img
                   src={pathCharacterSpriteSrc(profile.aura_path, "idle")}
                   alt="Path character"
-                  className="h-[112px] w-auto object-contain"
+                  className="h-28 w-auto object-contain"
                   style={{ imageRendering: "pixelated" }}
                 />
               ) : (
                 <div
-                  className="h-[112px] w-[112px] flex items-center justify-center text-[10px] text-muted-foreground"
+                  className="h-28 w-28 flex items-center justify-center text-[10px] text-muted-foreground"
                   style={{ fontFamily: "var(--font-pixel)" }}
                 >
                   Choose path
@@ -181,7 +182,7 @@ function EquipmentPage() {
               {profile?.character_name ?? "Character"} · idle
             </p>
             <p
-              className="mt-1 text-[9px] text-muted-foreground text-center max-w-[200px]"
+              className="mt-1 text-[9px] text-muted-foreground text-center max-w-50"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Reflects your selected Aura path character.
@@ -207,7 +208,7 @@ function EquipmentPage() {
             return (
               <li
                 key={row.id}
-                className="pixel-panel p-3 flex items-start gap-3 justify-between"
+                className="pixel-panel p-3 flex flex-col sm:flex-row sm:items-start gap-3"
               >
                 <div className="flex gap-3 min-w-0 flex-1">
                   <div className="w-12 h-12 bg-background/50 border-2 border-border flex items-center justify-center shrink-0">
@@ -254,7 +255,7 @@ function EquipmentPage() {
                   type="button"
                   disabled={unequip.isPending}
                   onClick={() => onUnequip(row.id)}
-                  className="px-3 py-2 border-2 border-border hover:border-destructive text-[10px] shrink-0"
+                  className="px-3 py-2 border-2 border-border hover:border-destructive text-[10px] sm:shrink-0 self-start"
                   style={{ fontFamily: "var(--font-pixel)" }}
                 >
                   UNEQUIP
@@ -279,7 +280,7 @@ function EquipmentPage() {
             return (
               <li
                 key={row.id}
-                className="pixel-panel p-3 flex items-start gap-3 justify-between"
+                className="pixel-panel p-3 flex flex-col sm:flex-row sm:items-start gap-3"
               >
                 <div className="flex gap-3 min-w-0 flex-1">
                   <div className="w-12 h-12 bg-background/50 border-2 border-border flex items-center justify-center shrink-0">
@@ -332,7 +333,7 @@ function EquipmentPage() {
                   type="button"
                   disabled={equip.isPending}
                   onClick={() => onEquip(row.id)}
-                  className="px-3 py-2 bg-primary text-primary-foreground text-[10px] shrink-0"
+                  className="px-3 py-2 bg-primary text-primary-foreground text-[10px] sm:shrink-0 self-start"
                   style={{ fontFamily: "var(--font-pixel)" }}
                 >
                   EQUIP
@@ -425,7 +426,7 @@ function EquipmentPage() {
       </section>
       {showInfo && (
         <div
-          className="fixed inset-0 z-[130] bg-black/50 p-4 flex items-center justify-center"
+          className="fixed inset-0 z-130 bg-black/50 p-4 flex items-center justify-center"
           onClick={() => setShowInfo(false)}
         >
           <div

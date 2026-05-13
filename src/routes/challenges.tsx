@@ -40,8 +40,8 @@ function ChallengesPage() {
   };
 
   const onCreate = async () => {
-    if (!name.trim() || !title.trim()) {
-      toast.error("Name and task title are required.");
+    if (!name.trim()) {
+      toast.error("Challenge name is required.");
       return;
     }
     try {
@@ -50,7 +50,7 @@ function ChallengesPage() {
         description,
         duration_days: Math.max(1, Math.min(90, duration)),
         type,
-        title,
+        title: title.trim() || name.trim(),
         difficulty,
         sacred_days: type === "daily" ? sacredMask : 127,
       });
@@ -68,7 +68,7 @@ function ChallengesPage() {
   };
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div className="p-3 md:p-6 max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <Trophy className="text-primary" size={28} />
         <div>
@@ -176,7 +176,7 @@ function ChallengesPage() {
           className="px-3 py-2 bg-primary text-primary-foreground disabled:opacity-50"
           style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
         >
-          {create.isPending ? "CREATING..." : "CREATE TEMPLATE"}
+          {create.isPending ? "CREATING..." : "CREATE CHALLENGE"}
         </button>
       </div>
 

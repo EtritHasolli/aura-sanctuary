@@ -71,30 +71,45 @@ function Bar({
   max,
   color,
   label,
+  compact = false,
 }: {
   value: number;
   max: number;
   color: string;
   label: string;
+  compact?: boolean;
 }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   return (
     <div className="w-full">
+      {!compact && (
+        <div
+          className="flex justify-between text-[10px] mb-0.5"
+          style={{ fontFamily: "var(--font-pixel)" }}
+        >
+          <span className="text-muted-foreground">{label}</span>
+          <span>
+            {value}/{max}
+          </span>
+        </div>
+      )}
       <div
-        className="flex justify-between text-[10px] mb-0.5"
-        style={{ fontFamily: "var(--font-pixel)" }}
+        className={`w-full bg-muted border border-border relative overflow-hidden ${compact ? "h-2" : "h-3 border-2"}`}
+        title={compact ? `${label} ${value}/${max}` : undefined}
       >
-        <span className="text-muted-foreground">{label}</span>
-        <span>
-          {value}/{max}
-        </span>
-      </div>
-      <div className="h-3 w-full bg-muted border-2 border-border relative overflow-hidden">
         <div
           className="h-full transition-all"
           style={{ width: `${pct}%`, backgroundColor: color }}
         />
       </div>
+      {compact && (
+        <div
+          className="text-[8px] text-muted-foreground mt-px"
+          style={{ fontFamily: "var(--font-pixel)" }}
+        >
+          {label}
+        </div>
+      )}
     </div>
   );
 }
@@ -204,7 +219,7 @@ function NotificationsBell() {
         <Bell size={18} />
         {unread > 0 && (
           <span
-            className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 bg-destructive text-destructive-foreground flex items-center justify-center text-[9px]"
+            className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-0.5 bg-destructive text-destructive-foreground flex items-center justify-center text-[9px]"
             style={{ fontFamily: "var(--font-pixel)" }}
           >
             {unread > 9 ? "9+" : unread}
@@ -213,7 +228,7 @@ function NotificationsBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-10 z-[120] w-72 pixel-panel p-2 shadow-xl">
+        <div className="fixed right-2 top-14 z-120 w-[min(288px,calc(100vw-1rem))] pixel-panel p-2 shadow-xl">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[9px] text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
               NOTIFICATIONS
@@ -341,8 +356,44 @@ export function HUD() {
   const effDex = effectiveDexterity(profile);
 
   return (
-    <header className="relative z-[110] border-b-2 border-border bg-card/80 backdrop-blur px-4 py-3">
-      <div className="flex items-center gap-4 flex-wrap">
+    <header className="relative z-[110] border-b-2 border-border bg-card/80 backdrop-blur px-3 md:px-4 py-2 md:py-3">
+      {/* ── Mobile layout ── */}
+      <div className="flex md:hidden items-center gap-2">
+        {/* Avatar */}
+        <div className="w-8 h-8 pixel-panel flex items-center justify-center bg-secondary overflow-hidden shrink-0">
+          {profile.avatar_url ? (
+            <img src={profile.avatar_url} alt="Profile avatar" className="w-full h-full object-cover" />
+          ) : (
+            <span style={{ fontFamily: "var(--font-pixel)" }} className="text-primary text-xs">
+              {profile.display_name[0]?.toUpperCase()}
+            </span>
+          )}
+        </div>
+
+        {/* LV badge + compact bars */}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[8px] px-1 py-px bg-primary text-primary-foreground whitespace-nowrap" style={{ fontFamily: "var(--font-pixel)" }}>
+            LV {profile.level}
+          </span>
+        </div>
+        <div className="flex-1 min-w-0 grid grid-cols-3 gap-1">
+          <Bar value={profile.hp} max={profile.max_hp} color="var(--color-hp)" label="HP" compact />
+          <Bar value={profile.xp} max={xpMax} color="var(--color-xp)" label="XP" compact />
+          <Bar value={profile.stamina} max={staCap} color="var(--color-stamina)" label="STA" compact />
+        </div>
+
+        {/* Right: gold + notifications + theme */}
+        <div className="flex items-center gap-1.5 shrink-0" style={{ fontFamily: "var(--font-display)" }}>
+          <div className="flex items-center gap-0.5 text-(--color-gold) text-sm">
+            <Coins size={12} /> {profile.gold}
+          </div>
+          <NotificationsBell />
+          <ThemeToggle />
+        </div>
+      </div>
+
+      {/* ── Desktop layout (unchanged) ── */}
+      <div className="hidden md:flex items-center gap-4 flex-wrap">
         {/* Avatar + path character */}
         <div className="flex items-center gap-3">
           <div className="w-14 h-14 pixel-panel flex items-center justify-center bg-secondary overflow-hidden">

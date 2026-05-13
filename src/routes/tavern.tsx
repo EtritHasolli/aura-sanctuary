@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Info } from "lucide-react";
+import { Send, Info, MoreVertical } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -149,6 +149,213 @@ function PlayerMeter({
 
 function playerStat(base: number, bonus?: number) {
   return base + (bonus ?? 0);
+}
+
+interface PartyHeaderProps {
+  party: Party;
+  profile: { id: string; [k: string]: unknown } | null;
+  editingPartyId: string | null;
+  editingPartyName: string;
+  setEditingPartyName: (v: string) => void;
+  commitInlineRename: (p: Party) => void;
+  setEditingPartyId: (v: string | null) => void;
+  beginInlineRename: (p: Party) => void;
+  leavingParty: boolean;
+  copied: boolean;
+  onBack: () => void;
+  onPlayers: () => void;
+  onEmailInvite: () => void;
+  onCopyId: () => void;
+  onLeave: () => void;
+}
+
+function PartyHeader({
+  party, profile, editingPartyId, editingPartyName, setEditingPartyName,
+  commitInlineRename, setEditingPartyId, beginInlineRename,
+  leavingParty, copied, onBack, onPlayers, onEmailInvite, onCopyId, onLeave,
+}: PartyHeaderProps) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const isLeader = profile?.id === party.leader_id;
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const handler = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMobileMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
+  }, [mobileMenuOpen]);
+
+  return (
+    <div className="pixel-panel p-3 space-y-2">
+      {/* Mobile layout */}
+      <div className="flex items-center justify-between md:hidden">
+        <button
+          type="button"
+          onClick={onBack}
+          className="px-2 py-1 border-2 border-border hover:border-primary text-xs bg-background"
+          style={{ fontFamily: "var(--font-pixel)" }}
+        >
+          PARTIES
+        </button>
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((v) => !v)}
+            className="px-2 py-1 border-2 border-border hover:border-primary text-xs bg-background"
+            style={{ fontFamily: "var(--font-pixel)" }}
+          >
+            MENU
+          </button>
+          {mobileMenuOpen && (
+            <div className="absolute right-0 top-full mt-1 z-50 bg-card border-2 border-border min-w-36 flex flex-col">
+              <button
+                type="button"
+                onClick={() => { onPlayers(); setMobileMenuOpen(false); }}
+                className="text-left px-3 py-2 text-xs hover:bg-secondary"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
+              >
+                PLAYERS
+              </button>
+              <button
+                type="button"
+                onClick={() => { onEmailInvite(); setMobileMenuOpen(false); }}
+                className="text-left px-3 py-2 text-xs hover:bg-secondary"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
+              >
+                EMAIL
+              </button>
+              <button
+                type="button"
+                onClick={() => { onCopyId(); setMobileMenuOpen(false); }}
+                className="text-left px-3 py-2 text-xs hover:bg-secondary"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
+              >
+                {copied ? "COPIED!" : "ID"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { onLeave(); setMobileMenuOpen(false); }}
+                disabled={leavingParty}
+                className="text-left px-3 py-2 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
+              >
+                LEAVE
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Mobile party name */}
+      <div className="md:hidden">
+        {editingPartyId === party.id ? (
+          <input
+            autoFocus
+            value={editingPartyName}
+            onChange={(e) => setEditingPartyName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitInlineRename(party);
+              if (e.key === "Escape") setEditingPartyId(null);
+            }}
+            className="w-full bg-input border border-border px-2 py-1 text-xs outline-none"
+            style={{ fontFamily: "var(--font-pixel)" }}
+          />
+        ) : (
+          <div
+            className="border border-primary bg-primary/10 px-2 py-1 text-xs truncate"
+            style={{ fontFamily: "var(--font-pixel)" }}
+            onClick={isLeader ? () => beginInlineRename(party) : undefined}
+          >
+            {party.name}
+            {isLeader && <span className="text-muted-foreground ml-1 text-[9px]">(tap to rename)</span>}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop layout (unchanged) */}
+      <div className="hidden md:flex md:flex-row md:items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center justify-center px-2 py-1 border-2 border-border hover:border-primary text-xs bg-background shrink-0"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              PARTIES
+            </button>
+            <div className="w-full border border-primary bg-primary/10 text-xs">
+              <div className="flex items-center gap-1 px-2 py-1">
+                {editingPartyId === party.id ? (
+                  <input
+                    autoFocus
+                    value={editingPartyName}
+                    onChange={(e) => setEditingPartyName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitInlineRename(party);
+                      if (e.key === "Escape") setEditingPartyId(null);
+                    }}
+                    className="flex-1 bg-input border border-border px-1 py-0.5 outline-none"
+                    style={{ fontFamily: "var(--font-pixel)" }}
+                  />
+                ) : (
+                  <div className="flex-1 truncate" style={{ fontFamily: "var(--font-pixel)" }}>
+                    {party.name}
+                  </div>
+                )}
+                {isLeader && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editingPartyId === party.id) { commitInlineRename(party); return; }
+                      beginInlineRename(party);
+                    }}
+                    className="px-1.5 py-0.5 border border-border hover:border-primary text-[10px]"
+                    style={{ fontFamily: "var(--font-pixel)" }}
+                  >
+                    {editingPartyId === party.id ? "SAVE" : "EDIT"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-1">
+          <button
+            onClick={onPlayers}
+            className="flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-muted-foreground hover:text-primary transition-colors"
+            style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
+          >
+            PLAYERS
+          </button>
+          <button
+            onClick={onEmailInvite}
+            className="flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-muted-foreground hover:text-primary transition-colors"
+            style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
+          >
+            EMAIL
+          </button>
+          <button
+            onClick={onCopyId}
+            className="flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-muted-foreground hover:text-primary transition-colors"
+            style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
+          >
+            {copied ? "COPIED!" : "ID"}
+          </button>
+          <button
+            type="button"
+            onClick={onLeave}
+            disabled={leavingParty}
+            className="flex items-center gap-1 px-2 py-1 border-2 border-destructive bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
+            style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
+          >
+            LEAVE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function TavernPage() {
@@ -592,7 +799,7 @@ function TavernPage() {
 
   if (!party) {
     return (
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="p-3 md:p-6 max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
           <div className="pixel-panel p-4 space-y-2">
             <div
@@ -635,46 +842,46 @@ function TavernPage() {
               </p>
             )}
           </div>
-          <div className="pixel-panel p-6 text-center space-y-4">
+          <div className="pixel-panel p-4 text-center space-y-3">
             <h1 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
               THE TAVERN
             </h1>
             <p className="text-sm text-muted-foreground">
               Join a fellowship with a code, or forge a new party.
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2">
               <input
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value)}
                 placeholder="Party ID or short invite code"
-                className="flex-1 px-2 py-2 bg-input border-2 border-border text-sm"
+                className="w-full px-2 py-2 bg-input border-2 border-border text-sm min-w-0"
                 style={{ fontFamily: "var(--font-pixel)" }}
               />
               <button
                 type="button"
                 onClick={() => void joinWithCode()}
                 disabled={loading || !joinCode.trim()}
-                className="px-4 py-2 bg-primary text-primary-foreground disabled:opacity-50"
+                className="w-full px-4 py-2 bg-primary text-primary-foreground disabled:opacity-50"
                 style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
               >
                 JOIN
               </button>
             </div>
+            <input
+              value={newPartyName}
+              onChange={(e) => setNewPartyName(e.target.value)}
+              placeholder="New Fellowship"
+              className="w-full px-2 py-2 bg-input border-2 border-border text-sm"
+            />
             <button
               type="button"
               onClick={() => void createNewParty()}
               disabled={creating}
-              className="px-4 py-2 border-2 border-border hover:border-primary disabled:opacity-50"
+              className="w-full px-4 py-2 border-2 border-border hover:border-primary disabled:opacity-50"
               style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
             >
               {creating ? "CREATING..." : "CREATE PARTY"}
             </button>
-            <input
-              value={newPartyName}
-              onChange={(e) => setNewPartyName(e.target.value)}
-              placeholder="Party name"
-              className="w-full px-2 py-2 bg-input border-2 border-border text-sm"
-            />
             <p
               className="text-[10px] text-muted-foreground"
               style={{ fontFamily: "var(--font-pixel)" }}
@@ -692,103 +899,25 @@ function TavernPage() {
   const bossPct = (shownBossHp / shownBossMaxHp) * 100;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto h-full">
-      <div className="space-y-4 h-full">
-        <div className="pixel-panel p-3 flex flex-col lg:flex-row lg:items-start gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setParty(null);
-                  setMessages([]);
-                  setAdventure(null);
-                }}
-                className="inline-flex items-center justify-center px-2 py-1 border-2 border-border hover:border-primary text-xs bg-background shrink-0"
-                style={{ fontFamily: "var(--font-pixel)" }}
-                title="Back to party list"
-              >
-                PARTIES
-              </button>
-              <div className="w-full border border-primary bg-primary/10 text-xs">
-                <div className="flex items-center gap-1 px-2 py-1">
-                {editingPartyId === party.id ? (
-                  <input
-                    autoFocus
-                    value={editingPartyName}
-                    onChange={(e) => setEditingPartyName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void commitInlineRename(party);
-                      if (e.key === "Escape") setEditingPartyId(null);
-                    }}
-                    className="flex-1 bg-input border border-border px-1 py-0.5 outline-none"
-                    style={{ fontFamily: "var(--font-pixel)" }}
-                  />
-                ) : (
-                  <div className="flex-1 truncate" style={{ fontFamily: "var(--font-pixel)" }}>
-                    {party.name}
-                  </div>
-                )}
-                {profile?.id === party.leader_id && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (editingPartyId === party.id) {
-                        void commitInlineRename(party);
-                        return;
-                      }
-                      beginInlineRename(party);
-                    }}
-                    className="px-1.5 py-0.5 border border-border hover:border-primary text-[10px]"
-                    style={{ fontFamily: "var(--font-pixel)" }}
-                  >
-                    {editingPartyId === party.id ? "SAVE" : "EDIT"}
-                  </button>
-                )}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => {
-                setPlayersOpen(true);
-                void loadPartyPlayers(party.id);
-              }}
-              className="flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-muted-foreground hover:text-primary transition-colors"
-              style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
-              title="View party players"
-            >
-              PLAYERS
-            </button>
-            <button
-              onClick={() => setShowEmailInvite((v) => !v)}
-              className="flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-muted-foreground hover:text-primary transition-colors"
-              style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
-              title="Invite via email"
-            >
-              EMAIL
-            </button>
-            <button
-              onClick={copyInvite}
-              className="flex items-center gap-1 px-2 py-1 border-2 border-border hover:border-primary text-muted-foreground hover:text-primary transition-colors"
-              style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
-              title="Copy party ID for friends to paste in Join"
-            >
-              {copied ? "COPIED!" : "ID"}
-            </button>
-            <button
-              type="button"
-              onClick={() => void leaveParty()}
-              disabled={leavingParty}
-              className="flex items-center gap-1 px-2 py-1 border-2 border-destructive bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
-              style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
-              title="Leave this party"
-            >
-              LEAVE
-            </button>
-          </div>
-        </div>
+    <div className="p-3 md:p-6 max-w-6xl mx-auto">
+      <div className="space-y-4">
+        <PartyHeader
+          party={party}
+          profile={profile ?? null}
+          editingPartyId={editingPartyId}
+          editingPartyName={editingPartyName}
+          setEditingPartyName={setEditingPartyName}
+          commitInlineRename={commitInlineRename}
+          setEditingPartyId={setEditingPartyId}
+          beginInlineRename={beginInlineRename}
+          leavingParty={leavingParty}
+          copied={copied}
+          onBack={() => { setParty(null); setMessages([]); setAdventure(null); }}
+          onPlayers={() => { setPlayersOpen(true); void loadPartyPlayers(party.id); }}
+          onEmailInvite={() => setShowEmailInvite((v) => !v)}
+          onCopyId={copyInvite}
+          onLeave={() => void leaveParty()}
+        />
 
         <Dialog open={playersOpen} onOpenChange={setPlayersOpen}>
           <DialogContent className="max-w-3xl">
@@ -872,48 +1001,58 @@ function TavernPage() {
           </DialogContent>
         </Dialog>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 h-[calc(100%-4.5rem)]">
-          <div className="space-y-4 flex flex-col min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4">
+          <div className="flex flex-col min-h-0">
             {/* Chat */}
-            <div className="pixel-panel p-3 flex-1 flex flex-col min-h-0">
-              <h3 className="text-sm text-primary mb-2" style={{ fontFamily: "var(--font-pixel)" }}>
+            <div className="pixel-panel p-3 flex flex-col" style={{ height: "clamp(320px, 50dvh, 560px)" }}>
+              <h3 className="text-sm text-primary mb-2 shrink-0" style={{ fontFamily: "var(--font-pixel)" }}>
                 TAVERN CHAT
               </h3>
-              <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-1 px-1">
+              <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-2 px-1 min-h-0">
                 {messages.length === 0 && (
                   <p className="text-sm text-muted-foreground italic">
                     The hall is quiet... break the silence.
                   </p>
                 )}
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    id={`tavern-message-${m.id}`}
-                    className={`text-sm px-2 py-0.5 ${
-                      highlightedMessageId === m.id ? "bg-primary/10 border border-primary" : ""
-                    }`}
-                  >
-                    <span
-                      style={{
-                        color: chatNameColorByUserId.get(m.user_id) ?? "var(--color-primary)",
-                        fontFamily: "var(--font-pixel)",
-                        fontSize: 12,
-                      }}
+                {messages.map((m) => {
+                  const isMine = m.user_id === user?.id;
+                  const nameColor = chatNameColorByUserId.get(m.user_id) ?? "var(--color-primary)";
+                  return (
+                    <div
+                      key={m.id}
+                      id={`tavern-message-${m.id}`}
+                      className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}
                     >
-                      {m.display_name}:
-                    </span>{" "}
-                    <span style={{ fontFamily: "var(--font-display)" }}>{m.content}</span>
-                  </div>
-                ))}
+                      {!isMine && (
+                        <span
+                          className="text-[10px] mb-0.5 px-1"
+                          style={{ color: nameColor, fontFamily: "var(--font-pixel)" }}
+                        >
+                          {m.display_name}
+                        </span>
+                      )}
+                      <div
+                        className={`max-w-[75%] px-2.5 py-1.5 text-sm leading-snug wrap-break-word border-2 ${
+                          isMine
+                            ? "bg-primary/15 border-primary text-foreground"
+                            : "bg-secondary/60 border-border text-foreground"
+                        } ${highlightedMessageId === m.id ? "ring-1 ring-primary" : ""}`}
+                        style={{ fontFamily: "var(--font-display)" }}
+                      >
+                        {m.content}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <form onSubmit={send} className="mt-2 flex gap-1">
+              <form onSubmit={send} className="mt-2 flex gap-1 shrink-0">
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Cast into ink..."
                   className="flex-1 bg-input border-2 border-border px-2 py-1.5 text-sm focus:border-primary outline-none"
                 />
-                <button className="px-3 bg-primary text-primary-foreground">
+                <button className="px-3 bg-primary text-primary-foreground shrink-0">
                   <Send size={14} />
                 </button>
               </form>

@@ -106,7 +106,7 @@ function RootComponent() {
             <PersistentYouTubeAudio />
             <MiniPlayerManager />
             <AppGate />
-            <Toaster />
+            <Toaster offset="72px" />
           </div>
         </div>
       </NotificationsProvider>
@@ -333,7 +333,7 @@ function PersistentYouTubeAudio() {
   const className =
     path === "/" && slotRect
       ? "fixed z-50 border-2 border-border bg-black shadow-xl"
-      : "fixed bottom-4 right-4 z-50 w-[420px] h-[236px] border-2 border-border bg-black shadow-xl";
+      : "fixed bottom-16 right-2 z-50 w-[min(420px,calc(100vw-1rem))] h-[min(236px,calc((100vw-1rem)*9/16))] md:bottom-4 md:right-4 border-2 border-border bg-black shadow-xl";
 
   const style =
     path === "/" && slotRect
@@ -528,7 +528,7 @@ function AppGate() {
             <HUD />
             <div className="flex-1 flex overflow-hidden">
               <SideNav />
-              <main className="flex-1 overflow-auto">
+              <main className="flex-1 overflow-auto pb-14 md:pb-0">
                 <Outlet />
               </main>
             </div>

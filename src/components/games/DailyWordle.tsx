@@ -572,9 +572,9 @@ export function DailyWordle() {
         </p>
       )}
 
-      <div className="w-full max-w-[480px] space-y-2">
+      <div className="w-full space-y-1">
         {KEYBOARD_ROWS.map((kr, i) => (
-          <div key={i} className="flex gap-1 justify-center">
+          <div key={i} className="flex gap-0.5 sm:gap-1 justify-center">
             {kr.map((key) => {
               const wide = key === "ENTER" || key === "BACK";
               const st = key.length === 1 ? letterKeyboardState.get(key) : undefined;
@@ -595,9 +595,9 @@ export function DailyWordle() {
                   }
                   onClick={() => onKey(key)}
                   className={cn(
-                    "rounded px-1 sm:px-2 py-3 text-[10px] sm:text-xs font-semibold uppercase min-h-[44px] flex items-center justify-center border-2 border-border",
+                    "flex-1 rounded py-3 text-[8px] sm:text-[10px] font-semibold uppercase min-h-9 sm:min-h-11 flex items-center justify-center border-2 border-border",
                     !bg && "bg-secondary hover:bg-secondary/80",
-                    wide && "px-2 sm:px-3 flex-1 max-w-[64px] sm:max-w-none",
+                    wide ? "flex-[1.6] sm:flex-[1.8]" : "flex-1",
                   )}
                   style={{
                     fontFamily: "var(--font-pixel)",
