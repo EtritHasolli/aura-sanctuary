@@ -25,6 +25,14 @@ import paladinIdle from "../../characters/paladin/idle.gif";
 import paladinStance from "../../characters/paladin/stance.gif";
 import rogueIdle from "../../characters/rogue/idle.gif";
 import rogueStance from "../../characters/rogue/stance.gif";
+import evilSwordsmanIdle from "../../characters/evilswordsman/idle.gif";
+import evilSwordsmanStance from "../../characters/evilswordsman/stance.gif";
+import evilMageIdle from "../../characters/evilmage/idle.gif";
+import evilMageStance from "../../characters/evilmage/stance.gif";
+import evilPaladinIdle from "../../characters/evilpaladin/idle.gif";
+import evilPaladinStance from "../../characters/evilpaladin/stance.gif";
+import evilRogueIdle from "../../characters/evilrogue/idle.gif";
+import evilRogueStance from "../../characters/evilrogue/stance.gif";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Settings — Aura" }] }),
@@ -58,6 +66,10 @@ const PATH_GIFS: Record<AuraPath, { idle: string; stance: string }> = {
   mage: { idle: mageIdle, stance: mageStance },
   tank: { idle: paladinIdle, stance: paladinStance },
   rogue: { idle: rogueIdle, stance: rogueStance },
+  evilswordsman: { idle: evilSwordsmanIdle, stance: evilSwordsmanStance },
+  evilmage: { idle: evilMageIdle, stance: evilMageStance },
+  evilpaladin: { idle: evilPaladinIdle, stance: evilPaladinStance },
+  evilrogue: { idle: evilRogueIdle, stance: evilRogueStance },
 };
 
 async function readFileAsDataUrl(file: File): Promise<string> {
@@ -117,6 +129,7 @@ function SettingsPage() {
   const [characterName, setCharacterName] = useState("");
   const [timezone, setTimezone] = useState("UTC");
   const [auraPath, setAuraPath] = useState<AuraPath | "">("");
+  const [alignment, setAlignment] = useState<"good" | "evil" | null>(null);
   const [desktopNotifs, setDesktopNotifs] = useState(false);
   const [soundNotifs, setSoundNotifs] = useState(true);
   const [pathTestingOverride, setPathTestingOverride] = useState(false);
@@ -155,7 +168,10 @@ function SettingsPage() {
 
   useEffect(() => {
     if (!profile) return;
-    if (!profile.aura_path) setPathModalOpen(true);
+    if (!profile.aura_path) {
+      setAlignment(null);
+      setPathModalOpen(true);
+    }
   }, [profile?.aura_path, profile?.id]);
 
   useEffect(() => {
@@ -473,6 +489,14 @@ function SettingsPage() {
     tank: "You are the wall that does not fall. Threat shatters on your guard and resolve.",
     rogue:
       "You strike from the blind angle. Precision, pace, and timing become your true weapons.",
+    evilswordsman:
+      "Blood stains your blade. You crush resistance and turn chaos into your own ruthless power.",
+    evilmage:
+      "Forbidden runes flicker in your gaze. You shatter minds and bend the void to your dark whims.",
+    evilpaladin:
+      "You are the shadow that consumes. Mercy withers in your presence as you enforce your cold, iron will.",
+    evilrogue:
+      "You are the whisper in the dark. Malice, cunning, and betrayal are the tools of your deadly trade.",
   };
 
   return (
@@ -935,68 +959,115 @@ function SettingsPage() {
               className="text-xl sm:text-2xl lg:text-3xl pr-8"
               style={{ fontFamily: "var(--font-pixel)" }}
             >
-              Choose Your Path
+              {alignment === null ? "Choose Your Alignment" : "Choose Your Path"}
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm sm:text-base text-muted-foreground">
-            {profile.aura_path
-              ? "Reshape your role for testing. Pick a path card, then save."
-              : "You must choose one path to continue. This choice is permanent unless testing override is enabled."}
+            {alignment === null
+              ? "Will you walk the path of light or embrace the darkness?"
+              : profile.aura_path
+                ? "Reshape your role for testing. Pick a path card, then save."
+                : "You must choose one path to continue. This choice is permanent unless testing override is enabled."}
           </p>
-          <div className="grid grid-cols-1 min-[520px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0">
-            {AURA_PATHS.map((path) => (
+
+          {alignment === null ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <button
-                key={path.id}
                 type="button"
-                onClick={() => setAuraPath(path.id)}
-                aria-pressed={selectedPathId === path.id}
-                className={`relative text-left pixel-panel min-w-0 p-3 sm:p-4 border-2 transition-all duration-150 ${
-                  selectedPathId === path.id
-                    ? "!border-primary !bg-primary/10 shadow-[0_0_0_2px_rgba(217,150,48,0.9),0_0_24px_rgba(217,150,48,0.55)]"
-                    : "border-border hover:!border-primary hover:shadow-[0_0_16px_rgba(217,150,48,0.45)]"
-                }`}
+                onClick={() => setAlignment("good")}
+                className="pixel-panel p-6 border-2 border-border hover:border-primary hover:bg-primary/10 transition-all group"
               >
-                {selectedPathId === path.id && (
-                  <span
-                    className="absolute top-2 right-2 px-1.5 py-0.5 text-[9px] sm:text-[10px] bg-primary text-primary-foreground"
-                    style={{ fontFamily: "var(--font-pixel)" }}
-                  >
-                    SELECTED
-                  </span>
-                )}
-                <div className="w-full h-32 min-[520px]:h-36 sm:h-40 lg:h-44 border-2 border-border bg-secondary/40 mb-3 flex items-center justify-center overflow-hidden">
-                  <img
-                    src={selectedPathId === path.id ? PATH_GIFS[path.id].stance : PATH_GIFS[path.id].idle}
-                    alt={`${path.label} preview`}
-                    className="h-full w-auto max-w-full object-contain"
-                  />
+                <div className="text-2xl text-primary mb-2" style={{ fontFamily: "var(--font-pixel)" }}>
+                  GOOD
                 </div>
-                <div
-                  className="text-primary mb-1.5 text-sm sm:text-base"
-                  style={{ fontFamily: "var(--font-pixel)" }}
-                >
-                  {path.label}
-                </div>
-                <p className="text-xs sm:text-sm text-muted-foreground">{path.fantasy}</p>
-                <p className="text-xs sm:text-sm text-accent mt-1">{path.growth}</p>
-                <p className="text-xs sm:text-sm text-muted-foreground mt-1">Skill: {path.skill}</p>
-                <p className="text-xs sm:text-sm text-foreground/80 italic mt-2 leading-relaxed">
-                  {dramaticByPath[path.id]}
+                <p className="text-sm text-muted-foreground group-hover:text-foreground">
+                  Protect the sanctuary and uphold the virtues of discipline.
                 </p>
               </button>
-            ))}
-          </div>
-          <div className="flex justify-between gap-2 pt-1">
-            {profile.aura_path ? (
               <button
                 type="button"
-                onClick={() => setPathModalOpen(false)}
-                className="px-3 py-1.5 border-2 border-border"
-                style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+                onClick={() => setAlignment("evil")}
+                className="pixel-panel p-6 border-2 border-border hover:border-accent hover:bg-accent/10 transition-all group"
               >
-                Close
+                <div className="text-2xl text-accent mb-2" style={{ fontFamily: "var(--font-pixel)" }}>
+                  EVIL
+                </div>
+                <p className="text-sm text-muted-foreground group-hover:text-foreground">
+                  Harness the power of chaos and bend the world to your will.
+                </p>
               </button>
-            ) : <div />}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 min-[520px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0">
+              {AURA_PATHS.filter((p) => p.alignment === alignment).map((path) => (
+                <button
+                  key={path.id}
+                  type="button"
+                  onClick={() => setAuraPath(path.id)}
+                  aria-pressed={selectedPathId === path.id}
+                  className={`relative text-left pixel-panel min-w-0 p-3 sm:p-4 border-2 transition-all duration-150 ${
+                    selectedPathId === path.id
+                      ? "!border-primary !bg-primary/10 shadow-[0_0_0_2px_rgba(217,150,48,0.9),0_0_24px_rgba(217,150,48,0.55)]"
+                      : "border-border hover:!border-primary hover:shadow-[0_0_16px_rgba(217,150,48,0.45)]"
+                  }`}
+                >
+                  {selectedPathId === path.id && (
+                    <span
+                      className="absolute top-2 right-2 px-1.5 py-0.5 text-[9px] sm:text-[10px] bg-primary text-primary-foreground"
+                      style={{ fontFamily: "var(--font-pixel)" }}
+                    >
+                      SELECTED
+                    </span>
+                  )}
+                  <div className="w-full h-32 min-[520px]:h-36 sm:h-40 lg:h-44 border-2 border-border bg-secondary/40 mb-3 flex items-center justify-center overflow-hidden">
+                    <img
+                      src={selectedPathId === path.id ? PATH_GIFS[path.id].stance : PATH_GIFS[path.id].idle}
+                      alt={`${path.label} preview`}
+                      className="h-full w-auto max-w-full object-contain"
+                    />
+                  </div>
+                  <div
+                    className="text-primary mb-1.5 text-sm sm:text-base"
+                    style={{ fontFamily: "var(--font-pixel)" }}
+                  >
+                    {path.label}
+                  </div>
+                  <p className="text-xs sm:text-sm text-muted-foreground">{path.fantasy}</p>
+                  <p className="text-xs sm:text-sm text-accent mt-1">{path.growth}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">Skill: {path.skill}</p>
+                  <p className="text-xs sm:text-sm text-foreground/80 italic mt-2 leading-relaxed">
+                    {dramaticByPath[path.id]}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex justify-between gap-2 pt-1">
+            <div className="flex gap-2">
+              {alignment !== null && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAlignment(null);
+                    setAuraPath("");
+                  }}
+                  className="px-3 py-1.5 border-2 border-border"
+                  style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+                >
+                  Back to Alignment
+                </button>
+              )}
+              {profile.aura_path && (
+                <button
+                  type="button"
+                  onClick={() => setPathModalOpen(false)}
+                  className="px-3 py-1.5 border-2 border-border"
+                  style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+                >
+                  Close
+                </button>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => void saveProfile()}

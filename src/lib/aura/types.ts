@@ -4,7 +4,15 @@ export type TaskType = "habit" | "daily" | "todo";
 export type Difficulty = "trivial" | "easy" | "medium" | "hard";
 export type RepeatUnit = "day" | "week" | "month" | "year";
 export type CharacterState = "idle" | "working" | "sleeping";
-export type AuraPath = "swordsman" | "mage" | "tank" | "rogue";
+export type AuraPath =
+  | "swordsman"
+  | "mage"
+  | "tank"
+  | "rogue"
+  | "evilswordsman"
+  | "evilmage"
+  | "evilpaladin"
+  | "evilrogue";
 
 export const AURA_PATHS: Array<{
   id: AuraPath;
@@ -12,6 +20,7 @@ export const AURA_PATHS: Array<{
   fantasy: string;
   skill: string;
   growth: string;
+  alignment: "good" | "evil";
 }> = [
   {
     id: "swordsman",
@@ -19,6 +28,7 @@ export const AURA_PATHS: Array<{
     fantasy: "Frontline duelist who sharpens body and will.",
     skill: "Battle Focus",
     growth: "Per level: STR +2, CON +1",
+    alignment: "good",
   },
   {
     id: "mage",
@@ -26,6 +36,7 @@ export const AURA_PATHS: Array<{
     fantasy: "Arcane tactician weaving precision and intellect.",
     skill: "Arcane Mend",
     growth: "Per level: INT +2, DEX +1",
+    alignment: "good",
   },
   {
     id: "tank",
@@ -33,6 +44,7 @@ export const AURA_PATHS: Array<{
     fantasy: "Holy bulwark guardian shielding the party from chaos.",
     skill: "Iron Guard",
     growth: "Per level: CON +2, STR +1",
+    alignment: "good",
   },
   {
     id: "rogue",
@@ -40,6 +52,39 @@ export const AURA_PATHS: Array<{
     fantasy: "Shadow skirmisher striking where foes are weakest.",
     skill: "Shadow Strike",
     growth: "Per level: DEX +2, INT +1",
+    alignment: "good",
+  },
+  {
+    id: "evilswordsman",
+    label: "Chaos Knight",
+    fantasy: "Brutal conqueror who turns pain into dark momentum.",
+    skill: "Death Swing",
+    growth: "Per level: STR +2, CON +1",
+    alignment: "evil",
+  },
+  {
+    id: "evilmage",
+    label: "Warlock",
+    fantasy: "Corrupt scholar bending the void to their dark whims.",
+    skill: "Void Blast",
+    growth: "Per level: INT +2, DEX +1",
+    alignment: "evil",
+  },
+  {
+    id: "evilpaladin",
+    label: "Death Knight",
+    fantasy: "Fallen guardian who enforces a cold, iron will.",
+    skill: "Soul Reap",
+    growth: "Per level: CON +2, STR +1",
+    alignment: "evil",
+  },
+  {
+    id: "evilrogue",
+    label: "Assassin",
+    fantasy: "Whisper in the dark, striking from the heart of malice.",
+    skill: "Venom Strike",
+    growth: "Per level: DEX +2, INT +1",
+    alignment: "evil",
   },
 ];
 

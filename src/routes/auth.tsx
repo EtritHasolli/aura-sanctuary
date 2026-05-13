@@ -14,6 +14,14 @@ import paladinIdle from "../../characters/paladin/idle.gif";
 import paladinStance from "../../characters/paladin/stance.gif";
 import rogueIdle from "../../characters/rogue/idle.gif";
 import rogueStance from "../../characters/rogue/stance.gif";
+import evilSwordsmanIdle from "../../characters/evilswordsman/idle.gif";
+import evilSwordsmanStance from "../../characters/evilswordsman/stance.gif";
+import evilMageIdle from "../../characters/evilmage/idle.gif";
+import evilMageStance from "../../characters/evilmage/stance.gif";
+import evilPaladinIdle from "../../characters/evilpaladin/idle.gif";
+import evilPaladinStance from "../../characters/evilpaladin/stance.gif";
+import evilRogueIdle from "../../characters/evilrogue/idle.gif";
+import evilRogueStance from "../../characters/evilrogue/stance.gif";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
@@ -24,6 +32,10 @@ const PATH_GIFS: Record<AuraPath, { idle: string; stance: string }> = {
   mage: { idle: mageIdle, stance: mageStance },
   tank: { idle: paladinIdle, stance: paladinStance },
   rogue: { idle: rogueIdle, stance: rogueStance },
+  evilswordsman: { idle: evilSwordsmanIdle, stance: evilSwordsmanStance },
+  evilmage: { idle: evilMageIdle, stance: evilMageStance },
+  evilpaladin: { idle: evilPaladinIdle, stance: evilPaladinStance },
+  evilrogue: { idle: evilRogueIdle, stance: evilRogueStance },
 };
 
 const dramaticByPath: Record<AuraPath, string> = {
@@ -34,6 +46,14 @@ const dramaticByPath: Record<AuraPath, string> = {
   tank: "You are the wall that does not fall. Threat shatters on your guard and resolve.",
   rogue:
     "You strike from the blind angle. Precision, pace, and timing become your true weapons.",
+  evilswordsman:
+    "Blood stains your blade. You crush resistance and turn chaos into your own ruthless power.",
+  evilmage:
+    "Forbidden runes flicker in your gaze. You shatter minds and bend the void to your dark whims.",
+  evilpaladin:
+    "You are the shadow that consumes. Mercy withers in your presence as you enforce your cold, iron will.",
+  evilrogue:
+    "You are the whisper in the dark. Malice, cunning, and betrayal are the tools of your deadly trade.",
 };
 
 type SignupPhase = "credentials" | "awaiting_path" | "profile";
@@ -45,6 +65,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [path, setPath] = useState<AuraPath | "">("");
+  const [alignment, setAlignment] = useState<"good" | "evil" | null>(null);
   const [loading, setLoading] = useState(false);
   const [pathModalOpen, setPathModalOpen] = useState(false);
   const [pathCardGifMode, setPathCardGifMode] = useState<"idle" | "stance">("idle");
@@ -87,6 +108,7 @@ function AuthPage() {
     awaitingPathConfirmedRef.current = false;
     pathModalFromProfileRef.current = false;
     setPath("");
+    setAlignment(null);
     setSignupPhase("awaiting_path");
     setPathModalOpen(true);
   }
@@ -155,6 +177,7 @@ function AuthPage() {
     setMode(next);
     setSignupPhase("credentials");
     setPath("");
+    setAlignment(null);
     awaitingPathConfirmedRef.current = false;
     pathModalFromProfileRef.current = false;
     setPathModalOpen(false);
@@ -343,56 +366,101 @@ function AuthPage() {
               className="text-xl sm:text-2xl lg:text-3xl pr-8"
               style={{ fontFamily: "var(--font-pixel)" }}
             >
-              Choose Your Path
+              {alignment === null ? "Choose Your Alignment" : "Choose Your Path"}
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm sm:text-base text-muted-foreground">
-            You must choose one path to continue. This choice is permanent.
+            {alignment === null
+              ? "Will you walk the path of light or embrace the darkness?"
+              : "You must choose one path to continue. This choice is permanent."}
           </p>
-          <div className="grid grid-cols-1 min-[520px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0">
-            {AURA_PATHS.map((p) => (
+
+          {alignment === null ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <button
-                key={p.id}
                 type="button"
-                onClick={() => setPath(p.id)}
-                aria-pressed={path === p.id}
-                className={`relative text-left pixel-panel min-w-0 p-3 sm:p-4 border-2 transition-all duration-150 ${
-                  path === p.id
-                    ? "!border-primary !bg-primary/10 shadow-[0_0_0_2px_rgba(217,150,48,0.9),0_0_24px_rgba(217,150,48,0.55)]"
-                    : "border-border hover:!border-primary hover:shadow-[0_0_16px_rgba(217,150,48,0.45)]"
-                }`}
+                onClick={() => setAlignment("good")}
+                className="pixel-panel p-6 border-2 border-border hover:border-primary hover:bg-primary/10 transition-all group"
               >
-                {path === p.id && (
-                  <span
-                    className="absolute top-2 right-2 px-1.5 py-0.5 text-[9px] sm:text-[10px] bg-primary text-primary-foreground"
-                    style={{ fontFamily: "var(--font-pixel)" }}
-                  >
-                    SELECTED
-                  </span>
-                )}
-                <div className="w-full h-32 min-[520px]:h-36 sm:h-40 lg:h-44 border-2 border-border bg-secondary/40 mb-3 flex items-center justify-center overflow-hidden">
-                  <img
-                    src={path === p.id ? PATH_GIFS[p.id].stance : PATH_GIFS[p.id].idle}
-                    alt={`${p.label} preview`}
-                    className="h-full w-auto max-w-full object-contain"
-                  />
+                <div className="text-2xl text-primary mb-2" style={{ fontFamily: "var(--font-pixel)" }}>
+                  GOOD
                 </div>
-                <div
-                  className="text-primary mb-1.5 text-sm sm:text-base"
-                  style={{ fontFamily: "var(--font-pixel)" }}
-                >
-                  {p.label}
-                </div>
-                <p className="text-xs sm:text-sm text-muted-foreground">{p.fantasy}</p>
-                <p className="text-xs sm:text-sm text-accent mt-1">{p.growth}</p>
-                <p className="text-xs sm:text-sm text-muted-foreground mt-1">Skill: {p.skill}</p>
-                <p className="text-xs sm:text-sm text-foreground/80 italic mt-2 leading-relaxed">
-                  {dramaticByPath[p.id]}
+                <p className="text-sm text-muted-foreground group-hover:text-foreground">
+                  Protect the sanctuary and uphold the virtues of discipline.
                 </p>
               </button>
-            ))}
-          </div>
+              <button
+                type="button"
+                onClick={() => setAlignment("evil")}
+                className="pixel-panel p-6 border-2 border-border hover:border-accent hover:bg-accent/10 transition-all group"
+              >
+                <div className="text-2xl text-accent mb-2" style={{ fontFamily: "var(--font-pixel)" }}>
+                  EVIL
+                </div>
+                <p className="text-sm text-muted-foreground group-hover:text-foreground">
+                  Harness the power of chaos and bend the world to your will.
+                </p>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 min-[520px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0">
+              {AURA_PATHS.filter((p) => p.alignment === alignment).map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setPath(p.id)}
+                  aria-pressed={path === p.id}
+                  className={`relative text-left pixel-panel min-w-0 p-3 sm:p-4 border-2 transition-all duration-150 ${
+                    path === p.id
+                      ? "!border-primary !bg-primary/10 shadow-[0_0_0_2px_rgba(217,150,48,0.9),0_0_24px_rgba(217,150,48,0.55)]"
+                      : "border-border hover:!border-primary hover:shadow-[0_0_16px_rgba(217,150,48,0.45)]"
+                  }`}
+                >
+                  {path === p.id && (
+                    <span
+                      className="absolute top-2 right-2 px-1.5 py-0.5 text-[9px] sm:text-[10px] bg-primary text-primary-foreground"
+                      style={{ fontFamily: "var(--font-pixel)" }}
+                    >
+                      SELECTED
+                    </span>
+                  )}
+                  <div className="w-full h-32 min-[520px]:h-36 sm:h-40 lg:h-44 border-2 border-border bg-secondary/40 mb-3 flex items-center justify-center overflow-hidden">
+                    <img
+                      src={path === p.id ? PATH_GIFS[p.id].stance : PATH_GIFS[p.id].idle}
+                      alt={`${p.label} preview`}
+                      className="h-full w-auto max-w-full object-contain"
+                    />
+                  </div>
+                  <div
+                    className="text-primary mb-1.5 text-sm sm:text-base"
+                    style={{ fontFamily: "var(--font-pixel)" }}
+                  >
+                    {p.label}
+                  </div>
+                  <p className="text-xs sm:text-sm text-muted-foreground">{p.fantasy}</p>
+                  <p className="text-xs sm:text-sm text-accent mt-1">{p.growth}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">Skill: {p.skill}</p>
+                  <p className="text-xs sm:text-sm text-foreground/80 italic mt-2 leading-relaxed">
+                    {dramaticByPath[p.id]}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap justify-end gap-2 pt-1">
+            {alignment !== null && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAlignment(null);
+                  setPath("");
+                }}
+                className="px-4 py-2.5 border-2 border-border mr-auto"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 14 }}
+              >
+                BACK TO ALIGNMENT
+              </button>
+            )}
             {mode === "signup" && signupPhase === "awaiting_path" && (
               <button
                 type="button"
