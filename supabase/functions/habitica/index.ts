@@ -614,7 +614,7 @@ async function persistRefresh(
 }
 
 async function actionStatus(ctx: Ctx) {
-  const row = await loadIntegration(ctx);
+  let row = await loadIntegration(ctx);
   if (!row) {
     return jsonResponse({
       connected: false,
@@ -624,6 +624,36 @@ async function actionStatus(ctx: Ctx) {
       lastSyncedAt: null,
     });
   }
+
+  // Backfill public_profile if it was never populated (e.g. user connected
+  // before this column existed). Do it inline so friends can see the profile
+  // immediately after the owner's next status call.
+  const profileEmpty =
+    !row.public_profile ||
+    (typeof row.public_profile === "object" &&
+      Object.keys(row.public_profile).length === 0);
+
+  if (profileEmpty) {
+    try {
+      const creds: HabiticaCreds = {
+        external_user_id: row.external_user_id,
+        api_token: row.api_token,
+      };
+      const summary = await persistRefresh(ctx, creds, { reconcileCompletions: false });
+      // Reload the row so we return the freshly-written public_profile.
+      row = (await loadIntegration(ctx)) ?? row;
+      return jsonResponse({
+        connected: true,
+        profile: publicProfileSummary(row),
+        publicProfile: summary.publicProfile,
+        settings: normalizeSettings(row.settings),
+        lastSyncedAt: row.last_synced_at,
+      });
+    } catch {
+      // If the backfill fails (e.g. rate-limit), fall through and return what we have.
+    }
+  }
+
   return jsonResponse({
     connected: true,
     profile: publicProfileSummary(row),

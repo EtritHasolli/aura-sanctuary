@@ -239,9 +239,10 @@ export function useRefreshHabitica() {
 }
 
 export function useFriendHabiticaProfile(friendUserId: string | null | undefined) {
+  const { user } = useAuth();
   return useQuery({
     queryKey: ["habitica", "friend", friendUserId] as const,
-    enabled: !!friendUserId,
+    enabled: !!friendUserId && !!user,
     queryFn: async (): Promise<HabiticaPublicProfile | null> => {
       // Supabase generated types lag behind migrations; bypass the static name list.
       const rpc = supabase.rpc as unknown as (

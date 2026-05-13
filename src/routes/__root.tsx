@@ -351,8 +351,7 @@ function PersistentYouTubeAudio() {
       src={embedUrl}
       className={className}
       style={style}
-      allow="autoplay; encrypted-media; picture-in-picture"
-      referrerPolicy="strict-origin-when-cross-origin"
+      allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
     />
   );
 }

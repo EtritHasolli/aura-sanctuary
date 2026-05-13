@@ -63,6 +63,7 @@ function createWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       autoplayPolicy: "no-user-gesture-required",
+      webSecurity: false,
     },
   });
 

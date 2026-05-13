@@ -653,7 +653,6 @@ function TaskRow({
             {task.streak_current ?? 0}
           </span>
         )}
-        <HabiticaTaskBadge task={task} />
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>

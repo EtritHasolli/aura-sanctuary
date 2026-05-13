@@ -9,6 +9,23 @@ import {
 } from "@/lib/aura/equipmentBonuses";
 import { useAuth } from "./useAuth";
 
+export function useIsAdmin() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["is_admin", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as unknown as (
+        name: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: unknown; error: { message: string } | null }>)("is_admin", {});
+      if (error) return false;
+      return data === true;
+    },
+    staleTime: 5 * 60_000,
+  });
+}
+
 const STAMINA_ON_LEVEL_UP = 50;
 const MAX_HP_PER_LEVEL_UP = 10;
 const HP_REGEN_PER_LEVEL_UP = 10;

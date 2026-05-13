@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell, Clock3, Info, Link2, Link2Off, ShieldCheck, Trash2, UserRound } from "lucide-react";
-import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
+import { useProfile, useUpdateProfile, useIsAdmin } from "@/hooks/useProfile";
 import { useNotifications } from "@/components/aura/NotificationsContext";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
 import {
@@ -109,6 +109,7 @@ function dataUrlToBlob(dataUrl: string): Blob {
 function SettingsPage() {
   const { data: profile } = useProfile();
   const updateProfile = useUpdateProfile();
+  const { data: isAdmin = false } = useIsAdmin();
   const { notifications, unread, markAllRead, clear } = useNotifications();
   const { focusMinutes, breakMinutes, updateDurations, sessionPlan, updateSessionPlan } = usePomodoro();
 
@@ -607,14 +608,16 @@ function SettingsPage() {
               Path is locked after your first choice.
             </p>
           )}
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={pathTestingOverride}
-              onChange={(e) => setPathTestingOverride(e.target.checked)}
-            />
-            Testing override: allow changing path
-          </label>
+          {isAdmin && (
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={pathTestingOverride}
+                onChange={(e) => setPathTestingOverride(e.target.checked)}
+              />
+              Testing override: allow changing path
+            </label>
+          )}
           <div className="flex justify-end">
             <button
               onClick={saveProfile}
