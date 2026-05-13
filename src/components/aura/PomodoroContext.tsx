@@ -1,10 +1,18 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 type Mode = "focus" | "break";
 
 export interface PomodoroSession {
   focusMinutes: number;
   breakMinutes: number;
+}
+
+interface PomodoroSettings {
+  focusMinutes: number;
+  breakMinutes: number;
+  sessionPlan: PomodoroSession[];
 }
 
 interface Ctx {
@@ -21,76 +29,143 @@ interface Ctx {
   updateDurations: (durations: { focusMinutes: number; breakMinutes: number }) => void;
   updateSessionPlan: (sessions: PomodoroSession[]) => void;
   characterState: "idle" | "working" | "sleeping";
-  onCycleComplete?: (cb: () => void) => void;
+  settingsLoaded: boolean;
 }
 
 const PomodoroCtx = createContext<Ctx | null>(null);
 
-const FOCUS_SECS = 25 * 60;
-const BREAK_SECS = 5 * 60;
+const DEFAULT_FOCUS = 25;
+const DEFAULT_BREAK = 5;
 const MIN_MINUTES = 1;
+
+// localStorage keys kept as fast-read cache so the UI doesn't flash on load
 const FOCUS_STORAGE_KEY = "aura:pomodoro-focus-minutes";
 const BREAK_STORAGE_KEY = "aura:pomodoro-break-minutes";
 const SESSION_PLAN_STORAGE_KEY = "aura:pomodoro-session-plan";
 
 function sanitizeMinutes(v: number, fallback: number) {
   if (!Number.isFinite(v)) return fallback;
-  const rounded = Math.round(v);
-  return Math.max(MIN_MINUTES, rounded);
-}
-
-function readStoredMinutes(key: string, fallback: number) {
-  if (typeof window === "undefined") return fallback;
-  const value = Number(window.localStorage.getItem(key));
-  return sanitizeMinutes(value, fallback);
+  return Math.max(MIN_MINUTES, Math.round(v));
 }
 
 function sanitizeSessionPlan(
   sessions: PomodoroSession[],
-  fallbackFocusMinutes: number,
-  fallbackBreakMinutes: number,
+  fallbackFocus: number,
+  fallbackBreak: number,
 ): PomodoroSession[] {
   if (!Array.isArray(sessions) || sessions.length === 0) {
-    return [{ focusMinutes: fallbackFocusMinutes, breakMinutes: fallbackBreakMinutes }];
+    return [{ focusMinutes: fallbackFocus, breakMinutes: fallbackBreak }];
   }
-  return sessions.map((session) => ({
-    focusMinutes: sanitizeMinutes(session.focusMinutes, fallbackFocusMinutes),
-    breakMinutes: sanitizeMinutes(session.breakMinutes, fallbackBreakMinutes),
+  return sessions.map((s) => ({
+    focusMinutes: sanitizeMinutes(s.focusMinutes, fallbackFocus),
+    breakMinutes: sanitizeMinutes(s.breakMinutes, fallbackBreak),
   }));
 }
 
-function readStoredSessionPlan(fallbackFocusMinutes: number, fallbackBreakMinutes: number) {
-  if (typeof window === "undefined") {
-    return [{ focusMinutes: fallbackFocusMinutes, breakMinutes: fallbackBreakMinutes }];
-  }
+function readLocalSettings(): PomodoroSettings {
+  const focusMinutes =
+    sanitizeMinutes(Number(localStorage.getItem(FOCUS_STORAGE_KEY)), DEFAULT_FOCUS);
+  const breakMinutes =
+    sanitizeMinutes(Number(localStorage.getItem(BREAK_STORAGE_KEY)), DEFAULT_BREAK);
   try {
-    const raw = window.localStorage.getItem(SESSION_PLAN_STORAGE_KEY);
-    if (!raw) {
-      return [{ focusMinutes: fallbackFocusMinutes, breakMinutes: fallbackBreakMinutes }];
-    }
-    const parsed = JSON.parse(raw) as PomodoroSession[];
-    return sanitizeSessionPlan(parsed, fallbackFocusMinutes, fallbackBreakMinutes);
+    const raw = localStorage.getItem(SESSION_PLAN_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as PomodoroSession[]) : [];
+    return { focusMinutes, breakMinutes, sessionPlan: sanitizeSessionPlan(parsed, focusMinutes, breakMinutes) };
   } catch {
-    return [{ focusMinutes: fallbackFocusMinutes, breakMinutes: fallbackBreakMinutes }];
+    return { focusMinutes, breakMinutes, sessionPlan: [{ focusMinutes, breakMinutes }] };
   }
 }
 
-export function PomodoroProvider({ children, onFocusComplete }: { children: ReactNode; onFocusComplete?: () => void }) {
-  const initialFocusMinutes = readStoredMinutes(FOCUS_STORAGE_KEY, FOCUS_SECS / 60);
-  const initialBreakMinutes = readStoredMinutes(BREAK_STORAGE_KEY, BREAK_SECS / 60);
-  const initialSessionPlan = readStoredSessionPlan(initialFocusMinutes, initialBreakMinutes);
+function writeLocalSettings(s: PomodoroSettings) {
+  localStorage.setItem(FOCUS_STORAGE_KEY, String(s.focusMinutes));
+  localStorage.setItem(BREAK_STORAGE_KEY, String(s.breakMinutes));
+  localStorage.setItem(SESSION_PLAN_STORAGE_KEY, JSON.stringify(s.sessionPlan));
+}
+
+async function loadDbSettings(userId: string): Promise<PomodoroSettings | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("pomodoro_settings")
+    .eq("id", userId)
+    .single();
+  if (error || !data?.pomodoro_settings) return null;
+  const raw = data.pomodoro_settings as Record<string, unknown>;
+  const focus = sanitizeMinutes(Number(raw.focusMinutes), DEFAULT_FOCUS);
+  const brk = sanitizeMinutes(Number(raw.breakMinutes), DEFAULT_BREAK);
+  const plan = sanitizeSessionPlan(
+    Array.isArray(raw.sessionPlan) ? (raw.sessionPlan as PomodoroSession[]) : [],
+    focus,
+    brk,
+  );
+  return { focusMinutes: focus, breakMinutes: brk, sessionPlan: plan };
+}
+
+async function saveDbSettings(userId: string, settings: PomodoroSettings) {
+  await supabase
+    .from("profiles")
+    .update({ pomodoro_settings: settings as unknown as Record<string, unknown> })
+    .eq("id", userId);
+}
+
+export function PomodoroProvider({
+  children,
+  onFocusComplete,
+}: {
+  children: ReactNode;
+  onFocusComplete?: () => void;
+}) {
+  const { user } = useAuth();
+
+  // Boot from localStorage immediately so the UI never flashes defaults
+  const local = readLocalSettings();
+  const [focusMinutes, setFocusMinutes] = useState(local.focusMinutes);
+  const [breakMinutes, setBreakMinutes] = useState(local.breakMinutes);
+  const [sessionPlan, setSessionPlan] = useState<PomodoroSession[]>(local.sessionPlan);
+  const [activeSessionIndex, setActiveSessionIndex] = useState(0);
+  const [secondsLeft, setSecondsLeft] = useState(local.sessionPlan[0].focusMinutes * 60);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
   const [running, setRunning] = useState(false);
   const [mode, setMode] = useState<Mode>("focus");
-  const [focusMinutes, setFocusMinutes] = useState(initialFocusMinutes);
-  const [breakMinutes, setBreakMinutes] = useState(initialBreakMinutes);
-  const [sessionPlan, setSessionPlan] = useState<PomodoroSession[]>(initialSessionPlan);
-  const [activeSessionIndex, setActiveSessionIndex] = useState(0);
-  const [secondsLeft, setSecondsLeft] = useState(initialSessionPlan[0].focusMinutes * 60);
   const idleTicksRef = useRef(0);
   const [isSleeping, setIsSleeping] = useState(false);
   const cbRef = useRef(onFocusComplete);
   cbRef.current = onFocusComplete;
 
+  // Debounce timer for DB writes — avoid hammering on every keystroke in settings
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const persistSettings = (settings: PomodoroSettings) => {
+    writeLocalSettings(settings);
+    if (!user) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      void saveDbSettings(user.id, settings);
+    }, 800);
+  };
+
+  // On login, pull from DB and override local state if DB has data
+  useEffect(() => {
+    if (!user) {
+      setSettingsLoaded(true);
+      return;
+    }
+    let cancelled = false;
+    void loadDbSettings(user.id).then((db) => {
+      if (cancelled) return;
+      if (db) {
+        setFocusMinutes(db.focusMinutes);
+        setBreakMinutes(db.breakMinutes);
+        setSessionPlan(db.sessionPlan);
+        setSecondsLeft(db.sessionPlan[0].focusMinutes * 60);
+        writeLocalSettings(db); // keep local cache in sync
+      }
+      setSettingsLoaded(true);
+    });
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  // Idle / sleep detection
   useEffect(() => {
     if (!running) {
       idleTicksRef.current = 0;
@@ -107,21 +182,19 @@ export function PomodoroProvider({ children, onFocusComplete }: { children: Reac
     idleTicksRef.current = 0;
     setIsSleeping(false);
     const t = setInterval(() => {
-      setSecondsLeft(s => {
+      setSecondsLeft((s) => {
         if (s > 1) return s - 1;
         const activeSession =
-          sessionPlan[activeSessionIndex] ??
-          ({ focusMinutes, breakMinutes } satisfies PomodoroSession);
-        // cycle complete
+          sessionPlan[activeSessionIndex] ?? { focusMinutes, breakMinutes };
         if (mode === "focus") {
           cbRef.current?.();
           if (typeof window !== "undefined") window.dispatchEvent(new Event("aura:focus-complete"));
           setMode("break");
           return activeSession.breakMinutes * 60;
         } else {
-          const nextSessionIndex = (activeSessionIndex + 1) % sessionPlan.length;
-          const nextSession = sessionPlan[nextSessionIndex] ?? activeSession;
-          setActiveSessionIndex(nextSessionIndex);
+          const nextIdx = (activeSessionIndex + 1) % sessionPlan.length;
+          const nextSession = sessionPlan[nextIdx] ?? activeSession;
+          setActiveSessionIndex(nextIdx);
           setMode("focus");
           return nextSession.focusMinutes * 60;
         }
@@ -131,35 +204,23 @@ export function PomodoroProvider({ children, onFocusComplete }: { children: Reac
   }, [running, mode, focusMinutes, breakMinutes, sessionPlan, activeSessionIndex]);
 
   const characterState: Ctx["characterState"] =
-    running && mode === "focus" ? "working" :
-    isSleeping ? "sleeping" : "idle";
+    running && mode === "focus" ? "working" : isSleeping ? "sleeping" : "idle";
 
-  // toggle the focused theme on the html element when working
   useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle("theme-focused", characterState === "working");
+    document.documentElement.classList.toggle("theme-focused", characterState === "working");
   }, [characterState]);
 
-  const updateDurations: Ctx["updateDurations"] = ({ focusMinutes, breakMinutes }) => {
-    const nextFocus = sanitizeMinutes(focusMinutes, FOCUS_SECS / 60);
-    const nextBreak = sanitizeMinutes(breakMinutes, BREAK_SECS / 60);
+  const updateDurations: Ctx["updateDurations"] = ({ focusMinutes: f, breakMinutes: b }) => {
+    const nextFocus = sanitizeMinutes(f, DEFAULT_FOCUS);
+    const nextBreak = sanitizeMinutes(b, DEFAULT_BREAK);
+    const nextPlan = [{ focusMinutes: nextFocus, breakMinutes: nextBreak }];
     setFocusMinutes(nextFocus);
     setBreakMinutes(nextBreak);
-    const nextPlan = [{ focusMinutes: nextFocus, breakMinutes: nextBreak }];
     setSessionPlan(nextPlan);
     setActiveSessionIndex(0);
     setMode("focus");
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(FOCUS_STORAGE_KEY, String(nextFocus));
-      window.localStorage.setItem(BREAK_STORAGE_KEY, String(nextBreak));
-      window.localStorage.setItem(SESSION_PLAN_STORAGE_KEY, JSON.stringify(nextPlan));
-    }
-
-    // Keep the active timer in sync with updated settings.
-    setSecondsLeft((current) => {
-      if (running) return current;
-      return nextFocus * 60;
-    });
+    setSecondsLeft((current) => (running ? current : nextFocus * 60));
+    persistSettings({ focusMinutes: nextFocus, breakMinutes: nextBreak, sessionPlan: nextPlan });
   };
 
   const updateSessionPlan: Ctx["updateSessionPlan"] = (sessions) => {
@@ -170,16 +231,18 @@ export function PomodoroProvider({ children, onFocusComplete }: { children: Reac
     setBreakMinutes(first.breakMinutes);
     setActiveSessionIndex(0);
     setMode("focus");
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(FOCUS_STORAGE_KEY, String(first.focusMinutes));
-      window.localStorage.setItem(BREAK_STORAGE_KEY, String(first.breakMinutes));
-      window.localStorage.setItem(SESSION_PLAN_STORAGE_KEY, JSON.stringify(nextPlan));
-    }
     setSecondsLeft((current) => (running ? current : first.focusMinutes * 60));
+    persistSettings({ focusMinutes: first.focusMinutes, breakMinutes: first.breakMinutes, sessionPlan: nextPlan });
   };
 
   const value: Ctx = {
-    running, mode, secondsLeft, focusMinutes, breakMinutes, sessionPlan, activeSessionIndex,
+    running,
+    mode,
+    secondsLeft,
+    focusMinutes,
+    breakMinutes,
+    sessionPlan,
+    activeSessionIndex,
     start: () => setRunning(true),
     pause: () => setRunning(false),
     reset: () => {
@@ -192,7 +255,9 @@ export function PomodoroProvider({ children, onFocusComplete }: { children: Reac
     updateDurations,
     updateSessionPlan,
     characterState,
+    settingsLoaded,
   };
+
   return <PomodoroCtx.Provider value={value}>{children}</PomodoroCtx.Provider>;
 }
 

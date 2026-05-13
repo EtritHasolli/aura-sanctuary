@@ -3,6 +3,11 @@ import { renderHook, act } from "@testing-library/react";
 import { PomodoroProvider, usePomodoro } from "@/components/aura/PomodoroContext";
 import type { ReactNode } from "react";
 
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: null, loading: false }) }));
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: { from: () => ({ select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) }), update: () => ({ eq: () => Promise.resolve({}) }) }) },
+}));
+
 const wrapper = ({ children }: { children: ReactNode }) => (
   <PomodoroProvider>{children}</PomodoroProvider>
 );

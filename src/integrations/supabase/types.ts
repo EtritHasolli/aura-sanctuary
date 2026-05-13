@@ -179,6 +179,7 @@ export type Database = {
           max_hp: number
           pet_name: string
           pet_state: string
+          pomodoro_settings: Json | null
           stamina: number
           strength: number
           updated_at: string
@@ -206,6 +207,7 @@ export type Database = {
           max_hp?: number
           pet_name?: string
           pet_state?: string
+          pomodoro_settings?: Json | null
           stamina?: number
           strength?: number
           updated_at?: string
@@ -232,6 +234,7 @@ export type Database = {
           max_hp?: number
           pet_name?: string
           pet_state?: string
+          pomodoro_settings?: Json | null
           stamina?: number
           strength?: number
           updated_at?: string
