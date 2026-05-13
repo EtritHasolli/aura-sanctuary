@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Send, X } from "lucide-react";
+import { publicAsset } from "@/lib/utils";
 import { useRouterState } from "@tanstack/react-router";
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,35 +30,21 @@ function loadSavedPosition(): { x: number; y: number } {
   }
 }
 
-function RobotIcon({ size = 18 }: { size?: number }) {
+function AiChatIcon({ size = 48 }: { size?: number }) {
+  const [hovered, setHovered] = useState(false);
   return (
-    <svg
+    <img
+      src={hovered ? publicAsset("aichat-angry.png") : publicAsset("aichat-normal.png")}
+      alt="Aura Guide"
       width={size}
       height={size}
-      viewBox="0 0 16 16"
-      fill="currentColor"
-      shapeRendering="crispEdges"
-      aria-hidden="true"
-    >
-      {/* antenna */}
-      <rect x="7" y="0" width="2" height="2" />
-      <rect x="6" y="2" width="4" height="1" />
-      {/* head */}
-      <rect x="2" y="3" width="12" height="10" />
-      {/* eyes */}
-      <rect x="4" y="6" width="3" height="3" fill="var(--color-background, #000)" />
-      <rect x="9" y="6" width="3" height="3" fill="var(--color-background, #000)" />
-      {/* eye glow */}
-      <rect x="5" y="7" width="1" height="1" fill="currentColor" />
-      <rect x="10" y="7" width="1" height="1" fill="currentColor" />
-      {/* mouth */}
-      <rect x="4" y="11" width="8" height="1" fill="var(--color-background, #000)" />
-      <rect x="5" y="11" width="2" height="1" fill="currentColor" />
-      <rect x="9" y="11" width="2" height="1" fill="currentColor" />
-      {/* ears */}
-      <rect x="0" y="5" width="2" height="3" />
-      <rect x="14" y="5" width="2" height="3" />
-    </svg>
+      style={{
+        imageRendering: "pixelated",
+        animation: "aichat-float 2.4s ease-in-out infinite",
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    />
   );
 }
 
@@ -279,10 +266,10 @@ export function AiAssistant() {
           <button
             onPointerDown={startBubbleDrag}
             onPointerUp={endBubbleDrag}
-            className="pointer-events-auto h-12 w-12 rounded-full border-2 border-border bg-card shadow-xl flex items-center justify-center hover:border-primary"
+            className="pointer-events-auto bg-transparent border-none shadow-none p-0"
             title="Open Aura assistant"
           >
-            <RobotIcon size={20} />
+            <AiChatIcon size={80} />
           </button>
         ) : chatPanel}
       </div>
@@ -292,10 +279,10 @@ export function AiAssistant() {
         {!open ? (
           <button
             onClick={() => setOpen(true)}
-            className="pointer-events-auto h-11 w-11 rounded-full border-2 border-border bg-card shadow-xl flex items-center justify-center hover:border-primary"
+            className="pointer-events-auto bg-transparent border-none shadow-none p-0"
             title="Open Aura assistant"
           >
-            <RobotIcon size={18} />
+            <AiChatIcon size={72} />
           </button>
         ) : chatPanel}
       </div>
