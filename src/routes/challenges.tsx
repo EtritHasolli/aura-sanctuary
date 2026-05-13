@@ -176,7 +176,7 @@ function ChallengesPage() {
           className="px-3 py-2 bg-primary text-primary-foreground disabled:opacity-50"
           style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
         >
-          {create.isPending ? "CREATING..." : "CREATE CHALLENGE"}
+          {create.isPending ? "CREATING..." : "CREATE TRIAL"}
         </button>
       </div>
 

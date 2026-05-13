@@ -348,6 +348,27 @@ async function updateHabiticaTask(
   });
 }
 
+async function createHabiticaTask(
+  creds: HabiticaCreds,
+  payload: Record<string, unknown>,
+): Promise<HabiticaTask> {
+  return callHabitica<HabiticaTask>("/tasks/user", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    creds,
+  });
+}
+
+async function deleteHabiticaTask(
+  creds: HabiticaCreds,
+  habiticaTaskId: string,
+): Promise<void> {
+  await callHabitica(`/tasks/${encodeURIComponent(habiticaTaskId)}`, {
+    method: "DELETE",
+    creds,
+  });
+}
+
 const DIFFICULTY_PRIORITY: Record<string, 0.1 | 1 | 1.5 | 2> = {
   trivial: 0.1,
   easy: 1,
@@ -471,6 +492,8 @@ async function persistRefresh(
   habitsUpdated: number;
   dailiesUpdated: number;
   completionsApplied: number;
+  newTasksImported: number;
+  tasksUnlinked: number;
 }> {
   const [user, habits, dailies, todos, tagCatalog] = await Promise.all([
     fetchHabiticaUser(creds),
@@ -519,6 +542,8 @@ async function persistRefresh(
   let habitsUpdated = 0;
   let dailiesUpdated = 0;
   let completionsApplied = 0;
+  let newTasksImported = 0;
+  let tasksUnlinked = 0;
 
   for (const localRow of linkedRows) {
     const remote = byId.get(localRow.habitica_task_id);
@@ -610,7 +635,51 @@ async function persistRefresh(
     }
   }
 
-  return { publicProfile, habitsUpdated, dailiesUpdated, completionsApplied };
+  // --- Delete tasks locally that were deleted on Habitica ---
+  // A linked local task whose habitica_task_id no longer appears in the remote
+  // set was deleted on Habitica — delete it here too so both sides stay in sync.
+  for (const localRow of linkedRows) {
+    if (!byId.has(localRow.habitica_task_id)) {
+      await ctx.adminClient
+        .from("tasks")
+        .delete()
+        .eq("user_id", ctx.userId)
+        .eq("id", localRow.id);
+      tasksUnlinked += 1;
+    }
+  }
+
+  // --- Detect new tasks on Habitica and import them ---
+  // Any Habitica task whose id is not already mapped to an Aura task is new.
+  const linkedHabiticaIds = new Set(linkedRows.map((r) => r.habitica_task_id));
+  const activeTodos = todos.filter((t) => t.completed !== true);
+  const remoteTasks = [...habits, ...dailies, ...activeTodos];
+
+  for (const remote of remoteTasks) {
+    if (linkedHabiticaIds.has(remote.id)) continue;
+    const auraType =
+      remote.type === "habit"
+        ? "habit"
+        : remote.type === "daily"
+          ? "daily"
+          : remote.type === "todo"
+            ? "todo"
+            : null;
+    if (!auraType) continue;
+
+    const { error: insErr } = await ctx.adminClient.from("tasks").insert({
+      user_id: ctx.userId,
+      type: auraType,
+      title: remote.text || "Untitled (from Habitica)",
+      notes: remote.notes ?? "",
+      difficulty: priorityToDifficulty(remote.priority),
+      habitica_task_id: remote.id,
+      habitica_meta: buildTaskMeta(remote),
+    });
+    if (!insErr) newTasksImported += 1;
+  }
+
+  return { publicProfile, habitsUpdated, dailiesUpdated, completionsApplied, newTasksImported, tasksUnlinked };
 }
 
 async function actionStatus(ctx: Ctx) {
@@ -965,6 +1034,8 @@ async function actionSyncPull(ctx: Ctx) {
     habitsUpdated: summary.habitsUpdated,
     dailiesUpdated: summary.dailiesUpdated,
     completionsApplied: summary.completionsApplied,
+    newTasksImported: summary.newTasksImported,
+    tasksUnlinked: summary.tasksUnlinked,
   });
 }
 
@@ -978,6 +1049,8 @@ async function actionRefresh(ctx: Ctx) {
   return jsonResponse({
     publicProfile: summary.publicProfile,
     tasksRefreshed: summary.habitsUpdated + summary.dailiesUpdated,
+    newTasksImported: summary.newTasksImported,
+    tasksUnlinked: summary.tasksUnlinked,
   });
 }
 
@@ -1096,6 +1169,115 @@ async function actionPushTask(ctx: Ctx, body: Record<string, unknown>) {
   return jsonResponse({ pushed: true });
 }
 
+async function actionCreateTask(ctx: Ctx, body: Record<string, unknown>) {
+  const auraTaskId = typeof body.auraTaskId === "string" ? body.auraTaskId : "";
+  if (!auraTaskId) return badRequest("auraTaskId is required.");
+
+  const row = await loadIntegration(ctx);
+  if (!row) return jsonResponse({ created: false, reason: "not_connected" });
+
+  const { data: task, error } = await ctx.adminClient
+    .from("tasks")
+    .select(
+      "habitica_task_id, type, title, notes, difficulty, repeat_every, repeat_unit, sacred_days",
+    )
+    .eq("user_id", ctx.userId)
+    .eq("id", auraTaskId)
+    .maybeSingle();
+  if (error) return serverError(error.message);
+  if (!task) return jsonResponse({ created: false, reason: "no_task" });
+
+  type LocalTask = {
+    habitica_task_id: string | null;
+    type: "habit" | "daily" | "todo";
+    title: string;
+    notes: string | null;
+    difficulty: keyof typeof DIFFICULTY_PRIORITY;
+    repeat_every: number | null;
+    repeat_unit: string | null;
+    sacred_days: number | null;
+  };
+  const t = task as LocalTask;
+
+  // Already linked — no-op to avoid creating duplicates.
+  if (t.habitica_task_id) return jsonResponse({ created: false, reason: "already_linked" });
+
+  const habiticaType = t.type === "daily" ? "daily" : t.type === "habit" ? "habit" : "todo";
+  const payload: Record<string, unknown> = {
+    type: habiticaType,
+    text: t.title,
+    notes: t.notes ?? "",
+    priority: DIFFICULTY_PRIORITY[t.difficulty] ?? 1,
+  };
+  if (t.type === "daily") {
+    const freq = REPEAT_UNIT_TO_FREQUENCY[t.repeat_unit ?? "day"] ?? "daily";
+    payload.frequency = freq;
+    payload.everyX = Math.max(1, t.repeat_every ?? 1);
+    if (freq === "weekly") {
+      payload.repeat = sacredDaysToRepeat(t.sacred_days);
+    }
+  }
+
+  const creds: HabiticaCreds = {
+    external_user_id: row.external_user_id,
+    api_token: row.api_token,
+  };
+
+  let created: HabiticaTask;
+  try {
+    created = await createHabiticaTask(creds, payload);
+  } catch (e: any) {
+    const status = typeof e?.status === "number" ? e.status : 500;
+    return jsonResponse({ created: false, error: e?.message ?? "Habitica create failed" }, status);
+  }
+
+  await ctx.adminClient
+    .from("tasks")
+    .update({ habitica_task_id: created.id, habitica_meta: buildTaskMeta(created) })
+    .eq("user_id", ctx.userId)
+    .eq("id", auraTaskId);
+
+  return jsonResponse({ created: true, habiticaTaskId: created.id });
+}
+
+async function actionDeleteTask(ctx: Ctx, body: Record<string, unknown>) {
+  const auraTaskId = typeof body.auraTaskId === "string" ? body.auraTaskId : "";
+  if (!auraTaskId) return badRequest("auraTaskId is required.");
+
+  const row = await loadIntegration(ctx);
+  if (!row) return jsonResponse({ deleted: false, reason: "not_connected" });
+
+  const { data: task, error } = await ctx.adminClient
+    .from("tasks")
+    .select("habitica_task_id")
+    .eq("user_id", ctx.userId)
+    .eq("id", auraTaskId)
+    .maybeSingle();
+  if (error) return serverError(error.message);
+  const habiticaTaskId =
+    (task as { habitica_task_id: string | null } | null)?.habitica_task_id ?? null;
+  if (!habiticaTaskId) return jsonResponse({ deleted: false, reason: "no_mapping" });
+
+  const creds: HabiticaCreds = {
+    external_user_id: row.external_user_id,
+    api_token: row.api_token,
+  };
+  try {
+    await deleteHabiticaTask(creds, habiticaTaskId);
+  } catch (e: any) {
+    // 404 means it was already gone on Habitica's side — treat as success.
+    if ((e as { status?: number })?.status !== 404) {
+      const status = typeof e?.status === "number" ? e.status : 500;
+      return jsonResponse(
+        { deleted: false, error: e?.message ?? "Habitica delete failed" },
+        status,
+      );
+    }
+  }
+
+  return jsonResponse({ deleted: true });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -1150,6 +1332,10 @@ Deno.serve(async (req: Request) => {
         return await actionTagSync(ctx, body);
       case "pushTask":
         return await actionPushTask(ctx, body);
+      case "createTask":
+        return await actionCreateTask(ctx, body);
+      case "deleteTask":
+        return await actionDeleteTask(ctx, body);
       default:
         return badRequest(`Unknown action: ${action || "<missing>"}`);
     }

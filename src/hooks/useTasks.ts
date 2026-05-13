@@ -10,7 +10,11 @@ import type {
 } from "@/lib/aura/types";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
-import { useSyncTagToHabitica } from "./useHabitica";
+import {
+  useSyncTagToHabitica,
+  usePushNewTaskToHabitica,
+  useDeleteLinkedHabiticaTask,
+} from "./useHabitica";
 
 function mergeTasks(
   tasks: Task[],
@@ -115,6 +119,7 @@ export function useTasks() {
 export function useCreateTask() {
   const qc = useQueryClient();
   const { user } = useAuth();
+  const pushToHabitica = usePushNewTaskToHabitica();
   return useMutation({
     mutationFn: async (input: {
       type: TaskType;
@@ -144,7 +149,10 @@ export function useCreateTask() {
       if (error) throw error;
       return data as Task;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+    onSuccess: (task) => {
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      void pushToHabitica(task.id);
+    },
     onError: (error) => {
       const msg = error instanceof Error ? error.message : "Failed to create quest";
       toast.error(msg);
@@ -171,8 +179,12 @@ export function useUpdateTask() {
 
 export function useDeleteTask() {
   const qc = useQueryClient();
+  const deleteFromHabitica = useDeleteLinkedHabiticaTask();
   return useMutation({
     mutationFn: async (id: string) => {
+      // Fire the Habitica delete first while the local row still exists so the
+      // edge function can look up the habitica_task_id.
+      await deleteFromHabitica(id);
       const { error } = await supabase.from("tasks").delete().eq("id", id);
       if (error) throw error;
     },

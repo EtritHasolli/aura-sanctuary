@@ -1,14 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Plus, Minus, Check, Trash2, Flame, Info } from "lucide-react";
+import { Plus, Minus, Check, Flame, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   useTasks,
   useCreateTask,
@@ -39,6 +33,7 @@ import { DIFFICULTY_GOLD, DIFFICULTY_HP_LOSS, DIFFICULTY_XP } from "@/lib/aura/t
 import { addCalendarDays, calendarDateInTimeZone, isDailyDueByRepeat } from "@/lib/aura/dates";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { BugLoader } from "@/components/aura/BugLoader";
 
 export const Route = createFileRoute("/quests")({
   head: () => ({ meta: [{ title: "Quests — Aura" }] }),
@@ -182,7 +177,8 @@ function Column({
   const create = useCreateTask();
 
   return (
-    <div className="pixel-panel p-3 flex flex-col relative">
+    <div className="pixel-panel p-3 flex flex-col relative overflow-hidden">
+      {create.isPending && <BugLoader overlay label="CONJURING..." />}
       <div className="mb-3">
         <button
           type="button"
@@ -222,13 +218,15 @@ function Column({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="New quest..."
-          className="w-full px-2 py-1.5 bg-input border-2 border-border focus:border-primary outline-none text-sm"
+          disabled={create.isPending}
+          className="w-full px-2 py-1.5 bg-input border-2 border-border focus:border-primary outline-none text-sm disabled:opacity-50"
         />
         <div className="flex gap-1">
           <select
             value={diff}
             onChange={(e) => setDiff(e.target.value as Difficulty)}
-            className="flex-1 bg-input border-2 border-border text-sm px-1 py-2"
+            disabled={create.isPending}
+            className="flex-1 bg-input border-2 border-border text-sm px-1 py-2 disabled:opacity-50"
             title={diff}
           >
             <option value="trivial">★ Trivial</option>
@@ -236,8 +234,19 @@ function Column({
             <option value="medium">★★★ Medium</option>
             <option value="hard">★★★★ Hard</option>
           </select>
-          <button className="px-3 bg-primary text-primary-foreground">
-            <Plus size={14} />
+          <button
+            disabled={create.isPending}
+            className="px-3 bg-primary text-primary-foreground disabled:opacity-60 disabled:cursor-not-allowed min-w-10 flex items-center justify-center"
+          >
+            {create.isPending ? (
+              <span className="flex items-center gap-0.5">
+                <span className="w-1 h-1 bg-primary-foreground rounded-none animate-bounce [animation-delay:0ms]" />
+                <span className="w-1 h-1 bg-primary-foreground rounded-none animate-bounce [animation-delay:150ms]" />
+                <span className="w-1 h-1 bg-primary-foreground rounded-none animate-bounce [animation-delay:300ms]" />
+              </span>
+            ) : (
+              <Plus size={14} />
+            )}
           </button>
         </div>
       </form>
@@ -363,7 +372,8 @@ function TaskRow({
   const rmTag = useRemoveTaskTag();
   const [clTitle, setClTitle] = useState("");
   const [tagInput, setTagInput] = useState("");
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const linkedNote = notes.find((n) => n.id === task.source_note_id) ?? null;
   const [titleText, setTitleText] = useState(task.title);
@@ -597,10 +607,23 @@ function TaskRow({
     );
   };
   const handleDeleteTask = async () => {
+    setConfirmDelete(false);
     if (task.type === "todo") await cleanupTodoAndLinkedNotes();
     else await del.mutateAsync(task.id);
-    setConfirmDeleteOpen(false);
     setOpen(false);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      saveTitle(titleText);
+      saveNotes(notesText);
+      // Give mutations a tick to fire before closing
+      await new Promise((r) => setTimeout(r, 300));
+    } finally {
+      setSaving(false);
+      setOpen(false);
+    }
   };
 
   const habiticaTint = habiticaValueColor(task.habitica_meta?.value ?? null);
@@ -657,17 +680,55 @@ function TaskRow({
         )}
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(v) => {
+        if (del.isPending || saving) return;
+        if (!v) { setConfirmDelete(false); setSaving(false); }
+        setOpen(v);
+      }}>
         <DialogContent
           className="max-w-2xl"
           hideClose
+          fullOverlay={
+            (del.isPending || saving) ? (
+              <BugLoader overlay label={del.isPending ? "BANISHING..." : "SAVING..."} />
+            ) : confirmDelete ? (
+              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-background/90 backdrop-blur-[2px]">
+                <p className="text-sm text-primary text-center" style={{ fontFamily: "var(--font-pixel)" }}>
+                  DELETE THIS QUEST?
+                </p>
+                <p className="text-xs text-muted-foreground text-center max-w-60">
+                  This will permanently remove this quest
+                  {task.type === "todo" ? " and any linked archive note." : "."}
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(false)}
+                    className="px-4 py-1.5 border border-border text-xs hover:border-primary"
+                    style={{ fontFamily: "var(--font-pixel)" }}
+                  >
+                    CANCEL
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteTask()}
+                    className="px-4 py-1.5 bg-destructive/20 text-destructive border border-destructive text-xs hover:bg-destructive/40"
+                    style={{ fontFamily: "var(--font-pixel)" }}
+                  >
+                    DELETE
+                  </button>
+                </div>
+              </div>
+            ) : null
+          }
           stickyHeader={
             <div className="flex flex-col border-b border-border">
               <div className="flex items-center gap-2 px-3 py-1.5">
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="shrink-0 flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-primary transition-colors"
+                  disabled={del.isPending || saving}
+                  className="shrink-0 flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-primary transition-colors disabled:opacity-40"
                   aria-label="Close without saving"
                   title="Back"
                 >
@@ -678,16 +739,18 @@ function TaskRow({
                 <div className="flex-1" />
                 <button
                   type="button"
-                  onClick={() => setConfirmDeleteOpen(true)}
-                  className="shrink-0 text-destructive hover:opacity-80 text-[9px] px-2 py-1 border border-destructive"
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={del.isPending || saving}
+                  className="shrink-0 text-destructive hover:opacity-80 text-[9px] px-2 py-1 border border-destructive disabled:opacity-40"
                   style={{ fontFamily: "var(--font-pixel)" }}
                 >
                   DELETE
                 </button>
                 <button
                   type="button"
-                  onClick={() => { saveTitle(titleText); saveNotes(notesText); setOpen(false); }}
-                  className="shrink-0 text-primary hover:opacity-80 text-[9px] px-2 py-1 border border-primary"
+                  onClick={() => void handleSave()}
+                  disabled={del.isPending || saving}
+                  className="shrink-0 text-primary hover:opacity-80 text-[9px] px-2 py-1 border border-primary disabled:opacity-40"
                   style={{ fontFamily: "var(--font-pixel)" }}
                 >
                   SAVE
@@ -903,35 +966,6 @@ function TaskRow({
               </div>
             )}
           </div>
-          <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-            <DialogContent className="max-w-sm">
-              <DialogHeader>
-                <DialogTitle style={{ fontFamily: "var(--font-pixel)" }}>DELETE TASK?</DialogTitle>
-                <DialogDescription>
-                  This will permanently remove this quest
-                  {task.type === "todo" ? " and any linked archive note." : "."}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex items-center justify-between gap-4">
-                <button
-                  type="button"
-                  onClick={() => setConfirmDeleteOpen(false)}
-                  className="px-3 py-1 border border-border"
-                  style={{ fontFamily: "var(--font-pixel)" }}
-                >
-                  CANCEL
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleDeleteTask()}
-                  className="px-3 py-1 bg-destructive/20 text-destructive border border-destructive"
-                  style={{ fontFamily: "var(--font-pixel)" }}
-                >
-                  DELETE
-                </button>
-              </div>
-            </DialogContent>
-          </Dialog>
         </DialogContent>
       </Dialog>
     </div>

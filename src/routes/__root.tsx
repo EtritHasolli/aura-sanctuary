@@ -20,6 +20,7 @@ import { NotificationsProvider, useNotifications } from "@/components/aura/Notif
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { publicAsset } from "@/lib/utils";
+import { RoamingBug } from "@/components/aura/BugLoader";
 
 const FOCUS_STAMINA_RESTORE = 15;
 
@@ -57,8 +58,9 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     `Time: ${new Date().toISOString()}`,
   ].join("\n");
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
+    <div className="relative min-h-screen bg-background overflow-hidden flex items-center justify-center px-4">
+      <RoamingBug />
+      <div className="relative z-10 max-w-md text-center">
         <h1 className="text-xl text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
           A wild bug appeared!
         </h1>

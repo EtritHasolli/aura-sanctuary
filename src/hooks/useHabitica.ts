@@ -67,7 +67,9 @@ type HabiticaAction =
   | "syncPull"
   | "refresh"
   | "tagSync"
-  | "pushTask";
+  | "pushTask"
+  | "createTask"
+  | "deleteTask";
 
 interface InvokeOptions {
   action: HabiticaAction;
@@ -210,6 +212,8 @@ export interface HabiticaSyncPullSummary {
   habitsUpdated: number;
   dailiesUpdated: number;
   completionsApplied: number;
+  newTasksImported: number;
+  tasksUnlinked: number;
 }
 
 export interface HabiticaRefreshSummary {
@@ -282,12 +286,17 @@ export function useSyncFromHabitica() {
       qc.invalidateQueries({ queryKey: habiticaStatusKey(user?.id) });
       const total = summary.habitsUpdated + summary.dailiesUpdated;
       const silent = !!variables?.silent;
-      if (total === 0 && summary.completionsApplied === 0) {
-        if (!silent) toast.message("Habitica sync: nothing to reconcile.");
+      const newImports = summary.newTasksImported ?? 0;
+      const unlinked = summary.tasksUnlinked ?? 0;
+      if (total === 0 && summary.completionsApplied === 0 && newImports === 0 && unlinked === 0) {
+        if (!silent) toast.message("Habitica sync: everything up to date.");
       } else {
-        toast.success(
-          `Synced from Habitica: ${summary.habitsUpdated} habit(s), ${summary.dailiesUpdated} daily/dailies, ${summary.completionsApplied} new completion(s).`,
-        );
+        const parts: string[] = [];
+        if (newImports > 0) parts.push(`${newImports} new task(s) imported`);
+        if (summary.completionsApplied > 0) parts.push(`${summary.completionsApplied} completion(s) applied`);
+        if (total > 0) parts.push(`${total} task(s) updated`);
+        if (unlinked > 0) parts.push(`${unlinked} deleted (removed on Habitica)`);
+        toast.success(`Habitica sync: ${parts.join(", ")}.`);
       }
     },
     onError: (error, variables) => {
@@ -470,4 +479,52 @@ export function useSyncTaskEditToHabitica() {
     },
     [qc],
   );
+}
+
+/**
+ * Best-effort push of a newly-created Aura task to Habitica. Creates the
+ * task on Habitica and stores the returned habitica_task_id on the local row.
+ * No-ops if not connected or if the task is already linked.
+ */
+export function usePushNewTaskToHabitica() {
+  const qc = useQueryClient();
+  return useCallback(
+    async (auraTaskId: string) => {
+      try {
+        const res = await invokeHabitica<{
+          created: boolean;
+          reason?: string;
+          error?: string;
+          habiticaTaskId?: string;
+        }>({
+          action: "createTask",
+          payload: { auraTaskId },
+        });
+        if (res.created) {
+          qc.invalidateQueries({ queryKey: ["tasks"] });
+        }
+      } catch {
+        // Silent: best-effort.
+      }
+    },
+    [qc],
+  );
+}
+
+/**
+ * Best-effort deletion of a linked Habitica task when the Aura task is deleted.
+ * The local delete should happen first; this fires afterward. No-ops for
+ * unlinked tasks or disconnected users.
+ */
+export function useDeleteLinkedHabiticaTask() {
+  return useCallback(async (auraTaskId: string) => {
+    try {
+      await invokeHabitica<{ deleted: boolean; reason?: string; error?: string }>({
+        action: "deleteTask",
+        payload: { auraTaskId },
+      });
+    } catch {
+      // Silent: best-effort.
+    }
+  }, []);
 }
