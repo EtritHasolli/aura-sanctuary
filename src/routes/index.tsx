@@ -28,6 +28,44 @@ export const Route = createFileRoute("/")({
 
 const FALL_ASLEEP_TRANSITION_MS = 1300;
 
+const TRACK_SOURCES = [
+  {
+    label: "chillhop stream",
+    kind: "stream" as const,
+    url: "https://cdn.pixabay.com/download/audio/2022/05/16/audio_c1c3fd27f2.mp3?filename=lofi-study-112191.mp3",
+  },
+  {
+    label: "ambient groove",
+    kind: "stream" as const,
+    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+  },
+  {
+    label: "night vibe",
+    kind: "stream" as const,
+    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+  },
+  {
+    label: "calm drift",
+    kind: "stream" as const,
+    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+  },
+  {
+    label: "rain ambience",
+    kind: "generated" as const,
+    generator: "rain" as const,
+  },
+  {
+    label: "forest birds",
+    kind: "stream" as const,
+    url: "https://www.soundjay.com/nature/birds-01.mp3",
+  },
+  {
+    label: "wood burning",
+    kind: "generated" as const,
+    generator: "fire" as const,
+  },
+] as const;
+
 function fmt(s: number) {
   const m = Math.floor(s / 60)
     .toString()
@@ -260,43 +298,7 @@ function SanctuaryPage() {
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
   const [youtubeUrlInput, setYoutubeUrlInput] = useState("");
   const [youtubeEmbedUrl, setYoutubeEmbedUrl] = useState<string | null>(null);
-  const trackSources = [
-    {
-      label: "chillhop stream",
-      kind: "stream" as const,
-      url: "https://cdn.pixabay.com/download/audio/2022/05/16/audio_c1c3fd27f2.mp3?filename=lofi-study-112191.mp3",
-    },
-    {
-      label: "ambient groove",
-      kind: "stream" as const,
-      url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-    },
-    {
-      label: "night vibe",
-      kind: "stream" as const,
-      url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-    },
-    {
-      label: "calm drift",
-      kind: "stream" as const,
-      url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-    },
-    {
-      label: "rain ambience",
-      kind: "generated" as const,
-      generator: "rain" as const,
-    },
-    {
-      label: "forest birds",
-      kind: "stream" as const,
-      url: "https://www.soundjay.com/nature/birds-01.mp3",
-    },
-    {
-      label: "wood burning",
-      kind: "generated" as const,
-      generator: "fire" as const,
-    },
-  ] as const;
+  const trackSources = TRACK_SOURCES;
   const todos = tasks.filter((t) => t.type === "todo").slice(0, 8);
 
   useEffect(() => {

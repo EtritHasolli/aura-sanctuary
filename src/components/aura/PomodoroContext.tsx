@@ -86,16 +86,26 @@ export function PomodoroProvider({ children, onFocusComplete }: { children: Reac
   const [sessionPlan, setSessionPlan] = useState<PomodoroSession[]>(initialSessionPlan);
   const [activeSessionIndex, setActiveSessionIndex] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(initialSessionPlan[0].focusMinutes * 60);
-  const [idleTicks, setIdleTicks] = useState(0);
+  const idleTicksRef = useRef(0);
+  const [isSleeping, setIsSleeping] = useState(false);
   const cbRef = useRef(onFocusComplete);
   cbRef.current = onFocusComplete;
 
   useEffect(() => {
     if (!running) {
-      const t = setInterval(() => setIdleTicks(x => x + 1), 1000);
+      idleTicksRef.current = 0;
+      setIsSleeping(false);
+      const t = setInterval(() => {
+        idleTicksRef.current += 1;
+        if (idleTicksRef.current > 60) {
+          setIsSleeping(true);
+          clearInterval(t);
+        }
+      }, 1000);
       return () => clearInterval(t);
     }
-    setIdleTicks(0);
+    idleTicksRef.current = 0;
+    setIsSleeping(false);
     const t = setInterval(() => {
       setSecondsLeft(s => {
         if (s > 1) return s - 1;
@@ -122,7 +132,7 @@ export function PomodoroProvider({ children, onFocusComplete }: { children: Reac
 
   const characterState: Ctx["characterState"] =
     running && mode === "focus" ? "working" :
-    idleTicks > 60 ? "sleeping" : "idle";
+    isSleeping ? "sleeping" : "idle";
 
   // toggle the focused theme on the html element when working
   useEffect(() => {

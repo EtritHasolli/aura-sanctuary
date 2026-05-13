@@ -279,17 +279,50 @@ function PersistentYouTubeAudio() {
       return;
     }
 
+    const setRectIfChanged = (newRect: DOMRect | null) => {
+      setSlotRect((prev) => {
+        if (!newRect && !prev) return prev;
+        if (!newRect || !prev) return newRect;
+        if (
+          prev.left === newRect.left &&
+          prev.top === newRect.top &&
+          prev.width === newRect.width &&
+          prev.height === newRect.height
+        )
+          return prev;
+        return newRect;
+      });
+    };
+
     const updateRect = () => {
       const slot = document.getElementById("aura-youtube-slot");
-      setSlotRect(slot ? slot.getBoundingClientRect() : null);
+      setRectIfChanged(slot ? slot.getBoundingClientRect() : null);
     };
 
     updateRect();
-    const timer = window.setInterval(updateRect, 250);
+
+    const ro = new ResizeObserver(updateRect);
+    const mo = new MutationObserver(() => {
+      const slot = document.getElementById("aura-youtube-slot");
+      if (slot) {
+        mo.disconnect();
+        ro.observe(slot);
+        updateRect();
+      }
+    });
+
+    const slot = document.getElementById("aura-youtube-slot");
+    if (slot) {
+      ro.observe(slot);
+    } else {
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
+
     window.addEventListener("resize", updateRect);
     window.addEventListener("scroll", updateRect, true);
     return () => {
-      window.clearInterval(timer);
+      ro.disconnect();
+      mo.disconnect();
       window.removeEventListener("resize", updateRect);
       window.removeEventListener("scroll", updateRect, true);
     };

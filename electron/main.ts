@@ -1,8 +1,13 @@
-import { app, BrowserWindow, ipcMain, nativeImage, net, protocol, screen, shell } from "electron";
+import { app, BrowserWindow, ipcMain, nativeImage, net, protocol, screen, session, shell } from "electron";
 import { autoUpdater } from "electron-updater";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+
+// Enable GPU acceleration for smoother animations
+app.commandLine.appendSwitch("enable-gpu-rasterization");
+app.commandLine.appendSwitch("enable-zero-copy");
+app.commandLine.appendSwitch("ignore-gpu-blocklist");
 
 // Register custom protocol so the packaged app has a proper web origin
 // (YouTube embeds refuse to load from file:// origins — Error 153)
@@ -57,6 +62,7 @@ function createWindow(): BrowserWindow {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
+      autoplayPolicy: "no-user-gesture-required",
     },
   });
 
@@ -240,6 +246,16 @@ app.whenReady().then(() => {
   });
 
   mainWin = createWindow();
+
+  // Spoof Referer for YouTube requests so embeds load from the app:// origin
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ["*://*.youtube.com/*", "*://*.googlevideo.com/*", "*://*.ytimg.com/*"] },
+    (details: { requestHeaders: Record<string, string> }, callback: (r: { requestHeaders: Record<string, string> }) => void) => {
+      details.requestHeaders["Referer"] = "https://aurasanctuary.netlify.app/";
+      details.requestHeaders["Origin"] = "https://aurasanctuary.netlify.app";
+      callback({ requestHeaders: details.requestHeaders });
+    },
+  );
 
   if (!isDev) {
     mainWin.webContents.once("did-finish-load", () => {
