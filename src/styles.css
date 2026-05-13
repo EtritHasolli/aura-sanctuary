@@ -261,4 +261,9 @@
   .glow-primary { box-shadow: 0 0 24px color-mix(in oklab, var(--sanctuary-glow) 50%, transparent); }
 }
 
+@keyframes aichat-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-6px); }
+}
+
 
