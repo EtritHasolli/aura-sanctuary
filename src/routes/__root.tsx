@@ -183,8 +183,7 @@ function CustomCursorOverlay() {
       isInteractiveRef.current = !!target?.closest(interactiveSelector);
       updateCursorImage();
       el.style.opacity = "1";
-      /* Hotspot at image center — matches centered cursor URL hotspots in styles.css */
-      el.style.transform = `translate(${event.clientX}px, ${event.clientY}px) translate(-50%, -50%)`;
+      el.style.transform = `translate(${event.clientX}px, ${event.clientY}px)`;
     };
 
     const down = (event: PointerEvent) => {
@@ -240,7 +239,7 @@ function CustomCursorOverlay() {
       src={publicAsset("cursor.png")}
       alt=""
       aria-hidden="true"
-      className="fixed left-0 top-0 z-[9999] w-8 h-8 pointer-events-none select-none opacity-0"
+      className="fixed left-0 top-0 z-[1000000000] w-8 h-8 pointer-events-none select-none opacity-0"
       style={{ transform: "translate(-100px, -100px)" }}
     />
   );

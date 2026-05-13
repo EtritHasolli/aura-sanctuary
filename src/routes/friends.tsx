@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
-import { PlusCircle, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import {
   useAcceptFriendRequest,
   useFriendDetail,
@@ -728,10 +728,9 @@ function FriendsPage() {
                             toast.error(e instanceof Error ? e.message : "Could not invite friend."),
                           );
                       }}
-                      className="px-3 py-1.5 bg-primary text-primary-foreground disabled:opacity-50 text-xs flex items-center gap-1"
+                      className="px-3 py-1.5 bg-primary text-primary-foreground disabled:opacity-50 text-xs"
                       style={{ fontFamily: "var(--font-pixel)" }}
                     >
-                      <PlusCircle size={12} />
                       {inviteFriendToParty.isPending ? "INVITING..." : "INVITE TO PARTY"}
                     </button>
                   </div>
@@ -739,10 +738,9 @@ function FriendsPage() {
                 <button
                   type="button"
                   disabled
-                  className="px-3 py-1.5 bg-primary text-primary-foreground disabled:opacity-50 text-xs flex items-center gap-1"
+                  className="px-3 py-1.5 bg-primary text-primary-foreground disabled:opacity-50 text-xs"
                   style={{ fontFamily: "var(--font-pixel)" }}
                 >
-                  <PlusCircle size={12} />
                   NO INVITES
                 </button>
                 )}

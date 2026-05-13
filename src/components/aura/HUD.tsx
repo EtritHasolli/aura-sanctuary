@@ -228,7 +228,7 @@ function NotificationsBell() {
       </button>
 
       {open && (
-        <div className="fixed right-2 top-14 z-120 w-[min(288px,calc(100vw-1rem))] pixel-panel p-2 shadow-xl">
+        <div className="absolute right-0 top-full mt-1 z-[120] w-[min(288px,calc(100vw-1rem))] pixel-panel p-2 shadow-xl">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[9px] text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
               NOTIFICATIONS
