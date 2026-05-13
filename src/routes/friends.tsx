@@ -25,6 +25,8 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useMarkMessageScopeRead } from "@/hooks/useMessageUnreadCounts";
+import { useFriendHabiticaProfile } from "@/hooks/useHabitica";
+import { HabiticaProfileDetails } from "@/components/aura/HabiticaChip";
 import { useNotifications } from "@/components/aura/NotificationsContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -625,6 +627,9 @@ function FriendsPage() {
                 )}
               </div>
 
+              <FriendHabiticaSection friendId={selectedFriendId} />
+
+
               <div>
                 <div
                   className="text-xs text-muted-foreground mb-1"
@@ -765,6 +770,35 @@ function FriendsPage() {
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function FriendHabiticaSection({ friendId }: { friendId: string | null }) {
+  const { data: habitica, isLoading } = useFriendHabiticaProfile(friendId);
+  if (isLoading) {
+    return (
+      <div className="pt-2 border-t-2 border-border">
+        <div
+          className="text-xs text-muted-foreground"
+          style={{ fontFamily: "var(--font-pixel)" }}
+        >
+          HABITICA
+        </div>
+        <div className="text-xs text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+  if (!habitica || !habitica.externalUserId) return null;
+  return (
+    <div className="pt-2 border-t-2 border-border space-y-2">
+      <div
+        className="text-xs text-muted-foreground"
+        style={{ fontFamily: "var(--font-pixel)" }}
+      >
+        HABITICA
+      </div>
+      <HabiticaProfileDetails profile={habitica} />
     </div>
   );
 }

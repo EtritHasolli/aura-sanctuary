@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useNotes, useCreateNote, useUpdateNote, useDeleteNote } from "@/hooks/useNotes";
 import { useCreateTask } from "@/hooks/useTasks";
@@ -66,9 +66,9 @@ function ArchivesPage() {
       <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4 h-[calc(100%-3rem)]">
         {/* List */}
         <div className="pixel-panel p-3 flex flex-col">
-          <button onClick={newNote} className="w-full mb-3 px-2 py-2 bg-primary text-primary-foreground flex items-center justify-center gap-1"
+          <button onClick={newNote} className="w-full mb-3 px-2 py-2 bg-primary text-primary-foreground"
             style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}>
-            <Plus size={12} /> NEW SCROLL
+            NEW SCROLL
           </button>
           <div className="space-y-1 overflow-y-auto">
             {notes.length === 0 && <p className="text-xs text-muted-foreground italic text-center">Your archives are empty.</p>}

@@ -1,5 +1,7 @@
 import { useProfile } from "@/hooks/useProfile";
 import { useAchievements } from "@/hooks/useAchievements";
+import { useHabiticaAutoSync } from "@/hooks/useHabitica";
+import { HabiticaChip } from "./HabiticaChip";
 import { useNavigate } from "@tanstack/react-router";
 import {
   effectiveConstitution,
@@ -323,10 +325,11 @@ const HUD_PATH_IDLE_NUDGE_Y_PX = -24;
 export function HUD() {
   const { data: profile } = useProfile();
   const { data: ach = [] } = useAchievements();
+  // Pulls Habitica completions/state into Aura once per session on app load.
+  useHabiticaAutoSync();
   /** Always idle in the HUD; full-body states stay on the Sanctuary screen. */
   const hudIdleCharacterSrc = useMemo(
-    () =>
-      profile?.aura_path != null ? pathCharacterSpriteSrc(profile.aura_path, "idle") : null,
+    () => (profile?.aura_path != null ? pathCharacterSpriteSrc(profile.aura_path, "idle") : null),
     [profile?.aura_path],
   );
   if (!profile) return null;
@@ -355,7 +358,10 @@ export function HUD() {
               </span>
             )}
           </div>
-          <div className="relative h-14 w-14 shrink-0 overflow-hidden" title="Path character (idle)">
+          <div
+            className="relative h-14 w-14 shrink-0 overflow-hidden"
+            title="Path character (idle)"
+          >
             {hudIdleCharacterSrc ? (
               <img
                 key={hudIdleCharacterSrc}
@@ -414,6 +420,7 @@ export function HUD() {
           <div className="flex items-center gap-1 text-muted-foreground" title="Achievements">
             <Trophy size={15} /> <span className="text-base">{ach.length}</span>
           </div>
+          <HabiticaChip />
           <div className="h-8 w-px bg-border" />
           <div className="flex items-center gap-2" title="Strength (gear included)">
             <Swords size={18} className="text-destructive" /> {effStr}

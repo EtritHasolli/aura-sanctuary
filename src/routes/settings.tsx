@@ -1,10 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Clock3, Plus, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { Bell, Clock3, Info, Link2, Link2Off, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
 import { useNotifications } from "@/components/aura/NotificationsContext";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
+import {
+  useConnectHabitica,
+  useDisconnectHabitica,
+  useHabiticaStatus,
+  useImportHabiticaTasks,
+  useSyncFromHabitica,
+  useUpdateHabiticaSettings,
+} from "@/hooks/useHabitica";
 import { AURA_PATHS, xpForLevel, type AuraPath } from "@/lib/aura/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -112,6 +120,7 @@ function SettingsPage() {
   const [soundNotifs, setSoundNotifs] = useState(true);
   const [pathTestingOverride, setPathTestingOverride] = useState(false);
   const [pathModalOpen, setPathModalOpen] = useState(false);
+  const [showStatsInfo, setShowStatsInfo] = useState(false);
   const [settingsPathCardGifMode, setSettingsPathCardGifMode] = useState<"idle" | "stance">("idle");
   const [nextFocusMinutes, setNextFocusMinutes] = useState(focusMinutes);
   const [nextBreakMinutes, setNextBreakMinutes] = useState(breakMinutes);
@@ -670,11 +679,21 @@ function SettingsPage() {
         </section>
 
         <section className="pixel-panel p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            <ShieldCheck size={18} className="text-primary" />
-            <h2 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
-              PLAYER STATS
-            </h2>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={18} className="text-primary" />
+              <h2 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+                PLAYER STATS
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowStatsInfo(true)}
+              className="text-muted-foreground hover:text-primary"
+              title="How stats work"
+            >
+              <Info size={16} />
+            </button>
           </div>
           <div className="grid grid-cols-2 gap-2 text-base">
             <Stat label="Level" value={profile.level} />
@@ -688,19 +707,51 @@ function SettingsPage() {
             <Stat label="Dexterity" value={profile.dexterity} />
             <Stat label="XP to next level" value={xpToNextLevel} />
           </div>
-          <div className="border-2 border-border bg-secondary/30 p-3 space-y-2">
-            <h3 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
-              HOW STATS WORK
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              STR boosts strike power, INT improves arcane utility and cooldown scaling, CON
-              strengthens survival and recovery behavior, and DEX powers precision/rogue tempo.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              HP/STA are your combat resources, XP/Level drive growth, and Gold/Moonshards fuel gear
-              progression that further modifies effective stats.
-            </p>
-          </div>
+          {showStatsInfo && (
+            <div
+              className="fixed inset-0 z-[130] bg-black/50 p-4 flex items-center justify-center"
+              onClick={() => setShowStatsInfo(false)}
+            >
+              <div
+                className="pixel-panel w-full max-w-xl p-4 space-y-3"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+                    HOW STATS WORK
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowStatsInfo(false)}
+                    className="px-2 py-0.5 border border-border hover:border-primary text-xs"
+                    style={{ fontFamily: "var(--font-pixel)" }}
+                  >
+                    CLOSE
+                  </button>
+                </div>
+                <ul className="list-disc pl-5 space-y-2 text-base text-muted-foreground">
+                  <li>
+                    <strong className="text-foreground">STR</strong> boosts strike power and flat pending damage dealt to the party boss.
+                  </li>
+                  <li>
+                    <strong className="text-foreground">INT</strong> improves arcane utility and cooldown scaling for the Mage path.
+                  </li>
+                  <li>
+                    <strong className="text-foreground">CON</strong> strengthens survival and recovery — increases max HP and reduces boss rage from missed dailies (Paladin).
+                  </li>
+                  <li>
+                    <strong className="text-foreground">DEX</strong> powers precision and rogue tempo, boosting shadow strike damage multipliers.
+                  </li>
+                  <li>
+                    <strong className="text-foreground">HP/STA</strong> are your combat resources. Equipment can raise your stamina cap.
+                  </li>
+                  <li>
+                    <strong className="text-foreground">XP/Level</strong> drive growth. Gold and Moonshards fund gear that further modifies effective stats.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="pixel-panel p-5 space-y-4">
@@ -714,10 +765,10 @@ function SettingsPage() {
             <button
               type="button"
               onClick={addSessionDraft}
-              className="px-2 py-1 border-2 border-border hover:border-primary text-[11px] flex items-center gap-1"
+              className="px-2 py-1 border-2 border-border hover:border-primary text-[11px]"
               style={{ fontFamily: "var(--font-pixel)" }}
             >
-              <Plus size={12} /> ADD SESSION
+              ADD SESSION
             </button>
           </div>
           <div className="space-y-3">
@@ -789,6 +840,8 @@ function SettingsPage() {
             </div>
           </div>
         </section>
+
+        <HabiticaSection />
       </div>
 
       <Dialog open={avatarModalOpen} onOpenChange={setAvatarModalOpen}>
@@ -964,5 +1017,271 @@ function Stat({ label, value }: { label: string; value: string | number }) {
       </div>
       <div className="text-lg text-foreground">{value}</div>
     </div>
+  );
+}
+
+function HabiticaSection() {
+  const { data: status, isLoading } = useHabiticaStatus();
+  const connect = useConnectHabitica();
+  const disconnect = useDisconnectHabitica();
+  const updateSettings = useUpdateHabiticaSettings();
+  const importTasks = useImportHabiticaTasks();
+  const syncPull = useSyncFromHabitica();
+
+  const connected = !!status?.connected;
+  const profile = status?.profile ?? null;
+  const settings = status?.settings ?? { autoSyncOnComplete: true };
+  const lastSyncedAt = status?.lastSyncedAt ?? null;
+
+  const [userId, setUserId] = useState("");
+  const [apiToken, setApiToken] = useState("");
+  const [showToken, setShowToken] = useState(false);
+  const [confirmDisconnectOpen, setConfirmDisconnectOpen] = useState(false);
+
+  const handleConnect = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const next = await connect.mutateAsync({ userId, apiToken });
+      if (next.profile) {
+        toast.success(`Connected to Habitica as ${next.profile.displayName}.`);
+      }
+      setUserId("");
+      setApiToken("");
+    } catch {
+      // toast handled in hook
+    }
+  };
+
+  const handleDisconnect = async () => {
+    await disconnect.mutateAsync();
+    setConfirmDisconnectOpen(false);
+    toast.success("Habitica disconnected.");
+  };
+
+  const handleImport = async () => {
+    try {
+      await importTasks.mutateAsync();
+    } catch {
+      // toast handled in hook
+    }
+  };
+
+  const handleSyncPull = async () => {
+    try {
+      await syncPull.mutateAsync();
+    } catch {
+      // toast handled in hook
+    }
+  };
+
+  const handleToggleAutoSync = async (checked: boolean) => {
+    try {
+      await updateSettings.mutateAsync({ ...settings, autoSyncOnComplete: checked });
+      toast.success(checked ? "Auto-sync enabled." : "Auto-sync disabled.");
+    } catch {
+      // toast handled in hook
+    }
+  };
+
+  const lastSyncedLabel = useMemo(() => {
+    if (!lastSyncedAt) return "Never";
+    try {
+      return new Date(lastSyncedAt).toLocaleString();
+    } catch {
+      return lastSyncedAt;
+    }
+  }, [lastSyncedAt]);
+
+  return (
+    <section className="pixel-panel p-5 space-y-4 min-w-0">
+      <div className="flex items-center gap-2">
+        <Link2 size={18} className="text-primary" />
+        <h2 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+          HABITICA SYNC
+        </h2>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Link your Habitica account to mirror habits &amp; dailies across devices. Completions in
+        Aura push to Habitica, and you can pull Habitica progress back any time.
+      </p>
+
+      {isLoading && <div className="text-xs text-muted-foreground">Loading Habitica status...</div>}
+
+      {!isLoading && !connected && (
+        <form onSubmit={handleConnect} className="space-y-3">
+          <div className="text-xs text-muted-foreground">
+            Find these at{" "}
+            <a
+              href="https://habitica.com/user/settings/api"
+              target="_blank"
+              rel="noreferrer"
+              className="underline text-primary"
+            >
+              Habitica → Settings → API
+            </a>
+            . Credentials are stored on the server and never sent to your other devices.
+          </div>
+          <label className="block text-sm text-muted-foreground">
+            User ID
+            <input
+              value={userId}
+              onChange={(e) => setUserId(e.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="00000000-0000-0000-0000-000000000000"
+              className="mt-1 w-full px-3 py-2 bg-input border-2 border-border focus:border-primary outline-none text-base font-mono"
+            />
+          </label>
+          <label className="block text-sm text-muted-foreground">
+            API Token
+            <div className="mt-1 flex gap-1">
+              <input
+                value={apiToken}
+                onChange={(e) => setApiToken(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+                type={showToken ? "text" : "password"}
+                placeholder="API Token"
+                className="flex-1 px-3 py-2 bg-input border-2 border-border focus:border-primary outline-none text-base font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => setShowToken((s) => !s)}
+                className="px-3 py-2 border-2 border-border hover:border-primary text-xs"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                {showToken ? "HIDE" : "SHOW"}
+              </button>
+            </div>
+          </label>
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={connect.isPending || !userId.trim() || !apiToken.trim()}
+              className="px-4 py-2.5 bg-primary text-primary-foreground disabled:opacity-60"
+              style={{ fontFamily: "var(--font-pixel)", fontSize: 14 }}
+            >
+              {connect.isPending ? "CONNECTING..." : "CONNECT"}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {!isLoading && connected && profile && (
+        <div className="space-y-3">
+          <div className="border-2 border-border bg-secondary/40 px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div
+                className="text-xs text-muted-foreground"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                CONNECTED AS
+              </div>
+              <div className="text-base text-foreground truncate">
+                {profile.displayName}
+                {profile.username && profile.username !== profile.displayName ? (
+                  <span className="text-muted-foreground"> (@{profile.username})</span>
+                ) : null}
+              </div>
+              <div className="text-xs text-muted-foreground">Habitica level {profile.level}</div>
+              <div className="text-xs text-muted-foreground">Last sync: {lastSyncedLabel}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setConfirmDisconnectOpen(true)}
+              className="px-3 py-1.5 border-2 border-border hover:border-destructive text-xs flex items-center gap-1"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              <Link2Off size={12} /> DISCONNECT
+            </button>
+          </div>
+
+          <label className="flex items-center gap-2 text-base">
+            <input
+              type="checkbox"
+              checked={settings.autoSyncOnComplete}
+              onChange={(e) => void handleToggleAutoSync(e.target.checked)}
+              disabled={updateSettings.isPending}
+            />
+            Auto-sync completions to Habitica
+          </label>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="border-2 border-border bg-background/30 p-3 space-y-2">
+              <h3 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+                IMPORT FROM HABITICA
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Pull your Habitica habits and dailies into Aura. Already-linked tasks are skipped,
+                so it&apos;s safe to run again.
+              </p>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => void handleImport()}
+                  disabled={importTasks.isPending}
+                  className="px-3 py-2 border-2 border-border hover:border-primary disabled:opacity-60 text-xs"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
+                  {importTasks.isPending ? "IMPORTING..." : "IMPORT NOW"}
+                </button>
+              </div>
+            </div>
+
+            <div className="border-2 border-border bg-background/30 p-3 space-y-2">
+              <h3 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+                SYNC FROM HABITICA
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Pull the latest streaks, habit counters, and daily completions from Habitica back
+                into Aura.
+              </p>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => void handleSyncPull()}
+                  disabled={syncPull.isPending}
+                  className="px-3 py-2 border-2 border-border hover:border-primary disabled:opacity-60 text-xs"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
+                  {syncPull.isPending ? "SYNCING..." : "SYNC NOW"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={confirmDisconnectOpen} onOpenChange={setConfirmDisconnectOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle style={{ fontFamily: "var(--font-pixel)" }}>
+              Disconnect Habitica?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This clears your stored Habitica credentials and the task mapping on every device.
+            Imported Aura quests are kept; they just stop syncing.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmDisconnectOpen(false)}
+              className="px-3 py-1.5 border-2 border-border"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleDisconnect()}
+              disabled={disconnect.isPending}
+              className="px-3 py-1.5 bg-destructive text-destructive-foreground disabled:opacity-60"
+            >
+              {disconnect.isPending ? "..." : "Disconnect"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </section>
   );
 }

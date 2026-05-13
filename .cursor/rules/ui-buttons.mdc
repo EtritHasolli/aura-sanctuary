@@ -1,0 +1,59 @@
+---
+description: Aura Sanctuary button styling — text labels only, no icons inside <button>
+globs: **/*.tsx
+alwaysApply: false
+---
+
+# Buttons: text labels only, no icons
+
+Aura Sanctuary is a pixel-art / retro-text UI. Buttons must use text labels
+only — **do not** render icon components (from `lucide-react`, etc.) inside
+`<button>` elements, even as a "small visual hint" next to the label.
+
+This applies to every interactive button rendered in the app: HUD actions,
+dialog footers (Refresh, Save, Cancel), inline list actions, settings
+toggles, modal close affordances — all of them. Use a clear pixel-font
+label instead.
+
+## ❌ Bad
+
+```tsx
+<button onClick={refresh}>
+  <RefreshCw size={12} /> REFRESH
+</button>
+
+<button onClick={save}>
+  <Save size={14} /> Save
+</button>
+```
+
+## ✅ Good
+
+```tsx
+<button onClick={refresh}>REFRESH</button>
+
+<button onClick={save}>Save</button>
+```
+
+## Notes
+
+- Icons remain fine **outside** buttons: section headers, status chips,
+  decorative tile labels (e.g. the HP/EXP/MP bars), inline list-item
+  glyphs, sidebar nav links rendered as `<a>` / `<Link>`, and other
+  `<Link>` elements anywhere in the app.
+- If a label feels too long for its container, shorten the label (e.g.
+  `ACHIEVEMENTS` → `BADGES`) rather than reaching for an icon.
+- When removing an icon, also drop the now-unused `lucide-react` import
+  to keep the bundle clean.
+
+## Explicit exceptions (do NOT strip these)
+
+The user has approved these as the only icon-in-button cases:
+
+- **Sidebar nav buttons / links** (`src/components/aura/SideNav.tsx`
+  and any sidebar-pattern usage).
+- **Habitica `CONNECT` and `DISCONNECT` buttons** in
+  `src/routes/settings.tsx` (the section that pairs `<Link2 />` /
+  `<Link2Off />` with the label).
+
+Everything else in any page or dialog must be text-only.

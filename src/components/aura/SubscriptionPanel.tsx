@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Plus, Sparkles, Trash2, Users } from "lucide-react";
+import { Pencil, Sparkles, Trash2, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -91,10 +91,10 @@ export function SubscriptionPanel() {
             type="button"
             disabled={sortedTiers.length >= MAX_ACTIVE_TIERS}
             onClick={() => setCreatingNew(true)}
-            className="px-3 py-1.5 border-2 border-border hover:border-primary text-[10px] disabled:opacity-40 flex items-center gap-1"
+            className="px-3 py-1.5 border-2 border-border hover:border-primary text-[10px] disabled:opacity-40"
             style={{ fontFamily: "var(--font-pixel)" }}
           >
-            <Plus size={12} /> ADD TIER
+            ADD TIER
           </button>
         </div>
       )}

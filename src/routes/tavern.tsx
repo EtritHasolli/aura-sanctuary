@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Flame, Info } from "lucide-react";
+import { Send, Info } from "lucide-react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -1008,9 +1008,9 @@ function TavernPage() {
                     <button
                       type="button"
                       onClick={() => void startAdventure()}
-                      className="w-full px-2 py-1 bg-primary text-primary-foreground text-sm flex items-center justify-center gap-1"
+                      className="w-full px-2 py-1 bg-primary text-primary-foreground text-sm"
                     >
-                      <Flame size={10} /> START
+                      START
                     </button>
                   </div>
                 )}

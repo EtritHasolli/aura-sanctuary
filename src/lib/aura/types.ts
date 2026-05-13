@@ -96,6 +96,33 @@ export interface TaskChecklistItem {
   created_at: string;
 }
 
+export interface HabiticaTaskMeta {
+  type: "habit" | "daily" | "todo" | "reward" | null;
+  /** Hidden "value" / color driver (-50..+50 ish). */
+  value: number | null;
+  streak: number | null;
+  counterUp: number | null;
+  counterDown: number | null;
+  completed: boolean | null;
+  /** ISO datetime for todo deadlines on Habitica. */
+  date: string | null;
+  startDate: string | null;
+  frequency: string | null;
+  everyX: number | null;
+  daysOfMonth: number[];
+  weeksOfMonth: number[];
+  repeat: Record<string, boolean>;
+  checklist: { id: string; text: string; completed: boolean }[];
+  tags: string[];
+  history: {
+    date: number;
+    value: number | null;
+    scoredUp: number | null;
+    scoredDown: number | null;
+  }[];
+  refreshedAt: string | null;
+}
+
 export interface Task {
   id: string;
   user_id: string;
@@ -118,6 +145,10 @@ export interface Task {
   streak_best?: number;
   last_completed_local_date?: string | null;
   challenge_run_id?: string | null;
+  /** Set when this task mirrors a Habitica habit/daily. */
+  habitica_task_id?: string | null;
+  /** Cached Habitica-side metadata (streak, counter, value, checklist, etc.). */
+  habitica_meta?: HabiticaTaskMeta | null;
   /** Joined client-side (see `useTasks`). */
   checklist?: TaskChecklistItem[];
   tags?: Pick<Tag, "id" | "name">[];

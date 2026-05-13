@@ -1,14 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { animate, motion, useMotionValue } from "framer-motion";
-import {
-  Pause,
-  RotateCcw,
-  Music,
-  SkipForward,
-  ListMusic,
-  Volume2,
-  VolumeX,
-} from "lucide-react";
+import { RotateCcw, Music, SkipForward, ListMusic, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -746,10 +738,10 @@ function SanctuaryPage() {
               ) : (
                 <button
                   onClick={pause}
-                  className="px-4 py-2 bg-secondary border-2 border-border flex items-center gap-2"
+                  className="px-4 py-2 bg-secondary border-2 border-border"
                   style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
                 >
-                  <Pause size={14} /> PAUSE
+                  PAUSE
                 </button>
               )}
               <button

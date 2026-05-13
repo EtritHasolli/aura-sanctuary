@@ -1,16 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import {
-  Plus,
-  Minus,
-  Check,
-  Trash2,
-  FileDown,
-  ExternalLink,
-  Flame,
-  Info,
-  ChevronDown,
-} from "lucide-react";
+import { Plus, Minus, Check, Trash2, Flame, Info, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -32,6 +22,15 @@ import {
   useRemoveTaskTag,
 } from "@/hooks/useTasks";
 import { useApplyReward, useProfile } from "@/hooks/useProfile";
+import {
+  useHabiticaStatus,
+  useScoreLinkedHabiticaTask,
+  useSyncFromHabitica,
+  useSyncTaskEditToHabitica,
+} from "@/hooks/useHabitica";
+import { useQueryClient } from "@tanstack/react-query";
+import { HabiticaTaskBadge, HabiticaTaskDetails } from "@/components/aura/HabiticaTaskUI";
+import { habiticaValueColor } from "@/lib/aura/habiticaTaskValue";
 import { withGoldEquipBonus, withXpEquipBonus } from "@/lib/aura/equipmentBonuses";
 import { useNotes, useCreateNote, useUpdateNote } from "@/hooks/useNotes";
 import type { Task, TaskType, Difficulty, RepeatUnit } from "@/lib/aura/types";
@@ -68,6 +67,9 @@ function QuestsPage() {
   const { data: tasks = [], error: tasksError } = useTasks();
   const { data: notes = [] } = useNotes();
   const { data: allTags = [] } = useUserTags();
+  const { data: habiticaStatus } = useHabiticaStatus();
+  const syncHabitica = useSyncFromHabitica();
+  const qc = useQueryClient();
   const [tagFilter, setTagFilter] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
@@ -75,11 +77,36 @@ function QuestsPage() {
     return tasks.filter((t) => t.tags?.some((g) => g.id === tagFilter));
   }, [tasks, tagFilter]);
 
+  const refreshing = syncHabitica.isPending;
+  const handleRefresh = () => {
+    if (refreshing) return;
+    // Always refresh local quests; sync with Habitica only when connected.
+    qc.invalidateQueries({ queryKey: ["tasks"] });
+    qc.invalidateQueries({ queryKey: ["tags"] });
+    if (habiticaStatus?.connected) {
+      syncHabitica.mutate({ silent: false });
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-4">
-      <h1 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
-        QUEST LOG
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+          QUEST LOG
+        </h1>
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="text-xs px-2 py-1 border-2 border-border hover:border-primary text-foreground/90 hover:text-primary disabled:opacity-60 disabled:cursor-not-allowed"
+          style={{ fontFamily: "var(--font-pixel)" }}
+          title={
+            habiticaStatus?.connected ? "Refresh quests and sync from Habitica" : "Refresh quests"
+          }
+        >
+          {refreshing ? "REFRESHING..." : "REFRESH"}
+        </button>
+      </div>
       {tasksError && (
         <div className="text-xs text-destructive border border-destructive/40 bg-destructive/10 px-2 py-1">
           Failed to load quests:{" "}
@@ -323,6 +350,8 @@ function TaskRow({
   const reward = useApplyReward();
   const { data: prof } = useProfile();
   const createNote = useCreateNote();
+  const scoreHabitica = useScoreLinkedHabiticaTask();
+  const pushTaskEdit = useSyncTaskEditToHabitica();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const addCl = useCreateChecklistItem();
@@ -403,6 +432,10 @@ function TaskRow({
       stat,
     });
 
+    // Cache the Habitica id BEFORE any cleanup so todos (which we delete on
+    // completion) can still score "up" against their remote counterpart.
+    const linkedHabiticaId = task.habitica_task_id ?? null;
+
     if (task.type === "habit") {
       update.mutate({
         id: task.id,
@@ -450,6 +483,8 @@ function TaskRow({
     const xpOut = prof ? withXpEquipBonus(baseXp, prof) : baseXp;
     const goldOut = prof ? withGoldEquipBonus(baseGold, prof) : baseGold;
     toast.success(`+${xpOut} XP · +${goldOut}g`);
+
+    void scoreHabitica(task.id, "up", linkedHabiticaId);
   };
 
   const uncompleteDaily = async () => {
@@ -475,6 +510,8 @@ function TaskRow({
       statAmount: -1,
     });
     toast.info("Daily unsealed.");
+
+    void scoreHabitica(task.id, "down");
   };
 
   const negative = () => {
@@ -484,10 +521,19 @@ function TaskRow({
       patch: { negative_count: task.negative_count + 1, streak_current: 0 },
     });
     toast.error(`-${DIFFICULTY_HP_LOSS[task.difficulty]} HP`);
+
+    void scoreHabitica(task.id, "down");
   };
 
   const saveNotes = (val: string) => {
-    update.mutate({ id: task.id, patch: { notes: val } });
+    update.mutate(
+      { id: task.id, patch: { notes: val } },
+      {
+        onSuccess: () => {
+          if (task.habitica_task_id) void pushTaskEdit(task.id);
+        },
+      },
+    );
     if (linkedNote) updateNote.mutate({ id: linkedNote.id, patch: { content: val } });
   };
 
@@ -503,7 +549,14 @@ function TaskRow({
       return;
     }
 
-    update.mutate({ id: task.id, patch: { title } });
+    update.mutate(
+      { id: task.id, patch: { title } },
+      {
+        onSuccess: () => {
+          if (task.habitica_task_id) void pushTaskEdit(task.id);
+        },
+      },
+    );
     if (linkedNote && linkedNote.title === task.title) {
       updateNote.mutate({ id: linkedNote.id, patch: { title } });
     }
@@ -522,10 +575,24 @@ function TaskRow({
   };
 
   const patchRepeat = (patch: { repeat_every?: number; repeat_unit?: RepeatUnit }) => {
-    update.mutate({ id: task.id, patch: patch as Partial<Task> });
+    update.mutate(
+      { id: task.id, patch: patch as Partial<Task> },
+      {
+        onSuccess: () => {
+          if (task.habitica_task_id) void pushTaskEdit(task.id);
+        },
+      },
+    );
   };
   const patchDifficulty = (difficulty: Difficulty) => {
-    update.mutate({ id: task.id, patch: { difficulty } });
+    update.mutate(
+      { id: task.id, patch: { difficulty } },
+      {
+        onSuccess: () => {
+          if (task.habitica_task_id) void pushTaskEdit(task.id);
+        },
+      },
+    );
   };
   const handleDeleteTask = async () => {
     if (task.type === "todo") await cleanupTodoAndLinkedNotes();
@@ -534,8 +601,13 @@ function TaskRow({
     setOpen(false);
   };
 
+  const habiticaTint = habiticaValueColor(task.habitica_meta?.value ?? null);
+
   return (
-    <div className="border-2 border-border bg-secondary/50 p-2">
+    <div
+      className="border-2 border-border bg-secondary/50 p-2"
+      style={habiticaTint ? { borderLeftColor: habiticaTint, borderLeftWidth: 4 } : undefined}
+    >
       <div className="flex items-center gap-2">
         {task.type === "habit" ? (
           <>
@@ -581,6 +653,7 @@ function TaskRow({
             {task.streak_current ?? 0}
           </span>
         )}
+        <HabiticaTaskBadge task={task} />
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -722,7 +795,7 @@ function TaskRow({
                 <button
                   key={g.id}
                   type="button"
-                  onClick={() => rmTag.mutate({ taskId: task.id, tagId: g.id })}
+                  onClick={() => rmTag.mutate({ taskId: task.id, tagId: g.id, tagName: g.name })}
                   className="text-[9px] px-1 border border-accent text-accent hover:bg-destructive/20"
                   style={{ fontFamily: "var(--font-pixel)" }}
                 >
@@ -758,12 +831,13 @@ function TaskRow({
                 <span className="text-accent truncate">↗ {linkedNote.title}</span>
                 <button
                   onClick={() => navigate({ to: "/archives", search: { id: linkedNote.id } })}
-                  className="flex items-center gap-1 text-muted-foreground hover:text-primary ml-2 shrink-0"
+                  className="text-muted-foreground hover:text-primary ml-2 shrink-0"
                 >
-                  <ExternalLink size={10} /> VIEW FULL NOTE
+                  VIEW FULL NOTE
                 </button>
               </div>
             )}
+            <HabiticaTaskDetails task={task} />
             <textarea
               placeholder="Notes..."
               value={notesText}
@@ -775,10 +849,10 @@ function TaskRow({
               {!linkedNote && task.type === "todo" && (
                 <button
                   onClick={convertToNote}
-                  className="flex-1 text-base px-2 py-1.5 bg-accent text-accent-foreground flex items-center justify-center gap-1"
+                  className="flex-1 text-base px-2 py-1.5 bg-accent text-accent-foreground"
                   style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
                 >
-                  <FileDown size={10} /> SAVE TO ARCHIVES
+                  SAVE TO ARCHIVES
                 </button>
               )}
             </div>

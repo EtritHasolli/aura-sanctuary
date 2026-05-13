@@ -10,6 +10,7 @@ import type {
 } from "@/lib/aura/types";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
+import { useSyncTagToHabitica } from "./useHabitica";
 
 function mergeTasks(
   tasks: Task[],
@@ -244,6 +245,7 @@ export function useUserTags() {
 export function useCreateTagAndAssign() {
   const qc = useQueryClient();
   const { user } = useAuth();
+  const pushTag = useSyncTagToHabitica();
   return useMutation({
     mutationFn: async ({ taskId, name }: { taskId: string; name: string }) => {
       const trimmed = name.trim().toLowerCase();
@@ -272,28 +274,41 @@ export function useCreateTagAndAssign() {
         .from("task_tags")
         .insert({ task_id: taskId, tag_id: tagId });
       if (jErr && !String(jErr.message).toLowerCase().includes("duplicate")) throw jErr;
+      return { taskId, tagName: trimmed };
     },
-    onSuccess: () => {
+    onSuccess: ({ taskId, tagName }) => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["tags"] });
+      void pushTag({ auraTaskId: taskId, op: "add", tagName });
     },
   });
 }
 
 export function useRemoveTaskTag() {
   const qc = useQueryClient();
+  const pushTag = useSyncTagToHabitica();
   return useMutation({
-    mutationFn: async ({ taskId, tagId }: { taskId: string; tagId: string }) => {
+    mutationFn: async ({
+      taskId,
+      tagId,
+      tagName,
+    }: {
+      taskId: string;
+      tagId: string;
+      tagName?: string;
+    }) => {
       const { error } = await supabase
         .from("task_tags")
         .delete()
         .eq("task_id", taskId)
         .eq("tag_id", tagId);
       if (error) throw error;
+      return { taskId, tagName: tagName?.trim().toLowerCase() ?? "" };
     },
-    onSuccess: () => {
+    onSuccess: ({ taskId, tagName }) => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["tags"] });
+      if (tagName) void pushTag({ auraTaskId: taskId, op: "remove", tagName });
     },
   });
 }
