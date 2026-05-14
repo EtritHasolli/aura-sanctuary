@@ -134,6 +134,7 @@ function SettingsPage() {
   const [soundNotifs, setSoundNotifs] = useState(true);
   const [pathTestingOverride, setPathTestingOverride] = useState(false);
   const [pathModalOpen, setPathModalOpen] = useState(false);
+  const [isRerolling, setIsRerolling] = useState(false);
   const [showStatsInfo, setShowStatsInfo] = useState(false);
   const [settingsPathCardGifMode, setSettingsPathCardGifMode] = useState<"idle" | "stance">("idle");
   const [nextFocusMinutes, setNextFocusMinutes] = useState(focusMinutes);
@@ -478,7 +479,9 @@ function SettingsPage() {
   if (!profile) {
     return <div className="p-6 text-muted-foreground">Loading settings...</div>;
   }
-  const pathLocked = !!profile.aura_path && !pathTestingOverride;
+  const rerollUsed = !!profile.path_reroll_used;
+  const canReroll = !isAdmin && !!profile.aura_path && !rerollUsed;
+  const pathLocked = !!profile.aura_path && !pathTestingOverride && (isAdmin ? false : rerollUsed);
   const activePath = AURA_PATHS.find((p) => p.id === (auraPath || profile.aura_path || ""));
   const selectedPathId = (auraPath || profile.aura_path || "") as AuraPath | "";
   const dramaticByPath: Record<AuraPath, string> = {
@@ -588,10 +591,13 @@ function SettingsPage() {
             <button
               type="button"
               onClick={() => {
-                if (pathTestingOverride || !profile.aura_path) setPathModalOpen(true);
+                if (pathTestingOverride || !profile.aura_path || canReroll) {
+                  setIsRerolling(canReroll && !pathTestingOverride);
+                  setPathModalOpen(true);
+                }
               }}
               className={`relative w-full overflow-hidden border-2 border-border bg-secondary/40 p-3 text-sm text-left ${
-                pathTestingOverride || !profile.aura_path
+                pathTestingOverride || !profile.aura_path || canReroll
                   ? "hover:border-primary hover:shadow-[0_0_14px_rgba(217,150,48,0.35)]"
                   : "cursor-default"
               }`}
@@ -627,9 +633,14 @@ function SettingsPage() {
               Choose your path
             </button>
           )}
-          {pathLocked && (
+          {canReroll && (
+            <p className="text-xs text-(--color-gold)" style={{ fontFamily: "var(--font-pixel)" }}>
+              1 PATH CHANGE AVAILABLE — Click your path card above to use it.
+            </p>
+          )}
+          {!isAdmin && rerollUsed && (
             <p className="text-xs text-muted-foreground">
-              Path is locked after your first choice.
+              Path is permanently locked — your one change has been used.
             </p>
           )}
           {isAdmin && (
@@ -965,9 +976,11 @@ function SettingsPage() {
           <p className="text-sm sm:text-base text-muted-foreground">
             {alignment === null
               ? "Will you walk the path of light or embrace the darkness?"
-              : profile.aura_path
-                ? "Reshape your role for testing. Pick a path card, then save."
-                : "You must choose one path to continue. This choice is permanent unless testing override is enabled."}
+              : isRerolling
+                ? "This is your one-time path change. Choose carefully — it cannot be undone."
+                : profile.aura_path
+                  ? "Reshape your role for testing. Pick a path card, then save."
+                  : "You must choose one path to continue. This choice is permanent."}
           </p>
 
           {alignment === null ? (
@@ -1070,12 +1083,30 @@ function SettingsPage() {
             </div>
             <button
               type="button"
-              onClick={() => void saveProfile()}
+              onClick={async () => {
+                if (!auraPath) return;
+                if (isRerolling) {
+                  try {
+                    await (supabase.rpc as unknown as (name: string, args: Record<string, unknown>) => Promise<{ error: { message: string } | null }>)(
+                      "use_path_reroll",
+                      { p_new_path: auraPath },
+                    );
+                    setPathModalOpen(false);
+                    setIsRerolling(false);
+                    toast.success("Path changed. Your reroll has been used.");
+                    await updateProfile.mutateAsync({});
+                  } catch (e: unknown) {
+                    toast.error(e instanceof Error ? e.message : "Reroll failed.");
+                  }
+                } else {
+                  void saveProfile();
+                }
+              }}
               disabled={!auraPath || updateProfile.isPending}
               className="px-4 py-2.5 bg-primary text-primary-foreground disabled:opacity-60"
               style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
             >
-              {updateProfile.isPending ? "BINDING..." : "Confirm"}
+              {updateProfile.isPending ? "BINDING..." : isRerolling ? "USE REROLL" : "Confirm"}
             </button>
           </div>
         </DialogContent>

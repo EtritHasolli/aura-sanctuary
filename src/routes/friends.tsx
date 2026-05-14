@@ -645,6 +645,13 @@ function FriendsPage() {
                 </div>
               </div>
 
+              {/* HP / XP / Stamina bars — always from DB */}
+              <div className="space-y-1.5">
+                <FriendStatBar label="HP" value={selectedDetail.profile.hp} max={selectedDetail.profile.max_hp} color="var(--color-hp, #ef4444)" />
+                <FriendStatBar label="XP" value={selectedDetail.profile.xp} max={xpForLevel(selectedDetail.profile.level)} color="var(--color-xp, #a855f7)" />
+                <FriendStatBar label="STA" value={selectedDetail.profile.stamina} max={selectedDetail.profile.max_stamina} color="var(--color-focus, #3b82f6)" />
+              </div>
+
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <StatChip label="STR" value={effectiveStrength(selectedDetail.profile as Profile)} />
                 <StatChip label="INT" value={effectiveIntelligence(selectedDetail.profile as Profile)} />
@@ -821,19 +828,19 @@ function FriendsPage() {
 }
 
 function FriendHabiticaSection({ friendId }: { friendId: string | null }) {
-  const { data: habitica, isLoading, isError } = useFriendHabiticaProfile(friendId);
+  const { data: habitica, isLoading, isError, error } = useFriendHabiticaProfile(friendId);
   return (
     <div className="pt-2 border-t-2 border-border space-y-2">
-      <div
-        className="text-xs text-muted-foreground"
-        style={{ fontFamily: "var(--font-pixel)" }}
-      >
+      <div className="text-xs text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
         HABITICA
       </div>
       {isLoading ? (
         <div className="text-xs text-muted-foreground">Loading...</div>
       ) : isError ? (
-        <div className="text-xs text-muted-foreground">Habitica profile unavailable.</div>
+        <div className="text-xs text-muted-foreground">
+          Could not load Habitica profile
+          {error instanceof Error ? `: ${error.message}` : "."}
+        </div>
       ) : !habitica || !habitica.externalUserId ? (
         <div className="text-xs text-muted-foreground">Friend has not connected Habitica.</div>
       ) : (
@@ -853,6 +860,21 @@ function StatChip({ label, value }: { label: string; value: number }) {
         {label}
       </div>
       <div className="text-sm">{value}</div>
+    </div>
+  );
+}
+
+function FriendStatBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+  const pct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
+  return (
+    <div>
+      <div className="flex justify-between text-[10px] mb-0.5 text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
+        <span>{label}</span>
+        <span>{Math.round(value)}/{Math.round(max)}</span>
+      </div>
+      <div className="h-2 border border-border bg-secondary/50">
+        <div className="h-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
     </div>
   );
 }

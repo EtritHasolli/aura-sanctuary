@@ -248,19 +248,18 @@ export function useFriendHabiticaProfile(friendUserId: string | null | undefined
     queryKey: ["habitica", "friend", friendUserId] as const,
     enabled: !!friendUserId && !!user,
     queryFn: async (): Promise<HabiticaPublicProfile | null> => {
-      // Supabase generated types lag behind migrations; bypass the static name list.
-      const rpc = supabase.rpc as unknown as (
-        name: string,
-        args: Record<string, unknown>,
-      ) => Promise<{ data: unknown; error: { message: string } | null }>;
-      const { data, error } = await rpc("get_friend_habitica_profile", {
-        p_friend_user_id: friendUserId!,
-      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)(
+        "get_friend_habitica_profile",
+        { p_friend_user_id: friendUserId! },
+      );
       if (error) throw new Error(error.message);
-      if (!data || (typeof data === "object" && Object.keys(data as object).length === 0)) {
+      // RPC returns JSONB — could be a raw string if postgrest doesn't auto-parse
+      const parsed: unknown = typeof data === "string" ? JSON.parse(data) : data;
+      if (!parsed || (typeof parsed === "object" && Object.keys(parsed as object).length === 0)) {
         return null;
       }
-      return data as HabiticaPublicProfile;
+      return parsed as HabiticaPublicProfile;
     },
     staleTime: 60_000,
   });

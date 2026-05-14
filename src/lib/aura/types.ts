@@ -107,6 +107,7 @@ export interface Profile {
   timezone?: string;
   aura_path?: AuraPath | null;
   path_testing_override?: boolean;
+  path_reroll_used?: boolean;
   skill_cooldowns?: Record<string, string>;
   /** Cached sum from equipped gear (server-maintained). */
   equip_str_bonus?: number;

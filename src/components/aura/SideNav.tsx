@@ -14,6 +14,7 @@ import {
   Crown,
   Gamepad2,
   MoreHorizontal,
+  Flame,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMessageUnreadCounts } from "@/hooks/useMessageUnreadCounts";
@@ -30,6 +31,7 @@ const items = [
   { to: "/equipment", icon: Shirt, label: "Gear", short: "Gear" },
   { to: "/forge", icon: Hammer, label: "Forge", short: "Forge" },
   { to: "/tavern", icon: Beer, label: "Tavern", short: "Tavern" },
+  { to: "/battle", icon: Flame, label: "Battle", short: "Battle" },
   { to: "/subscription", icon: Crown, label: "Subscription", short: "Sub" },
   { to: "/minigames", icon: Gamepad2, label: "Minigames", short: "Games" },
   { to: "/settings", icon: Settings, label: "Settings", short: "Settings" },

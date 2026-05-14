@@ -33,10 +33,14 @@ const HP_REGEN_PER_LEVEL_UP = 10;
 const BASE_MAX_HP = 50;
 const CON_HP_BONUS_DIVISOR = 5;
 const PATH_LEVEL_GROWTH = {
-  swordsman: { strength: 2, constitution: 1, intelligence: 0, dexterity: 0 },
-  mage: { strength: 0, constitution: 0, intelligence: 2, dexterity: 1 },
-  tank: { strength: 1, constitution: 2, intelligence: 0, dexterity: 0 },
-  rogue: { strength: 0, constitution: 0, intelligence: 1, dexterity: 2 },
+  swordsman:     { strength: 2, constitution: 1, intelligence: 0, dexterity: 0 },
+  evilswordsman: { strength: 2, constitution: 1, intelligence: 0, dexterity: 0 },
+  mage:          { strength: 0, constitution: 0, intelligence: 2, dexterity: 1 },
+  evilmage:      { strength: 0, constitution: 0, intelligence: 2, dexterity: 1 },
+  tank:          { strength: 1, constitution: 2, intelligence: 0, dexterity: 0 },
+  evilpaladin:   { strength: 1, constitution: 2, intelligence: 0, dexterity: 0 },
+  rogue:         { strength: 0, constitution: 0, intelligence: 1, dexterity: 2 },
+  evilrogue:     { strength: 0, constitution: 0, intelligence: 1, dexterity: 2 },
 } as const;
 
 export function canonicalMaxHpForLevel(level: number, constitution = 0) {

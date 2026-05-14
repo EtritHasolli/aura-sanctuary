@@ -4,6 +4,9 @@ import { publicAsset } from "@/lib/utils";
 import { useRouterState } from "@tanstack/react-router";
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
+
+const EVIL_PATHS = new Set(["evilswordsman", "evilmage", "evilpaladin", "evilrogue"]);
 
 type ChatRole = "user" | "assistant";
 type ChatMessage = { role: ChatRole; content: string };
@@ -30,26 +33,31 @@ function loadSavedPosition(): { x: number; y: number } {
   }
 }
 
-function AiChatIcon({ size = 48 }: { size?: number }) {
+function AiChatIcon({ size = 48, evil = false }: { size?: number; evil?: boolean }) {
   const [hovered, setHovered] = useState(false);
   return (
     <img
-      src={hovered ? publicAsset("aichat-angry.png") : publicAsset("aichat-normal.png")}
+      src={evil ? publicAsset("aichat-angry.png") : publicAsset("aichat-normal.png")}
       alt="Aura Guide"
       width={size}
       height={size}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         imageRendering: "pixelated",
         animation: "aichat-float 2.4s ease-in-out infinite",
+        transform: hovered ? "scale(1.15)" : "scale(1)",
+        filter: hovered ? "drop-shadow(0 0 8px rgba(217,150,48,0.7))" : "none",
+        transition: "transform 0.15s ease, filter 0.15s ease",
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     />
   );
 }
 
 export function AiAssistant() {
   const routePath = useRouterState({ select: (s) => s.location.pathname });
+  const { data: profile } = useProfile();
+  const isEvil = profile?.aura_path ? EVIL_PATHS.has(profile.aura_path) : false;
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -269,7 +277,7 @@ export function AiAssistant() {
             className="pointer-events-auto bg-transparent border-none shadow-none p-0"
             title="Open Aura assistant"
           >
-            <AiChatIcon size={80} />
+            <AiChatIcon size={80} evil={isEvil} />
           </button>
         ) : chatPanel}
       </div>
@@ -282,7 +290,7 @@ export function AiAssistant() {
             className="pointer-events-auto bg-transparent border-none shadow-none p-0"
             title="Open Aura assistant"
           >
-            <AiChatIcon size={72} />
+            <AiChatIcon size={72} evil={isEvil} />
           </button>
         ) : chatPanel}
       </div>
