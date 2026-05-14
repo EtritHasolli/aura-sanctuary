@@ -162,6 +162,7 @@ export function useCreateTask() {
 
 export function useUpdateTask() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: Partial<Task> }) => {
       const { data, error } = await supabase
@@ -171,9 +172,29 @@ export function useUpdateTask() {
         .select()
         .single();
       if (error) throw error;
+
+      // Log a battle completion whenever a task is positively completed
+      const isCompletion =
+        (patch.completed === true) ||
+        (typeof patch.positive_count === "number");
+      if (isCompletion && user) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any).from("battle_completions")
+          .insert({ user_id: user.id, task_id: id })
+          .then(({ error: bcErr }: { error: unknown }) => {
+            if (bcErr) console.error("[battle_completions] insert failed:", bcErr);
+            else console.log("[battle_completions] inserted for task", id);
+          });
+      }
+
       return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+    onSuccess: (_data, { patch }) => {
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      if ("completed" in patch || "positive_count" in patch || "negative_count" in patch) {
+        qc.invalidateQueries({ queryKey: ["battle_scores"] });
+      }
+    },
   });
 }
 

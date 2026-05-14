@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PATH_CHARACTER_SPRITES } from "@/lib/aura/pathCharacterSprites";
@@ -48,16 +49,16 @@ function useBattleScores() {
         evil: Number(row.evil_count),
       };
     },
-    staleTime: 60_000,
+    staleTime: 0,
   });
 }
 
 const MONTH_LABEL = new Date().toLocaleString("default", { month: "long", year: "numeric" });
 const WINNING_THRESHOLD = 0.7;
 
-type Stance = "idle" | "stance" | "falling";
+type Stance = "idle" | "stance" | "falling" | "sleep";
 
-function getStances(goodPct: number, evilPct: number): { good: Stance; evil: Stance } {
+function getBaseStances(goodPct: number, evilPct: number): { good: Stance; evil: Stance } {
   if (goodPct >= WINNING_THRESHOLD) return { good: "stance", evil: "falling" };
   if (evilPct >= WINNING_THRESHOLD) return { good: "falling", evil: "stance" };
   return { good: "idle", evil: "idle" };
@@ -67,17 +68,59 @@ function spriteSrc(path: AuraPath, stance: Stance): string {
   const s = PATH_CHARACTER_SPRITES[path];
   if (stance === "falling") return pathCharacterFallingSpriteSrc(path) ?? s.idle;
   if (stance === "stance") return s.stance;
+  if (stance === "sleep") return s.sleep;
   return s.idle;
+}
+
+// Exact single-loop duration per falling gif (read from GIF frame delays).
+const FALLING_DURATION_MS: Partial<Record<AuraPath, number>> = {
+  swordsman: 1700,
+  mage: 1700,
+  tank: 2100,
+  rogue: 1700,
+  evilswordsman: 1700,
+  evilmage: 1700,
+  evilpaladin: 2100,
+  evilrogue: 1700,
+};
+
+// Each character independently plays falling → sleep with its own timer.
+function CharacterSprite({ path, isLoser, flip }: { path: AuraPath; isLoser: boolean; flip: boolean }) {
+  const [stance, setStance] = useState<Stance>(isLoser ? "falling" : "idle");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (!isLoser) {
+      setStance("idle");
+      return;
+    }
+    setStance("falling");
+    timerRef.current = setTimeout(() => setStance("sleep"), FALLING_DURATION_MS[path] ?? 1800);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [isLoser, path]);
+
+  return (
+    <img
+      src={spriteSrc(path, stance)}
+      alt={PATH_LABELS[path]}
+      className="h-32 w-auto object-contain"
+      style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : undefined }}
+      draggable={false}
+    />
+  );
 }
 
 function DiamondArmy({
   paths,
+  isLoser,
   stance,
   flip,
   labelColor,
   label,
 }: {
   paths: AuraPath[];
+  isLoser: boolean;
   stance: Stance;
   flip: boolean;
   labelColor: string;
@@ -85,7 +128,6 @@ function DiamondArmy({
 }) {
   return (
     <div className="flex flex-col items-center gap-2">
-      {/* diamond grid: 3 cols × 3 rows, characters at top/left/right/bottom */}
       <div
         style={{
           display: "grid",
@@ -102,16 +144,17 @@ function DiamondArmy({
               style={{ gridColumn: pos.gridColumn, gridRow: pos.gridRow }}
               className="flex flex-col items-center justify-end gap-1"
             >
-              <img
-                src={spriteSrc(path, stance)}
-                alt={PATH_LABELS[path]}
-                className="h-32 w-auto object-contain"
-                style={{
-                  imageRendering: "pixelated",
-                  transform: flip ? "scaleX(-1)" : undefined,
-                }}
-                draggable={false}
-              />
+              {isLoser ? (
+                <CharacterSprite path={path} isLoser={true} flip={flip} />
+              ) : (
+                <img
+                  src={spriteSrc(path, stance)}
+                  alt={PATH_LABELS[path]}
+                  className="h-32 w-auto object-contain"
+                  style={{ imageRendering: "pixelated", transform: flip ? "scaleX(-1)" : undefined }}
+                  draggable={false}
+                />
+              )}
               <span
                 className="text-[8px] text-muted-foreground text-center leading-tight w-28"
                 style={{ fontFamily: "var(--font-pixel)" }}
@@ -122,10 +165,7 @@ function DiamondArmy({
           );
         })}
       </div>
-      <span
-        className={`text-[9px] ${labelColor}`}
-        style={{ fontFamily: "var(--font-pixel)" }}
-      >
+      <span className={`text-[9px] ${labelColor}`} style={{ fontFamily: "var(--font-pixel)" }}>
         {label}
       </span>
     </div>
@@ -142,28 +182,30 @@ function BattlePage() {
   const goodPct = total === 0 ? 0.5 : good / total;
   const evilPct = total === 0 ? 0.5 : evil / total;
 
-  const { good: goodStance, evil: evilStance } = getStances(goodPct, evilPct);
+  const base = getBaseStances(goodPct, evilPct);
+  const goodIsLoser = base.good === "falling";
+  const evilIsLoser = base.evil === "falling";
 
   const goodBarPct = Math.round(goodPct * 100);
   const evilBarPct = 100 - goodBarPct;
 
-  const isStandoff = total === 0 || (goodStance === "idle" && evilStance === "idle");
+  const isStandoff = total === 0 || (base.good === "idle" && base.evil === "idle");
 
-  const goodLabel = goodStance === "stance" ? "WINNING" : goodStance === "falling" ? "LOSING" : "STANDOFF";
-  const evilLabel = evilStance === "stance" ? "WINNING" : evilStance === "falling" ? "LOSING" : "STANDOFF";
+  const goodLabel = base.good === "stance" ? "WINNING" : goodIsLoser ? "LOSING" : "STANDOFF";
+  const evilLabel = base.evil === "stance" ? "WINNING" : evilIsLoser ? "LOSING" : "STANDOFF";
 
   return (
     <div className="flex flex-col min-h-full">
       {/* Tug-of-war bar — full width, flush to top, no box */}
       <div className="w-full px-4 pt-4 pb-2 space-y-1">
         <div className="flex justify-between text-[10px]" style={{ fontFamily: "var(--font-pixel)" }}>
-          <span className="text-[color:var(--color-focus)]">
+          <span style={{ color: "#4f8cff" }}>
             GOOD · {isLoading ? "—" : `${goodBarPct}%`}
           </span>
           <span className="text-muted-foreground text-[9px]">
             {isLoading ? "—" : isStandoff && total === 0 ? "NO TASKS YET" : `${good} vs ${evil} · ${MONTH_LABEL}`}
           </span>
-          <span className="text-destructive">
+          <span style={{ color: "#e53935" }}>
             {isLoading ? "—" : `${evilBarPct}%`} · EVIL
           </span>
         </div>
@@ -174,8 +216,8 @@ function BattlePage() {
             <div className="absolute inset-0 bg-muted animate-pulse" />
           ) : total === 0 ? (
             <>
-              <div className="absolute left-0 top-0 h-full bg-[color:var(--color-focus)]" style={{ width: "50%" }} />
-              <div className="absolute right-0 top-0 h-full bg-destructive" style={{ width: "50%" }} />
+              <div className="absolute left-0 top-0 h-full" style={{ width: "50%", backgroundColor: "#4f8cff" }} />
+              <div className="absolute right-0 top-0 h-full" style={{ width: "50%", backgroundColor: "#e53935" }} />
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="text-[8px] text-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
                   STANDOFF
@@ -185,12 +227,12 @@ function BattlePage() {
           ) : (
             <>
               <div
-                className="absolute left-0 top-0 h-full bg-[color:var(--color-focus)] transition-all duration-700"
-                style={{ width: `${goodBarPct}%` }}
+                className="absolute left-0 top-0 h-full transition-all duration-700"
+                style={{ width: `${goodBarPct}%`, backgroundColor: "#4f8cff" }}
               />
               <div
-                className="absolute right-0 top-0 h-full bg-destructive transition-all duration-700"
-                style={{ width: `${evilBarPct}%` }}
+                className="absolute right-0 top-0 h-full transition-all duration-700"
+                style={{ width: `${evilBarPct}%`, backgroundColor: "#e53935" }}
               />
               <div className="absolute left-1/2 top-0 h-full w-0.5 bg-border -translate-x-1/2" />
             </>
@@ -202,9 +244,10 @@ function BattlePage() {
       <div className="flex-1 flex items-center justify-center gap-4 px-2 py-6">
         <DiamondArmy
           paths={GOOD_PATHS}
-          stance={goodStance}
+          isLoser={goodIsLoser}
+          stance={base.good}
           flip={false}
-          labelColor="text-[color:var(--color-focus)]"
+          labelColor="text-[#4f8cff]"
           label={goodLabel}
         />
 
@@ -216,7 +259,8 @@ function BattlePage() {
 
         <DiamondArmy
           paths={EVIL_PATHS}
-          stance={evilStance}
+          isLoser={evilIsLoser}
+          stance={base.evil}
           flip={true}
           labelColor="text-destructive"
           label={evilLabel}

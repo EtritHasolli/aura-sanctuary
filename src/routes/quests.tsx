@@ -515,6 +515,22 @@ function TaskRow({
         last_completed_at: null,
       },
     });
+
+    // Remove the most recent battle completion for this task so the battle bar reverts.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: latest } = await (supabase as any)
+      .from("battle_completions")
+      .select("id")
+      .eq("task_id", task.id)
+      .order("completed_at", { ascending: false })
+      .limit(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((latest as any)?.[0]?.id) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("battle_completions").delete().eq("id", (latest as any)[0].id);
+      void qc.invalidateQueries({ queryKey: ["battle_scores"] });
+    }
+
     await reward.mutateAsync({
       xp: -withXpEquipBonus(baseXp, prof),
       gold: -withGoldEquipBonus(baseGold, prof),
