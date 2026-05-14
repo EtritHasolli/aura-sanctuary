@@ -11,8 +11,12 @@ import {
   pathCharacterFallingSpriteSrc,
   pathCharacterSpriteSrc,
   pathCharacterWalkSpriteSrc,
+  pathCharacterBedSpriteSrc,
 } from "@/lib/aura/pathCharacterSprites";
-import { SANCTUARY_WANDER_MIN_STEP_PX } from "@/lib/aura/sanctuaryCharacterWander";
+import {
+  SANCTUARY_CHARACTER_WALK_SPEED_PX_PER_SEC,
+  SANCTUARY_WANDER_MIN_STEP_PX,
+} from "@/lib/aura/sanctuaryCharacterWander";
 import { useSanctuaryIdleWander } from "@/hooks/useSanctuaryIdleWander";
 import { AURA_PATHS } from "@/lib/aura/types";
 
@@ -125,10 +129,12 @@ function SanctuaryPage() {
   const [showFallingSleepTransition, setShowFallingSleepTransition] = useState(false);
   const sleepTransitionTimeoutRef = useRef<number | null>(null);
   const previousCharacterStateRef = useRef(characterState);
+  const [isBackOrientation, setIsBackOrientation] = useState(false);
+  const [isWalkingToBed, setIsWalkingToBed] = useState(false);
 
   const triggerSleepTransition = useCallback(() => {
     if (profile?.aura_path == null) return;
-    if (!pathCharacterFallingSpriteSrc(profile.aura_path)) return;
+    if (!pathCharacterFallingSpriteSrc(profile.aura_path, isBackOrientation)) return;
     if (sleepTransitionTimeoutRef.current != null) {
       window.clearTimeout(sleepTransitionTimeoutRef.current);
       sleepTransitionTimeoutRef.current = null;
@@ -138,7 +144,7 @@ function SanctuaryPage() {
       sleepTransitionTimeoutRef.current = null;
       setShowFallingSleepTransition(false);
     }, FALL_ASLEEP_TRANSITION_MS);
-  }, [profile?.aura_path]);
+  }, [profile?.aura_path, isBackOrientation]);
 
   const roamSanctuaryIdle =
     pathCharacterClickable && characterState === "idle" && !sanctuaryTapAcknowledge;
@@ -150,6 +156,8 @@ function SanctuaryPage() {
     resetHomeWhenRoamingEnds: characterState === "sleeping" || !pathCharacterClickable,
   });
 
+  const prevWalkDirectionRef = useRef(idleWander.walkDirection);
+
   const xPan = useMotionValue(0);
   const sanctuaryPanCtlRef = useRef<ReturnType<typeof animate> | null>(null);
   const sanctuaryTapTimeoutRef = useRef<number | null>(null);
@@ -159,43 +167,101 @@ function SanctuaryPage() {
   const sanctuarySpriteUrl = useMemo(() => {
     if (profile?.aura_path == null) return null;
     const path = profile.aura_path;
+
+    // Working (stance) and tap acknowledgements always face front
     if (sanctuaryTapAcknowledge) return pathCharacterSpriteSrc(path, "working");
-    if (characterState === "sleeping" && showFallingSleepTransition) {
-      return pathCharacterFallingSpriteSrc(path) ?? pathCharacterSpriteSrc(path, "sleeping");
+
+    if (isWalkingToBed) {
+      return pathCharacterWalkSpriteSrc(path, xPan.get() > -60 ? "left" : "right");
     }
-    if (characterState === "sleeping") return pathCharacterSpriteSrc(path, "sleeping");
+
+    if (characterState === "sleeping" && showFallingSleepTransition) {
+      return (
+        pathCharacterFallingSpriteSrc(path, isBackOrientation) ??
+        pathCharacterSpriteSrc(path, "sleeping", isBackOrientation)
+      );
+    }
+    if (characterState === "sleeping")
+      return pathCharacterSpriteSrc(path, "sleeping", isBackOrientation);
     if (characterState === "working") return pathCharacterSpriteSrc(path, "working");
+
     if (idleWander.walkDirection === "left" || idleWander.walkDirection === "right") {
       return pathCharacterWalkSpriteSrc(path, idleWander.walkDirection);
     }
-    return pathCharacterSpriteSrc(path, "idle");
+
+    return pathCharacterSpriteSrc(path, "idle", isBackOrientation);
   }, [
     profile?.aura_path,
     characterState,
     showFallingSleepTransition,
     idleWander.walkDirection,
     sanctuaryTapAcknowledge,
+    isBackOrientation,
+    isWalkingToBed,
+    xPan,
   ]);
+
+  useEffect(() => {
+    if (idleWander.walkDirection === null) {
+      // If we just stopped walking, 50/50 chance to face back
+      if (prevWalkDirectionRef.current !== null) {
+        setIsBackOrientation(Math.random() > 0.5);
+      }
+    } else {
+      // While walking, always face front/side
+      setIsBackOrientation(false);
+    }
+    prevWalkDirectionRef.current = idleWander.walkDirection;
+  }, [idleWander.walkDirection]);
 
   useEffect(() => {
     const prev = previousCharacterStateRef.current;
     previousCharacterStateRef.current = characterState;
 
-    if (profile?.aura_path == null || characterState !== "sleeping") {
+    if (prev !== "sleeping") {
+      setIsWalkingToBed(true);
+      setIsBackOrientation(false);
+    }
+  }, [characterState, profile?.aura_path]);
+
+  useEffect(() => {
+    if (characterState !== "sleeping") {
+      setIsWalkingToBed(false);
       if (sleepTransitionTimeoutRef.current != null) {
         window.clearTimeout(sleepTransitionTimeoutRef.current);
         sleepTransitionTimeoutRef.current = null;
       }
       setShowFallingSleepTransition(false);
-      return;
     }
-
-    if (prev !== "sleeping") {
-      triggerSleepTransition();
-    }
-  }, [characterState, profile?.aura_path, triggerSleepTransition]);
+  }, [characterState]);
 
   useEffect(() => {
+    if (!isWalkingToBed) return;
+
+    const from = xPan.get();
+    const to = -130;
+    const walkSpeed = SANCTUARY_CHARACTER_WALK_SPEED_PX_PER_SEC;
+    const dur = Math.max(0.05, Math.abs(to - from) / walkSpeed);
+
+      const ctl = animate(xPan, to, {
+        duration: dur,
+        ease: "linear",
+        onComplete: () => {
+          setIsWalkingToBed(false);
+          // Stay in idle for 1s before falling asleep
+          setTimeout(() => {
+            if (characterStateRef.current === "sleeping") {
+              triggerSleepTransition();
+            }
+          }, 1000);
+        },
+      });
+
+    return () => ctl.stop();
+  }, [isWalkingToBed, xPan, triggerSleepTransition]);
+
+  useEffect(() => {
+    if (isWalkingToBed) return;
     sanctuaryPanCtlRef.current?.stop();
     const pathOk = pathCharacterClickable;
     const panSpeed = idleWander.strideSpeedPxPerSec;
@@ -207,8 +273,10 @@ function SanctuaryPage() {
       return () => sanctuaryPanCtlRef.current?.stop();
     }
 
-    if (!pathOk || characterState === "sleeping") {
-      sanctuaryPanCtlRef.current = animate(xPan, 0, { duration: 0, ease: "linear" });
+    if (!pathOk || (characterState === "sleeping" && !isWalkingToBed)) {
+      // If we are sleeping and not currently walking to the bed,
+      // we should be at the target position.
+      // (The initial transition to sleeping state triggers isWalkingToBed=true).
       return () => sanctuaryPanCtlRef.current?.stop();
     }
 
@@ -328,7 +396,7 @@ function SanctuaryPage() {
 
   useEffect(() => {
     if (!profile?.id) return;
-    void supabase.rpc("ensure_quest_arc_started", { p_arc_slug: "shadow-cleansing" });
+    void supabase.rpc("ensure_quest_arc_started" as any, { p_arc_slug: "shadow-cleansing" });
   }, [profile?.id]);
 
   useEffect(() => {
@@ -578,12 +646,24 @@ function SanctuaryPage() {
             {/* left fireplace block */}
             <div className="absolute left-[23%] top-[45%] w-[12%] h-[24%] border-2 border-border/70 bg-card/80" />
             <div className="absolute left-[25.2%] top-[53%] w-[7.6%] h-[9%] border border-border/70 bg-secondary/80" />
-            <motion.div
-              className="absolute left-[27.8%] top-[55.5%] w-[2.4%] h-[4.5%]"
-              animate={{ opacity: [0.45, 0.95, 0.45], y: [0, -1, 0] }}
-              transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
-              style={{ background: "var(--color-primary)" }}
-            />
+            {/* character bed — replaces glowing square */}
+            {profile?.aura_path && pathCharacterBedSpriteSrc(profile.aura_path) ? (
+              <div className="absolute left-[2%] top-[37%] w-[58%] h-[45%] pointer-events-none">
+                <img
+                  src={pathCharacterBedSpriteSrc(profile.aura_path)!}
+                  alt="Character bed"
+                  className="w-full h-full object-contain"
+                  style={{ imageRendering: "pixelated" }}
+                />
+              </div>
+            ) : (
+              <motion.div
+                className="absolute left-[27.8%] top-[55.5%] w-[2.4%] h-[4.5%]"
+                animate={{ opacity: [0.45, 0.95, 0.45], y: [0, -1, 0] }}
+                transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+                style={{ background: "var(--color-primary)" }}
+              />
+            )}
 
             {/* desk + task tablet */}
             <div
