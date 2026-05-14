@@ -160,6 +160,8 @@ export function useCreateTask() {
   });
 }
 
+const EVIL_PATHS_SET = new Set(["evilswordsman", "evilmage", "evilpaladin", "evilrogue"]);
+
 export function useUpdateTask() {
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -178,12 +180,20 @@ export function useUpdateTask() {
         (patch.completed === true) ||
         (typeof patch.positive_count === "number");
       if (isCompletion && user) {
+        // Read alignment from the profile at the moment of completion so path
+        // changes don't retroactively flip who scored.
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("aura_path")
+          .eq("id", user.id)
+          .maybeSingle();
+        const alignment = profile?.aura_path && EVIL_PATHS_SET.has(profile.aura_path) ? "evil" : "good";
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any).from("battle_completions")
-          .insert({ user_id: user.id, task_id: id })
+          .insert({ user_id: user.id, task_id: id, alignment })
           .then(({ error: bcErr }: { error: unknown }) => {
             if (bcErr) console.error("[battle_completions] insert failed:", bcErr);
-            else console.log("[battle_completions] inserted for task", id);
+            else console.log("[battle_completions] inserted for task", id, "alignment:", alignment);
           });
       }
 

@@ -40,13 +40,30 @@ Mechanics highlights:
 - XP curve: xpForLevel(n) = max(25, 45 + n*24 + floor(n²*3.5)) where n = level−1.
 
 Assistant goals:
-- Explain how features work clearly to end users using the route names and button labels above when helpful.
-- Give step-by-step instructions in Aura UI terms.
-- Be concise, friendly, and accurate to the app behavior.
-- If unsure, state uncertainty rather than inventing facts.
-- Speak in the voice of an old wise mage: archaic but clear, warm, and helpful.
-- Use light flavor (e.g., "adventurer", "arcane", "sanctuary"), but do not overdo roleplay.
-- Keep formatting readable with short paragraphs and bullets where useful.
+- Be extremely concise. 1-3 sentences max unless steps are needed.
+- Give direct answers — no preamble, no restating the question.
+- Use bullets only when listing 3+ steps. No nested lists.
+- If unsure, say so in one sentence.
+- Accurate to the app — never invent facts.
+`;
+
+const GOOD_PERSONA = `
+Personality — GOOD alignment:
+You speak as a warm, cheerful, and encouraging sage. Your tone is bright and uplifting.
+Use hopeful, positive language. Celebrate the adventurer's progress. Reference light, hope, valor, courage.
+Examples of your flavor: "Splendid!", "Fear not, brave soul!", "The light of the Sanctuary shines upon you!",
+"Every quest completed brings glory!", "You are doing wonderfully, hero!".
+Never be gloomy or threatening. Keep it earnest and enthusiastic without being over the top.
+`;
+
+const EVIL_PERSONA = `
+Personality — EVIL alignment:
+You speak as a cunning, darkly theatrical villain-guide. Your tone is sinister, sardonic, and menacing — but still genuinely helpful.
+Use dark, dramatic language. Reference shadows, power, domination, corruption, chaos.
+Examples of your flavor: "Excellent... your darkness grows.", "The weak cower — you do not.",
+"Power is taken, never given. Now listen closely...", "Chaos serves those who master it.",
+"Your enemies will tremble.", "Hmm... a worthy question for one of such delicious ambition."
+Be theatrically evil but never unhelpful — you still want them to succeed (for your own dark purposes).
 `;
 
 Deno.serve(async (req: Request) => {
@@ -91,6 +108,22 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = (await req.json()) as { messages?: unknown[]; routePath?: string };
+
+    // Fetch the user's aura_path to determine alignment for persona.
+    // Swallow errors so a DB hiccup never breaks the whole chat response.
+    let isEvil = false;
+    try {
+      const { data: profileRow } = await supabaseClient
+        .from("profiles")
+        .select("aura_path")
+        .eq("id", user.id)
+        .maybeSingle();
+      const EVIL_PATHS = new Set(["evilswordsman", "evilmage", "evilpaladin", "evilrogue"]);
+      isEvil = !!(profileRow?.aura_path && EVIL_PATHS.has(profileRow.aura_path));
+    } catch {
+      // fall through — default to good persona
+    }
+    const persona = isEvil ? EVIL_PERSONA : GOOD_PERSONA;
     const routePath = typeof body.routePath === "string" ? body.routePath : "unknown";
     const safeMessages = Array.isArray(body.messages)
       ? body.messages
@@ -112,10 +145,10 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
-        temperature: 0.2,
+        temperature: isEvil ? 0.5 : 0.2,
         max_tokens: 700,
         messages: [
-          { role: "system", content: `${AURA_APP_CONTEXT}\nCurrent route: ${routePath}` },
+          { role: "system", content: `${AURA_APP_CONTEXT}\n${persona}\nCurrent route: ${routePath}` },
           ...safeMessages,
         ],
       }),
@@ -138,7 +171,8 @@ Deno.serve(async (req: Request) => {
       status: 200,
       headers: { ...corsHeaders, "content-type": "application/json" },
     });
-  } catch {
+  } catch (err) {
+    console.error("[chatbot] unhandled error:", err);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { ...corsHeaders, "content-type": "application/json" },

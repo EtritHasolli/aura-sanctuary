@@ -158,16 +158,20 @@ export type Database = {
       }
       profiles: {
         Row: {
+          aura_path: string | null
+          avatar_url: string | null
           constitution: number
           created_at: string
+          dexterity: number
           display_name: string
-          friend_code: string
           equip_con_bonus: number
+          equip_dex_bonus: number
           equip_gold_bonus_pct: number
           equip_int_bonus: number
           equip_max_stamina_bonus: number
           equip_str_bonus: number
           equip_xp_bonus_pct: number
+          friend_code: string
           gold: number
           hp: number
           id: string
@@ -177,6 +181,8 @@ export type Database = {
           level: number
           max_stamina: number
           max_hp: number
+          path_reroll_used: boolean
+          path_testing_override: boolean
           pet_name: string
           pet_state: string
           pomodoro_settings: Json | null
@@ -186,16 +192,20 @@ export type Database = {
           xp: number
         }
         Insert: {
+          aura_path?: string | null
+          avatar_url?: string | null
           constitution?: number
           created_at?: string
+          dexterity?: number
           display_name?: string
-          friend_code?: string
           equip_con_bonus?: number
+          equip_dex_bonus?: number
           equip_gold_bonus_pct?: number
           equip_int_bonus?: number
           equip_max_stamina_bonus?: number
           equip_str_bonus?: number
           equip_xp_bonus_pct?: number
+          friend_code?: string
           gold?: number
           hp?: number
           id: string
@@ -205,6 +215,8 @@ export type Database = {
           level?: number
           max_stamina?: number
           max_hp?: number
+          path_reroll_used?: boolean
+          path_testing_override?: boolean
           pet_name?: string
           pet_state?: string
           pomodoro_settings?: Json | null
@@ -214,15 +226,20 @@ export type Database = {
           xp?: number
         }
         Update: {
+          aura_path?: string | null
+          avatar_url?: string | null
           constitution?: number
           created_at?: string
+          dexterity?: number
           display_name?: string
           equip_con_bonus?: number
+          equip_dex_bonus?: number
           equip_gold_bonus_pct?: number
           equip_int_bonus?: number
           equip_max_stamina_bonus?: number
           equip_str_bonus?: number
           equip_xp_bonus_pct?: number
+          friend_code?: string
           gold?: number
           hp?: number
           id?: string
@@ -232,6 +249,8 @@ export type Database = {
           level?: number
           max_stamina?: number
           max_hp?: number
+          path_reroll_used?: boolean
+          path_testing_override?: boolean
           pet_name?: string
           pet_state?: string
           pomodoro_settings?: Json | null

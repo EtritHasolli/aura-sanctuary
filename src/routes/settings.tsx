@@ -516,7 +516,6 @@ function SettingsPage() {
               PROFILE
             </h2>
           </div>
-          <label className="block text-sm text-muted-foreground">Display name</label>
           <div className="flex items-center gap-3">
             <div className="w-16 h-16 pixel-panel overflow-hidden bg-secondary flex items-center justify-center">
               {avatarDraft || profile.avatar_url ? (
@@ -560,6 +559,7 @@ function SettingsPage() {
               onChange={(e) => void onPickAvatar(e.target.files?.[0] ?? null)}
             />
           </div>
+          <label className="block text-sm text-muted-foreground">Display name</label>
           <input
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}

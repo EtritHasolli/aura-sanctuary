@@ -61,13 +61,23 @@ export function AiAssistant() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const goodGreeting =
+    "Greetings, brave soul! I am Aura Guide, keeper of this sanctuary's light. Ask of the Sanctuary and Pomodoro, Quests and Archives, Challenges, Friends, Shop and Gear, Forge, Tavern, Subscription, Minigames, or Settings!";
+  const evilGreeting =
+    "So... you seek counsel. Wise. I am Aura Guide, and my knowledge of this dark sanctuary is... considerable. Ask of the Sanctuary and Pomodoro, Quests and Archives, Challenges, Friends, Shop and Gear, Forge, Tavern, Subscription, Minigames, or Settings. Choose carefully.";
+
   const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: "assistant",
-      content:
-        "Greetings, adventurer. I am Aura Guide, keeper of this sanctuary's lore. Ask of the Sanctuary and Pomodoro, Quests and Archives, Challenges, Friends, Shop and Gear, Forge, Tavern, Subscription, Minigames, or Settings.",
-    },
+    { role: "assistant", content: goodGreeting },
   ]);
+
+  // Update greeting once alignment is known
+  const alignmentKnown = useRef(false);
+  useEffect(() => {
+    if (alignmentKnown.current) return;
+    if (profile === undefined) return; // still loading
+    alignmentKnown.current = true;
+    setMessages([{ role: "assistant", content: isEvil ? evilGreeting : goodGreeting }]);
+  }, [profile, isEvil, evilGreeting, goodGreeting]);
   const [offset, setOffset] = useState(loadSavedPosition);
   const dragRef = useRef<{
     startX: number;
@@ -200,13 +210,13 @@ export function AiAssistant() {
           style={{ fontFamily: "var(--font-pixel)" }}
           onPointerDown={startDrag}
         >
-          AURA GUIDE (DRAG)
+          {isEvil ? "DARK GUIDE (DRAG)" : "AURA GUIDE (DRAG)"}
         </div>
         <div
           className="text-xs text-primary flex-1 md:hidden"
           style={{ fontFamily: "var(--font-pixel)" }}
         >
-          AURA GUIDE
+          {isEvil ? "DARK GUIDE" : "AURA GUIDE"}
         </div>
         <button
           className="hover:text-destructive"
