@@ -3,7 +3,7 @@ import { createBrowserHistory, createHashHistory, createRouter } from "@tanstack
 import { routeTree } from "./routeTree.gen";
 
 const isElectron =
-  typeof navigator !== "undefined" && navigator.userAgent.includes("Electron");
+  typeof window !== "undefined" && !!window.electronAPI;
 
 export const getRouter = () => {
   const queryClient = new QueryClient();
