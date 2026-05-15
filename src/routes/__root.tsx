@@ -352,6 +352,25 @@ function PersistentYouTubeAudio() {
         }
       : undefined;
 
+  // In Electron, use <webview> instead of <iframe>: it runs in its own renderer
+  // process so YouTube doesn't hit the window.top !== window embed block, and the
+  // useragent attribute lets us strip the "Electron/xx" string that YouTube blocks.
+  if (typeof window !== "undefined" && window.electronAPI) {
+    // Cast to any — <webview> is an Electron-specific custom element unknown to React types.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const WebView = "webview" as any;
+    return (
+      <WebView
+        title="Persistent YouTube audio"
+        src={embedUrl}
+        className={className}
+        style={style}
+        useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+        allowpopups="false"
+      />
+    );
+  }
+
   return (
     <iframe
       title="Persistent YouTube audio"

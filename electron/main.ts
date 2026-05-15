@@ -64,6 +64,7 @@ function createWindow(): BrowserWindow {
       nodeIntegration: false,
       autoplayPolicy: "no-user-gesture-required",
       webSecurity: false,
+      webviewTag: true,
     },
   });
 
@@ -246,6 +247,13 @@ app.whenReady().then(() => {
     return net.fetch(pathToFileURL(filePath).toString());
   });
 
+  // Mask Electron user agent globally — YouTube blocks playback when it sees "Electron/xx"
+  // in the UA string. Must be set before createWindow() so the first page load already
+  // uses the spoofed UA, and before the webRequest interceptors are registered.
+  const CHROME_UA =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+  session.defaultSession.setUserAgent(CHROME_UA);
+
   // Spoof Referer/Origin so YouTube embeds load from app:// and localhost origins.
   // Must be registered before createWindow() so the interceptors are active
   // when the first request fires.
@@ -261,6 +269,7 @@ app.whenReady().then(() => {
     (details: { requestHeaders: Record<string, string> }, callback: (r: { requestHeaders: Record<string, string> }) => void) => {
       details.requestHeaders["Referer"] = "https://www.youtube.com/";
       details.requestHeaders["Origin"] = "https://www.youtube.com";
+      details.requestHeaders["User-Agent"] = CHROME_UA;
       callback({ requestHeaders: details.requestHeaders });
     },
   );
