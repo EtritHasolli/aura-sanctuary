@@ -84,7 +84,7 @@ function createWindow(): BrowserWindow {
     void win.loadURL("http://localhost:8080");
     win.webContents.openDevTools();
   } else {
-    void win.loadURL("app://localhost/index.html");
+    void win.loadURL("app://localhost/index.html#/");
   }
 
   win.webContents.setWindowOpenHandler(({ url }) => {

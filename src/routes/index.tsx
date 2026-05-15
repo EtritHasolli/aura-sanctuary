@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, animate, motion, useMotionValue } from "framer-motion";
-import { RotateCcw, Music, SkipBack, SkipForward, Play, Pause, Square, ListMusic, Volume2, VolumeX, FolderOpen } from "lucide-react";
+import { RotateCcw, Music, SkipBack, SkipForward, Play, Pause, Square, ListMusic, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
-import { LocalMusicModal } from "@/components/aura/LocalMusicModal";
 import { useProfile } from "@/hooks/useProfile";
 import { useTasks, useUpdateTask, useUpdateChecklistItem } from "@/hooks/useTasks";
 import { supabase } from "@/integrations/supabase/client";
@@ -382,7 +381,6 @@ function SanctuaryPage() {
   };
   const [trackLabel, setTrackLabel] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [localModalOpen, setLocalModalOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<"lofi" | "ambient" | "file">("lofi");
 
   // User file library (desktop only)
@@ -933,15 +931,6 @@ function SanctuaryPage() {
               <span className="text-sm" style={{ fontFamily: "var(--font-pixel)" }}>
                 Lo-fi Tavern
               </span>
-              {window.electronAPI && (
-                <button
-                  onClick={() => setLocalModalOpen(true)}
-                  className="ml-auto text-muted-foreground hover:text-primary"
-                  title="Local music library"
-                >
-                  <FolderOpen size={15} />
-                </button>
-              )}
             </div>
             {/* Controls row: [ListMusic] [Prev/Play/Next] [Volume] */}
             <div className="flex items-center justify-between mb-2">
@@ -1140,16 +1129,18 @@ function SanctuaryPage() {
               >
                 {muted ? "Silence." : `♪ ${trackLabel}`}
               </p>
-              {!muted && audioDuration > 0 && (
+              {!muted && playingUserUrl && (
                 <span
                   className="shrink-0 tabular-nums text-muted-foreground/60"
                   style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}
                 >
-                  {fmt(Math.floor(audioProgress))} / {fmt(Math.floor(audioDuration))}
+                  {audioDuration > 0
+                    ? `${fmt(Math.floor(audioProgress))} / ${fmt(Math.floor(audioDuration))}`
+                    : fmt(Math.floor(audioProgress))}
                 </span>
               )}
             </div>
-            {!muted && audioDuration > 0 && (
+            {!muted && playingUserUrl && (
               <div
                 className="mt-1.5 mb-0.5 relative cursor-pointer group"
                 style={{ padding: "5px 0" }}
@@ -1159,7 +1150,9 @@ function SanctuaryPage() {
                   const seek = (clientX: number) => {
                     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
                     const audio = audioRef.current;
-                    if (audio && isFinite(audio.duration)) audio.currentTime = ratio * audio.duration;
+                    if (audio && isFinite(audio.duration) && audio.duration > 0) {
+                      audio.currentTime = ratio * audio.duration;
+                    }
                   };
                   seek(e.clientX);
                   const onMove = (ev: MouseEvent) => seek(ev.clientX);
@@ -1228,10 +1221,6 @@ function SanctuaryPage() {
       </div>
     </div>
 
-    {/* Local music library modal — always mounted so audio persists across open/close */}
-    {window.electronAPI && (
-      <LocalMusicModal isOpen={localModalOpen} onClose={() => setLocalModalOpen(false)} />
-    )}
     </>
   );
 }
