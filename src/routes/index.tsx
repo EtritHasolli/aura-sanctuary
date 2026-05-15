@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, animate, motion, useMotionValue } from "framer-motion";
-import { RotateCcw, Music, SkipBack, SkipForward, Play, Pause, ListMusic, Volume2, VolumeX, FolderOpen } from "lucide-react";
+import { RotateCcw, Music, SkipBack, SkipForward, Play, Pause, Square, ListMusic, Volume2, VolumeX, FolderOpen } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
 import { LocalMusicModal } from "@/components/aura/LocalMusicModal";
@@ -586,6 +586,21 @@ function SanctuaryPage() {
     await playUserTrack(tracks[newIdx], tracks[newIdx].name);
   };
 
+  const stopTrack = () => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+    setYoutubeEmbedUrl(null);
+    window.dispatchEvent(new Event("aura:clear-youtube-audio"));
+    setPlayingUserUrl(null);
+    setTrackLabel("");
+    setAudioProgress(0);
+    setAudioDuration(0);
+    setMuted(true);
+  };
+
   const loadYouTubeTrack = () => {
     const videoId = getYouTubeVideoId(youtubeUrlInput);
     if (!videoId) {
@@ -932,6 +947,9 @@ function SanctuaryPage() {
               <div className="flex items-center gap-3">
                 <button onClick={prevTrack} className="text-muted-foreground hover:text-primary" title="Previous">
                   <SkipBack size={16} />
+                </button>
+                <button onClick={stopTrack} className="text-muted-foreground hover:text-destructive" title="Stop">
+                  <Square size={13} fill="currentColor" />
                 </button>
                 <button onClick={toggleMute} className="text-muted-foreground hover:text-primary" title={muted ? "Play" : "Pause"}>
                   {muted ? <Play size={16} fill="currentColor" /> : <Pause size={16} />}
