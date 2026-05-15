@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, animate, motion, useMotionValue } from "framer-motion";
 import { RotateCcw, Music, SkipBack, SkipForward, Play, Pause, Square, ListMusic, Volume2, VolumeX, FolderOpen } from "lucide-react";
+import { LocalMusicModal } from "@/components/aura/LocalMusicModal";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -381,6 +382,7 @@ function SanctuaryPage() {
   };
   const [trackLabel, setTrackLabel] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [localModalOpen, setLocalModalOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<"lofi" | "ambient" | "file">("lofi");
 
   // User file library (desktop only)
@@ -389,8 +391,12 @@ function SanctuaryPage() {
     () => (typeof window !== "undefined" ? localStorage.getItem("aura:file-folder") : null),
   );
   const [fileTracks, setFileTracks] = useState<UserTrack[]>([]);
-  const [lofiLibPath, setLofiLibPath] = useState<string | null>(null);
-  const [ambientLibPath, setAmbientLibPath] = useState<string | null>(null);
+  const [lofiFolder, setLofiFolder] = useState<string | null>(
+    () => typeof window !== "undefined" ? localStorage.getItem("aura:lofi-folder") : null,
+  );
+  const [ambientFolder, setAmbientFolder] = useState<string | null>(
+    () => typeof window !== "undefined" ? localStorage.getItem("aura:ambient-folder") : null,
+  );
   const [lofiLibTracks, setLofiLibTracks] = useState<UserTrack[]>([]);
   const [ambientLibTracks, setAmbientLibTracks] = useState<UserTrack[]>([]);
   const [playingUserUrl, setPlayingUserUrl] = useState<string | null>(null);
@@ -482,32 +488,21 @@ function SanctuaryPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Desktop: load built-in library paths + initial scan once on mount
+  // Desktop: scan lofi folder whenever it changes (incl. on mount)
   useEffect(() => {
-    if (!window.electronAPI) return;
-    window.electronAPI.getLibraryPaths().then(({ lofi, ambient }) => {
-      setLofiLibPath(lofi);
-      setAmbientLibPath(ambient);
+    if (!window.electronAPI || !lofiFolder) return;
+    void window.electronAPI.scanMusicFolder(lofiFolder).then((tracks) => {
+      setLofiLibTracks(tracks.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
     });
-    void window.electronAPI.scanLibrary().then(({ lofi, ambient }) => {
-      setLofiLibTracks(lofi.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
-      setAmbientLibTracks(ambient.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
-    });
-  }, []);
+  }, [lofiFolder]);
 
-  // Desktop: re-scan library + FILE tab folder whenever the menu opens
+  // Desktop: scan ambient folder whenever it changes (incl. on mount)
   useEffect(() => {
-    if (!menuOpen || !window.electronAPI) return;
-    void window.electronAPI.scanLibrary().then(({ lofi, ambient }) => {
-      setLofiLibTracks(lofi.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
-      setAmbientLibTracks(ambient.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
+    if (!window.electronAPI || !ambientFolder) return;
+    void window.electronAPI.scanMusicFolder(ambientFolder).then((tracks) => {
+      setAmbientLibTracks(tracks.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
     });
-    if (fileFolder) {
-      void window.electronAPI.scanMusicFolder(fileFolder).then((tracks) => {
-        setFileTracks(tracks.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
-      });
-    }
-  }, [menuOpen, fileFolder]);
+  }, [ambientFolder]);
 
   const lofiTracks = useMemo(() => [...BUNDLED_LOFI, ...lofiLibTracks], [lofiLibTracks]);
   const ambientTracks = useMemo(() => [...BUNDLED_AMBIENT, ...ambientLibTracks], [ambientLibTracks]);
@@ -525,6 +520,22 @@ function SanctuaryPage() {
     setTrackLabel(name);
     setPlayingUserUrl(track.url);
     setMuted(false);
+  };
+
+  const pickLofiFolder = async () => {
+    const picked = await window.electronAPI?.pickMusicFolder();
+    if (!picked) return;
+    setLofiFolder(picked);
+    localStorage.setItem("aura:lofi-folder", picked);
+    setLofiLibTracks([]);
+  };
+
+  const pickAmbientFolder = async () => {
+    const picked = await window.electronAPI?.pickMusicFolder();
+    if (!picked) return;
+    setAmbientFolder(picked);
+    localStorage.setItem("aura:ambient-folder", picked);
+    setAmbientLibTracks([]);
   };
 
   const pickFileFolder = async () => {
@@ -948,9 +959,9 @@ function SanctuaryPage() {
               </span>
               {window.electronAPI && (
                 <button
-                  onClick={() => void pickFileFolder()}
+                  onClick={() => setLocalModalOpen(true)}
                   className="text-muted-foreground hover:text-primary transition-colors"
-                  title="Pick music folder"
+                  title="Local music library"
                 >
                   <FolderOpen size={14} />
                 </button>
@@ -1088,19 +1099,6 @@ function SanctuaryPage() {
                   >
                     AMBIENT
                   </button>
-                  {window.electronAPI && (
-                    <button
-                      onClick={() => setActiveCategory("file")}
-                      className={`flex-1 py-1.5 text-center transition-colors ${
-                        activeCategory === "file"
-                          ? "bg-primary/15 text-primary border-b-2 border-primary"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/10"
-                      }`}
-                      style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}
-                    >
-                      FILE
-                    </button>
-                  )}
                 </div>
 
                 {/* Tab content */}
@@ -1110,33 +1108,26 @@ function SanctuaryPage() {
                       {lofiTracks.length === 0 ? (
                         <div className="flex flex-col items-center gap-2 py-5 px-3 text-center">
                           <p className="text-muted-foreground/60" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
-                            No tracks yet
+                            {lofiFolder ? "No audio files found" : "No folder selected"}
                           </p>
-                          {lofiLibPath && window.electronAPI ? (
-                            <button
-                              onClick={() => window.electronAPI!.revealFolder(lofiLibPath)}
-                              className="text-primary/70 hover:text-primary border border-primary/30 hover:border-primary px-2 py-1 transition-colors"
-                              style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
-                            >
-                              + Add MP3s to folder
-                            </button>
-                          ) : (
-                            <p className="text-muted-foreground/40" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
-                              Add MP3s to src/assets/music/lofi/
-                            </p>
-                          )}
+                          <button
+                            onClick={() => void pickLofiFolder()}
+                            className="text-primary/70 hover:text-primary border border-primary/30 hover:border-primary px-2 py-1 transition-colors"
+                            style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
+                          >
+                            {lofiFolder ? "Change folder" : "+ Pick folder"}
+                          </button>
                         </div>
                       ) : (
                         <>
-                          {lofiLibPath && window.electronAPI && (
-                            <button
-                              onClick={() => window.electronAPI!.revealFolder(lofiLibPath)}
-                              className="w-full text-left px-2 py-1 text-muted-foreground/50 hover:text-primary/70 transition-colors border-b border-border/30 mb-1"
-                              style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
-                            >
-                              + Open music folder
-                            </button>
-                          )}
+                          <button
+                            onClick={() => void pickLofiFolder()}
+                            className="w-full text-left px-2 py-1 text-muted-foreground/50 hover:text-primary/70 transition-colors border-b border-border/30 mb-1 flex items-center gap-1"
+                            style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
+                          >
+                            <FolderOpen size={9} />
+                            {lofiFolder?.split(/[\\/]/).pop() ?? "Change folder"}
+                          </button>
                           {lofiTracks.map((t) => {
                             const active = !muted && playingUserUrl === t.url;
                             return (
@@ -1158,33 +1149,26 @@ function SanctuaryPage() {
                       {ambientTracks.length === 0 ? (
                         <div className="flex flex-col items-center gap-2 py-5 px-3 text-center">
                           <p className="text-muted-foreground/60" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
-                            No tracks yet
+                            {ambientFolder ? "No audio files found" : "No folder selected"}
                           </p>
-                          {ambientLibPath && window.electronAPI ? (
-                            <button
-                              onClick={() => window.electronAPI!.revealFolder(ambientLibPath)}
-                              className="text-primary/70 hover:text-primary border border-primary/30 hover:border-primary px-2 py-1 transition-colors"
-                              style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
-                            >
-                              + Add MP3s to folder
-                            </button>
-                          ) : (
-                            <p className="text-muted-foreground/40" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
-                              Add MP3s to src/assets/music/ambient/
-                            </p>
-                          )}
+                          <button
+                            onClick={() => void pickAmbientFolder()}
+                            className="text-primary/70 hover:text-primary border border-primary/30 hover:border-primary px-2 py-1 transition-colors"
+                            style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
+                          >
+                            {ambientFolder ? "Change folder" : "+ Pick folder"}
+                          </button>
                         </div>
                       ) : (
                         <>
-                          {ambientLibPath && window.electronAPI && (
-                            <button
-                              onClick={() => window.electronAPI!.revealFolder(ambientLibPath)}
-                              className="w-full text-left px-2 py-1 text-muted-foreground/50 hover:text-primary/70 transition-colors border-b border-border/30 mb-1"
-                              style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
-                            >
-                              + Open music folder
-                            </button>
-                          )}
+                          <button
+                            onClick={() => void pickAmbientFolder()}
+                            className="w-full text-left px-2 py-1 text-muted-foreground/50 hover:text-primary/70 transition-colors border-b border-border/30 mb-1 flex items-center gap-1"
+                            style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
+                          >
+                            <FolderOpen size={9} />
+                            {ambientFolder?.split(/[\\/]/).pop() ?? "Change folder"}
+                          </button>
                           {ambientTracks.map((t) => {
                             const active = !muted && playingUserUrl === t.url;
                             return (
@@ -1201,46 +1185,6 @@ function SanctuaryPage() {
                     </div>
                   )}
 
-                  {activeCategory === "file" && window.electronAPI && (
-                    <div className="px-1.5 pt-1.5 pb-1.5">
-                      {fileTracks.length === 0 ? (
-                        <div className="flex flex-col items-center gap-2 py-5 px-3 text-center">
-                          <p className="text-muted-foreground/60" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
-                            No folder selected
-                          </p>
-                          <button
-                            onClick={() => void pickFileFolder()}
-                            className="text-primary/70 hover:text-primary border border-primary/30 hover:border-primary px-2 py-1 transition-colors"
-                            style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
-                          >
-                            + Pick folder
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => void pickFileFolder()}
-                            className="w-full text-left px-2 py-1 text-muted-foreground/50 hover:text-primary/70 transition-colors border-b border-border/30 mb-1 flex items-center gap-1"
-                            style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
-                          >
-                            <FolderOpen size={9} />
-                            {fileFolder ? fileFolder.split(/[\\/]/).pop() : "Change folder"}
-                          </button>
-                          {fileTracks.map((t) => {
-                            const active = !muted && playingUserUrl === t.url;
-                            return (
-                              <button key={t.url} onClick={() => void playUserTrack(t, t.name)}
-                                className={`w-full text-left px-2 py-1.5 flex items-center gap-2 border-l-2 transition-colors ${active ? "border-l-primary text-primary bg-primary/10" : "border-l-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20 hover:border-l-primary/40"}`}
-                                style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
-                                <span className={active ? "text-primary" : "opacity-40"}>♫</span>
-                                <ScrollingName name={t.name} />
-                              </button>
-                            );
-                          })}
-                        </>
-                      )}
-                    </div>
-                  )}
 
                 </div>
               </motion.div>
@@ -1345,6 +1289,9 @@ function SanctuaryPage() {
       </div>
     </div>
 
+    {window.electronAPI && (
+      <LocalMusicModal isOpen={localModalOpen} onClose={() => setLocalModalOpen(false)} />
+    )}
     </>
   );
 }
