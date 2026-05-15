@@ -1,6 +1,6 @@
-import { app, BrowserWindow, ipcMain, nativeImage, net, protocol, screen, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, net, protocol, screen, session, shell } from "electron";
 import { autoUpdater } from "electron-updater";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -202,6 +202,67 @@ ipcMain.on("mini-player:stop", (event) => {
 
 ipcMain.on("install-update", () => {
   autoUpdater.quitAndInstall();
+});
+
+// --- Music libraries (local folder picker + built-in lofi/ambient library) ---
+
+const AUDIO_EXTS = new Set([".mp3", ".flac", ".wav", ".ogg", ".m4a", ".aac", ".opus", ".wma"]);
+
+ipcMain.handle("music:pick-folder", async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    properties: ["openDirectory"],
+    title: "Select Music Folder",
+  });
+  return canceled ? null : filePaths[0];
+});
+
+ipcMain.handle("music:scan-folder", (_event, folderPath: string) => {
+  try {
+    return readdirSync(folderPath)
+      .filter((f) => AUDIO_EXTS.has(path.extname(f).toLowerCase()))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }))
+      .map((f) => ({
+        name: path.basename(f, path.extname(f)),
+        path: path.join(folderPath, f),
+      }));
+  } catch {
+    return [];
+  }
+});
+
+// Built-in lofi / ambient library folders (stored in Electron userData so they
+// survive app updates and the user can find and fill them easily).
+const scanAudioDir = (dir: string) => {
+  try {
+    mkdirSync(dir, { recursive: true });
+    return readdirSync(dir)
+      .filter((f) => AUDIO_EXTS.has(path.extname(f).toLowerCase()))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }))
+      .map((f) => ({ name: path.basename(f, path.extname(f)), path: path.join(dir, f) }));
+  } catch {
+    return [];
+  }
+};
+
+ipcMain.handle("music:get-library-paths", () => {
+  const base = path.join(app.getPath("userData"), "music");
+  return {
+    lofi: path.join(base, "lofi"),
+    ambient: path.join(base, "ambient"),
+  };
+});
+
+ipcMain.handle("music:scan-library", () => {
+  const base = path.join(app.getPath("userData"), "music");
+  return {
+    lofi: scanAudioDir(path.join(base, "lofi")),
+    ambient: scanAudioDir(path.join(base, "ambient")),
+  };
+});
+
+ipcMain.handle("music:reveal-folder", (_event, folderPath: string) => {
+  mkdirSync(folderPath, { recursive: true });
+  shell.openPath(folderPath);
 });
 
 if (process.env.GH_TOKEN) {

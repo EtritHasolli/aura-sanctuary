@@ -184,7 +184,7 @@ function CustomCursorOverlay() {
       isInteractiveRef.current = !!target?.closest(interactiveSelector);
       updateCursorImage();
       el.style.opacity = "1";
-      el.style.transform = `translate(${event.clientX}px, ${event.clientY}px)`;
+      el.style.transform = `translate(${event.clientX - 6}px, ${event.clientY - 6}px)`;
     };
 
     const down = (event: PointerEvent) => {
@@ -377,7 +377,7 @@ function PersistentYouTubeAudio() {
       src={embedUrl}
       className={className}
       style={style}
-      allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
       referrerPolicy="no-referrer-when-downgrade"
     />
   );

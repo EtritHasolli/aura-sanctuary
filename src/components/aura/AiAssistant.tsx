@@ -18,18 +18,29 @@ function defaultBottomOffset() {
   return window.innerWidth < 768 ? 72 : 24;
 }
 
+const BUBBLE_SIZE = 80;
+const MARGIN = 8;
+
+function clampBubble(x: number, y: number): { x: number; y: number } {
+  if (typeof window === "undefined") return { x: Math.max(MARGIN, x), y: Math.max(MARGIN, y) };
+  return {
+    x: Math.min(Math.max(MARGIN, x), window.innerWidth - BUBBLE_SIZE - MARGIN),
+    y: Math.min(Math.max(MARGIN, y), window.innerHeight - BUBBLE_SIZE - MARGIN),
+  };
+}
+
 function loadSavedPosition(): { x: number; y: number } {
   if (typeof window === "undefined") return { x: 24, y: defaultBottomOffset() };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { x: 24, y: defaultBottomOffset() };
+    if (!raw) return clampBubble(24, defaultBottomOffset());
     const parsed = JSON.parse(raw) as { x?: number; y?: number };
-    return {
-      x: typeof parsed.x === "number" ? parsed.x : 24,
-      y: typeof parsed.y === "number" ? parsed.y : defaultBottomOffset(),
-    };
+    return clampBubble(
+      typeof parsed.x === "number" ? parsed.x : 24,
+      typeof parsed.y === "number" ? parsed.y : defaultBottomOffset(),
+    );
   } catch {
-    return { x: 24, y: defaultBottomOffset() };
+    return clampBubble(24, defaultBottomOffset());
   }
 }
 
@@ -88,16 +99,20 @@ export function AiAssistant() {
     moved: boolean;
   } | null>(null);
 
-  const panelStyle = useMemo(
-    () => ({
-      right: `${offset.x}px`,
-      bottom: `${offset.y}px`,
-    }),
-    [offset.x, offset.y],
-  );
+  const panelStyle = useMemo(() => {
+    if (!open) return { right: `${offset.x}px`, bottom: `${offset.y}px` };
+    // Clamp panel so it doesn't overflow the viewport
+    const W = typeof window !== "undefined" ? window.innerWidth : 800;
+    const H = typeof window !== "undefined" ? window.innerHeight : 600;
+    const pw = Math.min(320, W - 16);
+    const ph = 420; // approx panel height: header + messages area + input
+    const cx = Math.min(Math.max(MARGIN, offset.x), W - pw - MARGIN);
+    const cy = Math.min(Math.max(MARGIN, offset.y), H - ph - MARGIN);
+    return { right: `${cx}px`, bottom: `${cy}px` };
+  }, [offset.x, offset.y, open]);
 
   const saveOffset = (x: number, y: number) => {
-    const next = { x: Math.max(8, x), y: Math.max(8, y) };
+    const next = clampBubble(x, y);
     setOffset(next);
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   };

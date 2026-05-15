@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { animate, motion, useMotionValue } from "framer-motion";
-import { RotateCcw, Music, SkipForward, ListMusic, Volume2, VolumeX } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, animate, motion, useMotionValue } from "framer-motion";
+import { RotateCcw, Music, SkipBack, SkipForward, Play, Pause, ListMusic, Volume2, VolumeX, FolderOpen } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
+import { LocalMusicModal } from "@/components/aura/LocalMusicModal";
 import { useProfile } from "@/hooks/useProfile";
 import { useTasks, useUpdateTask, useUpdateChecklistItem } from "@/hooks/useTasks";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,43 +33,26 @@ export const Route = createFileRoute("/")({
 
 const FALL_ASLEEP_TRANSITION_MS = 1300;
 
-const TRACK_SOURCES = [
-  {
-    label: "chillhop stream",
-    kind: "stream" as const,
-    url: "https://cdn.pixabay.com/download/audio/2022/05/16/audio_c1c3fd27f2.mp3?filename=lofi-study-112191.mp3",
-  },
-  {
-    label: "ambient groove",
-    kind: "stream" as const,
-    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-  },
-  {
-    label: "night vibe",
-    kind: "stream" as const,
-    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-  },
-  {
-    label: "calm drift",
-    kind: "stream" as const,
-    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-  },
-  {
-    label: "rain ambience",
-    kind: "generated" as const,
-    generator: "rain" as const,
-  },
-  {
-    label: "forest birds",
-    kind: "stream" as const,
-    url: "https://www.soundjay.com/nature/birds-01.mp3",
-  },
-  {
-    label: "wood burning",
-    kind: "generated" as const,
-    generator: "fire" as const,
-  },
-] as const;
+// Bundled music — drop MP3s into src/assets/music/lofi/ or src/assets/music/ambient/ and rebuild
+const _lofiGlob = import.meta.glob<string>(
+  "/src/assets/music/lofi/*.{mp3,flac,wav,ogg,m4a,aac,opus,wma}",
+  { eager: true, as: "url" },
+);
+const _ambientGlob = import.meta.glob<string>(
+  "/src/assets/music/ambient/*.{mp3,flac,wav,ogg,m4a,aac,opus,wma}",
+  { eager: true, as: "url" },
+);
+function _assetName(path: string) {
+  const file = path.split("/").pop() ?? path;
+  const dot = file.lastIndexOf(".");
+  return dot > 0 ? file.slice(0, dot) : file;
+}
+const BUNDLED_LOFI = Object.entries(_lofiGlob)
+  .map(([p, url]) => ({ name: _assetName(p), url }))
+  .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+const BUNDLED_AMBIENT = Object.entries(_ambientGlob)
+  .map(([p, url]) => ({ name: _assetName(p), url }))
+  .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
 
 function fmt(s: number) {
   const m = Math.floor(s / 60)
@@ -102,6 +86,45 @@ function getYouTubeVideoId(raw: string) {
   }
 }
 
+function ScrollingName({ name }: { name: string }) {
+  const outerRef = useRef<HTMLSpanElement>(null);
+  const innerRef = useRef<HTMLSpanElement>(null);
+  const [dist, setDist] = useState(0);
+
+  useLayoutEffect(() => {
+    const outer = outerRef.current;
+    const inner = innerRef.current;
+    if (!outer || !inner) return;
+    const d = inner.scrollWidth - outer.clientWidth;
+    setDist(d > 4 ? d : 0);
+  }, [name]);
+
+  const scrollTime = dist > 0 ? Math.max(dist / 40, 0.8) : 0;
+  const total = 4 + 2 * scrollTime;
+
+  return (
+    <span ref={outerRef} className="flex-1 min-w-0 overflow-hidden">
+      {dist > 0 ? (
+        <motion.span
+          ref={innerRef}
+          className="inline-block whitespace-nowrap"
+          animate={{ x: [0, 0, -dist, -dist, 0] }}
+          transition={{
+            duration: total,
+            times: [0, 2 / total, (2 + scrollTime) / total, (4 + scrollTime) / total, 1],
+            repeat: Infinity,
+            ease: "linear",
+          }}
+        >
+          {name}
+        </motion.span>
+      ) : (
+        <span ref={innerRef} className="block truncate">{name}</span>
+      )}
+    </span>
+  );
+}
+
 function SanctuaryPage() {
   const { running, mode, secondsLeft, start, pause, reset, characterState } = usePomodoro();
   const characterStateRef = useRef(characterState);
@@ -112,8 +135,6 @@ function SanctuaryPage() {
   const updateChecklist = useUpdateChecklistItem();
   const [muted, setMuted] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const stopGeneratedRef = useRef<(() => void) | null>(null);
 
   const focused = characterState === "working";
   const pathLabel = useMemo(
@@ -315,9 +336,8 @@ function SanctuaryPage() {
     return () => {
       sanctuaryPanCtlRef.current?.stop();
       if (sanctuaryTapTimeoutRef.current != null) window.clearTimeout(sanctuaryTapTimeoutRef.current);
-      if (sleepTransitionTimeoutRef.current != null) {
-        window.clearTimeout(sleepTransitionTimeoutRef.current);
-      }
+      if (sleepTransitionTimeoutRef.current != null) window.clearTimeout(sleepTransitionTimeoutRef.current);
+      if (volHideTimerRef.current != null) window.clearTimeout(volHideTimerRef.current);
     };
   }, []);
 
@@ -360,29 +380,53 @@ function SanctuaryPage() {
       }
     }, 2000);
   };
-  const [trackLabel, setTrackLabel] = useState("chillhop stream");
-  const [trackIdx, setTrackIdx] = useState(0);
+  const [trackLabel, setTrackLabel] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [localModalOpen, setLocalModalOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<"lofi" | "ambient" | "file">("lofi");
+
+  // User file library (desktop only)
+  type UserTrack = { name: string; url: string };
+  const [fileFolder, setFileFolder] = useState<string | null>(
+    () => (typeof window !== "undefined" ? localStorage.getItem("aura:file-folder") : null),
+  );
+  const [fileTracks, setFileTracks] = useState<UserTrack[]>([]);
+  const [lofiLibPath, setLofiLibPath] = useState<string | null>(null);
+  const [ambientLibPath, setAmbientLibPath] = useState<string | null>(null);
+  const [playingUserUrl, setPlayingUserUrl] = useState<string | null>(null);
+  const [volumeMuted, setVolumeMuted] = useState(false);
+  const [volume, setVolume] = useState(0.35);
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const volHideTimerRef = useRef<number | null>(null);
+  const [audioProgress, setAudioProgress] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
   const [youtubeUrlInput, setYoutubeUrlInput] = useState("");
   const [youtubeEmbedUrl, setYoutubeEmbedUrl] = useState<string | null>(null);
-  const trackSources = TRACK_SOURCES;
   const todos = tasks.filter((t) => t.type === "todo").slice(0, 8);
 
   useEffect(() => {
-    const audio = new Audio(trackSources[0].url);
+    const audio = new Audio();
     audio.loop = true;
     audio.volume = 0.35;
     audio.preload = "auto";
+
+    const onTimeUpdate = () => setAudioProgress(audio.currentTime);
+    const onDuration = () => setAudioDuration(isFinite(audio.duration) ? audio.duration : 0);
+
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("loadedmetadata", onDuration);
+    audio.addEventListener("durationchange", onDuration);
+
     audioRef.current = audio;
     return () => {
+      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("loadedmetadata", onDuration);
+      audio.removeEventListener("durationchange", onDuration);
       audio.pause();
       audioRef.current = null;
-      stopGeneratedRef.current?.();
-      stopGeneratedRef.current = null;
-      audioCtxRef.current?.close();
-      audioCtxRef.current = null;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -416,159 +460,130 @@ function SanctuaryPage() {
     };
   }, [menuOpen]);
 
-  const stopGenerated = () => {
-    stopGeneratedRef.current?.();
-    stopGeneratedRef.current = null;
-  };
-
-  const getAudioContext = async () => {
-    if (!audioCtxRef.current) {
-      audioCtxRef.current = new AudioContext();
-    }
-    if (audioCtxRef.current.state === "suspended") {
-      await audioCtxRef.current.resume();
-    }
-    return audioCtxRef.current;
-  };
-
-  const playGenerated = async (mode: "rain" | "fire") => {
-    const ctx = await getAudioContext();
-    stopGenerated();
-    const durationSec = 2;
-    const buffer = ctx.createBuffer(1, ctx.sampleRate * durationSec, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i += 1) {
-      data[i] = (Math.random() * 2 - 1) * 0.7;
-    }
-
-    const src = ctx.createBufferSource();
-    src.buffer = buffer;
-    src.loop = true;
-
-    const gain = ctx.createGain();
-    const filterA = ctx.createBiquadFilter();
-    const filterB = ctx.createBiquadFilter();
-
-    if (mode === "rain") {
-      filterA.type = "lowpass";
-      filterA.frequency.value = 1300;
-      filterB.type = "highpass";
-      filterB.frequency.value = 120;
-      gain.gain.value = 0.18;
-    } else {
-      filterA.type = "bandpass";
-      filterA.frequency.value = 900;
-      filterB.type = "highpass";
-      filterB.frequency.value = 250;
-      gain.gain.value = 0.14;
-    }
-
-    src.connect(filterA);
-    filterA.connect(filterB);
-    filterB.connect(gain);
-    gain.connect(ctx.destination);
-    src.start();
-
-    let crackleTimer: number | null = null;
-    if (mode === "fire") {
-      crackleTimer = window.setInterval(() => {
-        const now = ctx.currentTime;
-        gain.gain.cancelScheduledValues(now);
-        gain.gain.setValueAtTime(0.1 + Math.random() * 0.08, now);
-        gain.gain.exponentialRampToValueAtTime(
-          0.03 + Math.random() * 0.05,
-          now + 0.09 + Math.random() * 0.12,
-        );
-      }, 110);
-    }
-
-    stopGeneratedRef.current = () => {
-      if (crackleTimer) window.clearInterval(crackleTimer);
-      try {
-        src.stop();
-      } catch {
-        /* no-op */
-      }
-      src.disconnect();
-      filterA.disconnect();
-      filterB.disconnect();
-      gain.disconnect();
+  // When the local music modal starts playing, pause audio/YouTube
+  useEffect(() => {
+    const onLocalStart = (e: Event) => {
+      const name = (e as CustomEvent<{ name: string }>).detail?.name ?? "local track";
+      audioRef.current?.pause();
+      window.dispatchEvent(new Event("aura:clear-youtube-audio"));
+      setTrackLabel(name);
+      setMuted(false);
     };
-  };
+    window.addEventListener("aura:local-start", onLocalStart);
+    return () => window.removeEventListener("aura:local-start", onLocalStart);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const playSelectedTrack = async (idx: number) => {
-    const selected = trackSources[idx];
+  // Desktop: load built-in library paths once on mount
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    window.electronAPI.getLibraryPaths().then(({ lofi, ambient }) => {
+      setLofiLibPath(lofi);
+      setAmbientLibPath(ambient);
+    });
+  }, []);
+
+  // Desktop: re-scan FILE tab folder whenever the menu opens
+  useEffect(() => {
+    if (!menuOpen || !window.electronAPI || !fileFolder) return;
+    window.electronAPI.scanMusicFolder(fileFolder).then((tracks) => {
+      setFileTracks(tracks.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
+    });
+  }, [menuOpen, fileFolder]);
+
+  const playUserTrack = async (track: UserTrack, name: string) => {
     const audio = audioRef.current;
     if (!audio) return;
     setYoutubeEmbedUrl(null);
     window.dispatchEvent(new Event("aura:clear-youtube-audio"));
-    if (selected.kind === "generated") {
-      audio.pause();
-      await playGenerated(selected.generator);
-      return;
-    }
-
-    stopGenerated();
-    audio.src = selected.url;
+    window.dispatchEvent(new Event("aura:stream-start"));
+    audio.src = track.url;
     audio.load();
-    await audio.play();
+    await audio.play().catch(() => {});
+    audio.muted = volumeMuted;
+    setTrackLabel(name);
+    setPlayingUserUrl(track.url);
+    setMuted(false);
+  };
+
+  const pickFileFolder = async () => {
+    const picked = await window.electronAPI?.pickMusicFolder();
+    if (!picked) return;
+    setFileFolder(picked);
+    localStorage.setItem("aura:file-folder", picked);
+    const tracks = await window.electronAPI!.scanMusicFolder(picked);
+    setFileTracks(tracks.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
   };
 
   const toggleMute = async () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
     if (muted) {
-      try {
-        await playSelectedTrack(trackIdx);
-        setMuted(false);
-      } catch (err) {
-        const name = err instanceof DOMException ? err.name : "UnknownError";
-        if (name === "NotAllowedError") {
-          setMuted(true);
-          toast.error("Browser blocked autoplay. Click again after interacting with the page.");
-          return;
+      if (playingUserUrl) {
+        try {
+          await audio.play();
+          audio.muted = volumeMuted;
+          setMuted(false);
+        } catch (err) {
+          const errName = err instanceof DOMException ? err.name : "UnknownError";
+          if (errName === "NotAllowedError") {
+            toast.error("Browser blocked autoplay. Click again after interacting with the page.");
+          } else {
+            toast.error("Could not resume track.");
+          }
         }
-        setMuted(true);
-        toast.error("Could not start this sound. Please pick another track.");
+      } else {
+        const tracks = activeCategory === "lofi" ? BUNDLED_LOFI : activeCategory === "ambient" ? BUNDLED_AMBIENT : fileTracks;
+        if (tracks.length > 0) await playUserTrack(tracks[0], tracks[0].name);
       }
       return;
     }
 
-    audioRef.current?.pause();
-    stopGenerated();
+    audio.pause();
     setMuted(true);
   };
 
-  const nextTrack = async () => {
-    const nextIdx = (trackIdx + 1) % trackSources.length;
-    setTrackIdx(nextIdx);
-    setTrackLabel(trackSources[nextIdx].label);
-
-    if (!muted) {
-      try {
-        await playSelectedTrack(nextIdx);
-      } catch {
-        setMuted(true);
-        toast.error("Switched track, but playback was blocked. Tap volume to play.");
-        return;
-      }
-    }
-    toast.success(`Now playing: ${trackSources[nextIdx].label}`);
+  const toggleVolume = () => {
+    const next = !volumeMuted;
+    setVolumeMuted(next);
+    if (audioRef.current) audioRef.current.muted = next;
   };
 
-  const selectTrack = async (idx: number) => {
-    setTrackIdx(idx);
-    setTrackLabel(trackSources[idx].label);
-    setMenuOpen(false);
-
-    if (!muted) {
-      try {
-        await playSelectedTrack(idx);
-      } catch {
-        setMuted(true);
-        toast.error("Track selected, but playback was blocked. Tap volume to play.");
-        return;
+  const setAudioVolume = (v: number) => {
+    const clamped = Math.max(0, Math.min(1, v));
+    setVolume(clamped);
+    if (audioRef.current) {
+      audioRef.current.volume = clamped;
+      if (clamped > 0 && volumeMuted) {
+        setVolumeMuted(false);
+        audioRef.current.muted = false;
       }
     }
-    toast.success(`Selected: ${trackSources[idx].label}`);
+  };
+
+  const onVolEnter = () => {
+    if (volHideTimerRef.current) { clearTimeout(volHideTimerRef.current); volHideTimerRef.current = null; }
+    setShowVolumeSlider(true);
+  };
+  const onVolLeave = () => {
+    volHideTimerRef.current = window.setTimeout(() => setShowVolumeSlider(false), 150);
+  };
+
+  const prevTrack = async () => {
+    const tracks = activeCategory === "lofi" ? BUNDLED_LOFI : activeCategory === "ambient" ? BUNDLED_AMBIENT : fileTracks;
+    if (tracks.length === 0) return;
+    const idx = playingUserUrl ? tracks.findIndex((t) => t.url === playingUserUrl) : -1;
+    const newIdx = idx <= 0 ? tracks.length - 1 : idx - 1;
+    await playUserTrack(tracks[newIdx], tracks[newIdx].name);
+  };
+
+  const nextTrack = async () => {
+    const tracks = activeCategory === "lofi" ? BUNDLED_LOFI : activeCategory === "ambient" ? BUNDLED_AMBIENT : fileTracks;
+    if (tracks.length === 0) return;
+    const idx = playingUserUrl ? tracks.findIndex((t) => t.url === playingUserUrl) : -1;
+    const newIdx = idx < 0 || idx >= tracks.length - 1 ? 0 : idx + 1;
+    await playUserTrack(tracks[newIdx], tracks[newIdx].name);
   };
 
   const loadYouTubeTrack = () => {
@@ -579,7 +594,6 @@ function SanctuaryPage() {
     }
 
     audioRef.current?.pause();
-    stopGenerated();
     setMuted(false);
     setMenuOpen(false);
     setTrackLabel("youtube");
@@ -592,6 +606,7 @@ function SanctuaryPage() {
   };
 
   return (
+    <>
     <div className="p-3 md:p-6 max-w-6xl mx-auto">
       <div className="mb-3 flex items-center justify-end">
         <div className="px-2 py-1 border border-border bg-secondary/30 text-xs text-muted-foreground capitalize">
@@ -889,53 +904,321 @@ function SanctuaryPage() {
 
           {/* Lo-fi music */}
           <div ref={menuContainerRef} className="pixel-panel p-4 relative">
+            {/* Title row */}
             <div className="flex items-center gap-2 mb-2">
               <Music size={14} className="text-primary" />
               <span className="text-sm" style={{ fontFamily: "var(--font-pixel)" }}>
                 Lo-fi Tavern
               </span>
+              {window.electronAPI && (
+                <button
+                  onClick={() => setLocalModalOpen(true)}
+                  className="ml-auto text-muted-foreground hover:text-primary"
+                  title="Local music library"
+                >
+                  <FolderOpen size={15} />
+                </button>
+              )}
+            </div>
+            {/* Controls row: [ListMusic] [Prev/Play/Next] [Volume] */}
+            <div className="flex items-center justify-between mb-2">
               <button
                 onClick={() => setMenuOpen((v) => !v)}
-                className="ml-auto text-muted-foreground hover:text-primary"
+                className="text-muted-foreground hover:text-primary"
                 title="Song menu"
               >
                 <ListMusic size={16} />
               </button>
-              <button
-                onClick={nextTrack}
-                className="text-muted-foreground hover:text-primary"
-                title="Next sound"
-              >
-                <SkipForward size={16} />
-              </button>
-              <button onClick={toggleMute} className="text-muted-foreground hover:text-primary">
-                {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-              </button>
-            </div>
-            {menuOpen && (
-              <div className="absolute right-2 top-10 z-[80] w-48 pixel-panel p-2 space-y-1 bg-card">
-                {trackSources.map((track, idx) => (
-                  <button
-                    key={track.label}
-                    onClick={() => selectTrack(idx)}
-                    className={`w-full text-left px-2 py-1.5 text-xs border ${
-                      idx === trackIdx
-                        ? "border-primary text-primary"
-                        : "border-border hover:border-primary"
-                    }`}
-                    style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
+              <div className="flex items-center gap-3">
+                <button onClick={prevTrack} className="text-muted-foreground hover:text-primary" title="Previous">
+                  <SkipBack size={16} />
+                </button>
+                <button onClick={toggleMute} className="text-muted-foreground hover:text-primary" title={muted ? "Play" : "Pause"}>
+                  {muted ? <Play size={16} fill="currentColor" /> : <Pause size={16} />}
+                </button>
+                <button onClick={nextTrack} className="text-muted-foreground hover:text-primary" title="Next">
+                  <SkipForward size={16} />
+                </button>
+              </div>
+              <div className="relative" onMouseEnter={onVolEnter} onMouseLeave={onVolLeave}>
+                <AnimatePresence>
+                {showVolumeSlider && (
+                  <motion.div
+                    className="absolute z-[80] pixel-panel bg-card shadow-xl px-2 py-2.5 flex flex-col items-center gap-1.5"
+                    style={{ left: "calc(100% + 20px)", top: "50%", translateY: "-50%", transformOrigin: "left center" }}
+                    initial={{ opacity: 0, scale: 0.88, x: -12 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.88, x: -12 }}
+                    transition={{ duration: 0.14, ease: "easeOut" }}
                   >
-                    {track.label}
+                    <span className="text-muted-foreground/60 tabular-nums" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
+                      {volumeMuted ? "0" : Math.round(volume * 100)}
+                    </span>
+                    <div
+                      className="relative cursor-pointer group/vol"
+                      style={{ width: 8, height: 72 }}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const seek = (clientY: number) => {
+                          setAudioVolume((rect.bottom - clientY) / rect.height);
+                        };
+                        seek(e.clientY);
+                        const onMove = (ev: MouseEvent) => seek(ev.clientY);
+                        const onUp = () => {
+                          document.removeEventListener("mousemove", onMove);
+                          document.removeEventListener("mouseup", onUp);
+                        };
+                        document.addEventListener("mousemove", onMove);
+                        document.addEventListener("mouseup", onUp);
+                      }}
+                    >
+                      <div className="absolute inset-0 bg-border/40" />
+                      <div
+                        className="absolute bottom-0 left-0 right-0 bg-primary"
+                        style={{ height: `${volumeMuted ? 0 : volume * 100}%` }}
+                      />
+                      <div
+                        className="absolute left-1/2 -translate-x-1/2 w-3 h-1 bg-primary opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none"
+                        style={{ bottom: `calc(${volumeMuted ? 0 : volume * 100}% - 2px)` }}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+                </AnimatePresence>
+                <button onClick={toggleVolume} className="text-muted-foreground hover:text-primary" title={volumeMuted ? "Unmute" : "Mute"}>
+                  {volumeMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                </button>
+              </div>
+            </div>
+            <AnimatePresence>
+            {menuOpen && (
+              <motion.div
+                className="absolute z-[80] w-72 pixel-panel bg-card shadow-xl overflow-hidden"
+                style={{ right: "calc(100% + 8px)", top: 0, transformOrigin: "right top" }}
+                initial={{ opacity: 0, scale: 0.88, x: 12 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.88, x: 12 }}
+                transition={{ duration: 0.14, ease: "easeOut" }}
+              >
+                {/* Now playing header */}
+                <div className="px-3 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-muted-foreground mb-0.5" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
+                      NOW PLAYING
+                    </div>
+                    <div className="text-primary truncate" style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
+                      {muted ? "—" : trackLabel}
+                    </div>
+                  </div>
+                  {!muted && (
+                    <div className="flex items-end gap-px h-3.5 shrink-0">
+                      {[0, 1, 2, 3].map((i) => (
+                        <motion.div
+                          key={i}
+                          className="w-0.5 bg-primary"
+                          animate={{ height: ["25%", "100%", "55%", "80%", "25%"] }}
+                          transition={{ duration: 0.85, repeat: Infinity, delay: i * 0.12, ease: "easeInOut" }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Category tabs */}
+                <div className="flex border-b border-border">
+                  <button
+                    onClick={() => setActiveCategory("lofi")}
+                    className={`flex-1 py-1.5 text-center transition-colors ${
+                      activeCategory === "lofi"
+                        ? "bg-primary/15 text-primary border-b-2 border-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/10"
+                    }`}
+                    style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}
+                  >
+                    LO-FI
                   </button>
-                ))}
+                  <button
+                    onClick={() => setActiveCategory("ambient")}
+                    className={`flex-1 py-1.5 text-center transition-colors ${
+                      activeCategory === "ambient"
+                        ? "bg-primary/15 text-primary border-b-2 border-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/10"
+                    }`}
+                    style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}
+                  >
+                    AMBIENT
+                  </button>
+                  {window.electronAPI && (
+                    <button
+                      onClick={() => setActiveCategory("file")}
+                      className={`flex-1 py-1.5 text-center transition-colors ${
+                        activeCategory === "file"
+                          ? "bg-primary/15 text-primary border-b-2 border-primary"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/10"
+                      }`}
+                      style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}
+                    >
+                      FILE
+                    </button>
+                  )}
+                </div>
+
+                {/* Tab content */}
+                <div className="overflow-y-auto max-h-80">
+                  {activeCategory === "lofi" && (
+                    <div className="px-1.5 pt-1.5 pb-1.5">
+                      {BUNDLED_LOFI.length === 0 ? (
+                        <div className="flex flex-col items-center gap-2 py-5 px-3 text-center">
+                          <p className="text-muted-foreground/60" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
+                            No tracks yet
+                          </p>
+                          <p className="text-muted-foreground/40" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
+                            Add MP3s to src/assets/music/lofi/
+                          </p>
+                        </div>
+                      ) : BUNDLED_LOFI.map((t) => {
+                        const active = !muted && playingUserUrl === t.url;
+                        return (
+                          <button key={t.url} onClick={() => playUserTrack(t, t.name)}
+                            className={`w-full text-left px-2 py-1.5 flex items-center gap-2 border-l-2 transition-colors ${active ? "border-l-primary text-primary bg-primary/10" : "border-l-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20 hover:border-l-primary/40"}`}
+                            style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
+                            <span className={active ? "text-primary" : "opacity-40"}>♪</span>
+                            <ScrollingName name={t.name} />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {activeCategory === "ambient" && (
+                    <div className="px-1.5 pt-1.5 pb-1.5">
+                      {BUNDLED_AMBIENT.length === 0 ? (
+                        <div className="flex flex-col items-center gap-2 py-5 px-3 text-center">
+                          <p className="text-muted-foreground/60" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
+                            No tracks yet
+                          </p>
+                          <p className="text-muted-foreground/40" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
+                            Add MP3s to src/assets/music/ambient/
+                          </p>
+                        </div>
+                      ) : BUNDLED_AMBIENT.map((t) => {
+                        const active = !muted && playingUserUrl === t.url;
+                        return (
+                          <button key={t.url} onClick={() => playUserTrack(t, t.name)}
+                            className={`w-full text-left px-2 py-1.5 flex items-center gap-2 border-l-2 transition-colors ${active ? "border-l-primary text-primary bg-primary/10" : "border-l-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20 hover:border-l-primary/40"}`}
+                            style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
+                            <span className={active ? "text-primary" : "opacity-40"}>≋</span>
+                            <ScrollingName name={t.name} />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {activeCategory === "file" && window.electronAPI && (
+                    <div className="px-1.5 pt-1.5 pb-1.5">
+                      {!fileFolder ? (
+                        <button
+                          onClick={pickFileFolder}
+                          className="w-full text-left px-3 py-2.5 flex items-center gap-2 text-muted-foreground hover:text-primary hover:bg-muted/20 transition-colors"
+                          style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}
+                        >
+                          <FolderOpen size={11} />
+                          SELECT FOLDER
+                        </button>
+                      ) : (
+                        <>
+                          <div className="px-2 py-1.5 flex items-center gap-2 border-b border-border/40 mb-1">
+                            <FolderOpen size={9} className="text-primary shrink-0 opacity-70" />
+                            <span className="text-primary truncate flex-1" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
+                              {fileFolder.split(/[\\/]/).pop() ?? fileFolder}
+                            </span>
+                          </div>
+                          {fileTracks.length === 0 ? (
+                            <p className="px-3 py-1.5 text-muted-foreground/50" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
+                              No audio files found
+                            </p>
+                          ) : fileTracks.map((t) => {
+                            const active = !muted && playingUserUrl === t.url;
+                            return (
+                              <button
+                                key={t.url}
+                                onClick={() => playUserTrack(t, t.name)}
+                                className={`w-full text-left px-2 py-1.5 flex items-center gap-2 border-l-2 transition-colors ${active ? "border-l-primary text-primary bg-primary/10" : "border-l-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20 hover:border-l-primary/40"}`}
+                                style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
+                              >
+                                <span className={active ? "text-primary" : "opacity-40"}>♪</span>
+                                <ScrollingName name={t.name} />
+                              </button>
+                            );
+                          })}
+                          <button
+                            onClick={pickFileFolder}
+                            className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/10 transition-colors border-t border-border/40 mt-1"
+                            style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
+                          >
+                            <FolderOpen size={9} />
+                            SELECT ANOTHER FOLDER
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+            </AnimatePresence>
+            <div className="flex items-center gap-2 min-w-0">
+              <p
+                className="text-sm text-muted-foreground flex-1 min-w-0 truncate"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {muted ? "Silence." : `♪ ${trackLabel}`}
+              </p>
+              {!muted && audioDuration > 0 && (
+                <span
+                  className="shrink-0 tabular-nums text-muted-foreground/60"
+                  style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}
+                >
+                  {fmt(Math.floor(audioProgress))} / {fmt(Math.floor(audioDuration))}
+                </span>
+              )}
+            </div>
+            {!muted && audioDuration > 0 && (
+              <div
+                className="mt-1.5 mb-0.5 relative cursor-pointer group"
+                style={{ padding: "5px 0" }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const seek = (clientX: number) => {
+                    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+                    const audio = audioRef.current;
+                    if (audio && isFinite(audio.duration)) audio.currentTime = ratio * audio.duration;
+                  };
+                  seek(e.clientX);
+                  const onMove = (ev: MouseEvent) => seek(ev.clientX);
+                  const onUp = () => {
+                    document.removeEventListener("mousemove", onMove);
+                    document.removeEventListener("mouseup", onUp);
+                  };
+                  document.addEventListener("mousemove", onMove);
+                  document.addEventListener("mouseup", onUp);
+                }}
+              >
+                <div className="h-1 bg-border/40 relative overflow-hidden">
+                  <div
+                    className="h-full bg-primary"
+                    style={{ width: audioDuration > 0 ? `${(audioProgress / audioDuration) * 100}%` : "0%" }}
+                  />
+                </div>
+                <div
+                  className="absolute w-2.5 h-2.5 rounded-full bg-primary shadow-sm opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                  style={{ left: `${audioDuration > 0 ? (audioProgress / audioDuration) * 100 : 0}%`, top: "50%", transform: "translate(-50%, -50%)" }}
+                />
               </div>
             )}
-            <p
-              className="text-sm text-muted-foreground"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              {muted ? "Silence." : `♪ ${trackLabel}`}
-            </p>
             <div className="mt-2 space-y-2">
               <div className="flex flex-col gap-1">
                 <input
@@ -978,5 +1261,11 @@ function SanctuaryPage() {
         </div>
       </div>
     </div>
+
+    {/* Local music library modal — always mounted so audio persists across open/close */}
+    {window.electronAPI && (
+      <LocalMusicModal isOpen={localModalOpen} onClose={() => setLocalModalOpen(false)} />
+    )}
+    </>
   );
 }

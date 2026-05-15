@@ -59,4 +59,19 @@ contextBridge.exposeInMainWorld("electronAPI", {
   miniPlayerCollapse: (): Promise<void> => ipcRenderer.invoke("mini-player:collapse"),
   miniPlayerClose: () => ipcRenderer.send("mini-player:close"),
   miniPlayerStop: () => ipcRenderer.send("mini-player:stop"),
+
+  // --- Local music library (arbitrary folder picker) ---
+  pickMusicFolder: (): Promise<string | null> => ipcRenderer.invoke("music:pick-folder"),
+  scanMusicFolder: (folderPath: string): Promise<Array<{ name: string; path: string }>> =>
+    ipcRenderer.invoke("music:scan-folder", folderPath),
+  fileToUrl: (filePath: string): string =>
+    "file:///" + filePath.replace(/\\/g, "/"),
+
+  // --- Built-in lofi / ambient library ---
+  getLibraryPaths: (): Promise<{ lofi: string; ambient: string }> =>
+    ipcRenderer.invoke("music:get-library-paths"),
+  scanLibrary: (): Promise<{ lofi: Array<{ name: string; path: string }>; ambient: Array<{ name: string; path: string }> }> =>
+    ipcRenderer.invoke("music:scan-library"),
+  revealFolder: (folderPath: string): Promise<void> =>
+    ipcRenderer.invoke("music:reveal-folder", folderPath),
 });

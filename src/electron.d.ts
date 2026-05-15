@@ -24,6 +24,12 @@ declare global {
       miniPlayerCollapse: () => Promise<void>;
       miniPlayerClose: () => void;
       miniPlayerStop: () => void;
+      pickMusicFolder: () => Promise<string | null>;
+      scanMusicFolder: (folderPath: string) => Promise<Array<{ name: string; path: string }>>;
+      fileToUrl: (filePath: string) => string;
+      getLibraryPaths: () => Promise<{ lofi: string; ambient: string }>;
+      scanLibrary: () => Promise<{ lofi: Array<{ name: string; path: string }>; ambient: Array<{ name: string; path: string }> }>;
+      revealFolder: (folderPath: string) => Promise<void>;
     };
   }
 }
