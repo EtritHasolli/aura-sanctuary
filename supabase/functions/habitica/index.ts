@@ -245,6 +245,7 @@ interface HabiticaTask {
   checklist?: { id: string; text: string; completed: boolean }[];
   tags?: string[];
   history?: { date: number; value?: number; scoredUp?: number; scoredDown?: number }[];
+  reminders?: { id: string; time: string }[];
 }
 
 async function fetchHabiticaTasks(
@@ -551,6 +552,14 @@ async function persistRefresh(
     const patch: Record<string, unknown> = {
       habitica_meta: buildTaskMeta(remote),
     };
+
+    // Sync the first Habitica reminder time → reminder_time (HH:MM).
+    if (Array.isArray(remote.reminders) && remote.reminders.length > 0) {
+      const rawTime = remote.reminders[0].time ?? "";
+      // Habitica stores time as "HH:MM" or full ISO; extract HH:MM.
+      const match = rawTime.match(/(\d{2}:\d{2})/);
+      if (match) patch.reminder_time = match[1];
+    }
 
     if (options.reconcileCompletions) {
       if (localRow.type === "habit" && remote.type === "habit") {

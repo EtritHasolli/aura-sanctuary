@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile, useApplyReward } from "@/hooks/useProfile";
+import { useTaskReminders } from "@/hooks/useTaskReminders";
 import { HUD } from "@/components/aura/HUD";
 import { SideNav } from "@/components/aura/SideNav";
 import { AiAssistant } from "@/components/aura/AiAssistant";
@@ -327,7 +328,7 @@ function PersistentYouTubeAudio() {
       window.removeEventListener("resize", updateRect);
       window.removeEventListener("scroll", updateRect, true);
     };
-  }, [path, embedUrl]);
+  }, [path]);
 
   if (!embedUrl) return null;
 
@@ -353,6 +354,8 @@ function PersistentYouTubeAudio() {
       className={className}
       style={style}
       allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+      referrerPolicy="origin"
+      sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-forms"
     />
   );
 }
@@ -486,6 +489,7 @@ function AppGate() {
   useDailyLoginCheckIn(user?.id ?? null, push);
   useMoonshardAwardToasts(push);
   useMonthlyStipendCheckIn(user?.id ?? null);
+  useTaskReminders();
 
   if (loading) {
     return (

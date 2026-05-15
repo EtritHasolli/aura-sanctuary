@@ -191,6 +191,8 @@ export interface Task {
   streak_best?: number;
   last_completed_local_date?: string | null;
   challenge_run_id?: string | null;
+  /** Optional daily reminder time in HH:MM 24h format. Null = no reminder. */
+  reminder_time?: string | null;
   /** Set when this task mirrors a Habitica habit/daily. */
   habitica_task_id?: string | null;
   /** Cached Habitica-side metadata (streak, counter, value, checklist, etc.). */

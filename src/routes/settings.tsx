@@ -676,7 +676,18 @@ function SettingsPage() {
             <input
               type="checkbox"
               checked={desktopNotifs}
-              onChange={(e) => setDesktopNotifs(e.target.checked)}
+              onChange={async (e) => {
+                const enabled = e.target.checked;
+                if (enabled && typeof Notification !== "undefined" && Notification.permission !== "granted") {
+                  const result = await Notification.requestPermission();
+                  if (result !== "granted") {
+                    toast.error("Browser blocked desktop notifications. Allow them in your browser settings.");
+                    return;
+                  }
+                }
+                setDesktopNotifs(enabled);
+                window.localStorage.setItem(DESKTOP_NOTIF_KEY, String(enabled));
+              }}
             />
             Enable desktop notifications
           </label>

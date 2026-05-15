@@ -2,7 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Plus, Minus, Check, Flame, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import {
   useTasks,
   useCreateTask,
@@ -496,7 +497,11 @@ function TaskRow({
     const goldOut = prof ? withGoldEquipBonus(baseGold, prof) : baseGold;
     toast.success(`+${xpOut} XP · +${goldOut}g`);
 
-    void scoreHabitica(task.id, "up", linkedHabiticaId);
+    // Todos are deleted on completion (locally and on Habitica via useDeleteTask).
+    // Scoring a deleted Habitica task returns a 404, so skip it for todos.
+    if (task.type !== "todo") {
+      void scoreHabitica(task.id, "up", linkedHabiticaId);
+    }
   };
 
   const uncompleteDaily = async () => {
@@ -704,6 +709,7 @@ function TaskRow({
         <DialogContent
           className="max-w-2xl"
           hideClose
+          aria-describedby={undefined}
           fullOverlay={
             (del.isPending || saving) ? (
               <BugLoader overlay label={del.isPending ? "BANISHING..." : "SAVING..."} />
@@ -785,6 +791,9 @@ function TaskRow({
             </div>
           }
         >
+          <VisuallyHidden.Root>
+            <DialogTitle>{task.title}</DialogTitle>
+          </VisuallyHidden.Root>
           <div className="space-y-2">
             <div
               className="text-[10px] text-muted-foreground"
@@ -819,6 +828,65 @@ function TaskRow({
                 })}
               </div>
             </div>
+            <div
+              className="text-[10px] text-muted-foreground"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              Reminder:
+              {task.type === "todo" ? (
+                // Todos get a one-shot datetime picker (stored as YYYY-MM-DDTHH:MM)
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <input
+                    type="datetime-local"
+                    value={task.reminder_time ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value || null;
+                      update.mutate({ id: task.id, patch: { reminder_time: val } });
+                    }}
+                    className="px-1 py-0.5 bg-input border border-border text-xs"
+                  />
+                  {task.reminder_time && (
+                    <button
+                      type="button"
+                      onClick={() => update.mutate({ id: task.id, patch: { reminder_time: null } })}
+                      className="text-destructive text-[10px] hover:opacity-70"
+                      style={{ fontFamily: "var(--font-pixel)" }}
+                    >
+                      CLEAR
+                    </button>
+                  )}
+                </div>
+              ) : (
+                // Habits & dailies repeat, so just a daily time is enough
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="time"
+                    value={task.reminder_time ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value || null;
+                      update.mutate({ id: task.id, patch: { reminder_time: val } });
+                    }}
+                    className="px-1 py-0.5 bg-input border border-border text-xs"
+                  />
+                  {task.reminder_time && (
+                    <button
+                      type="button"
+                      onClick={() => update.mutate({ id: task.id, patch: { reminder_time: null } })}
+                      className="text-destructive text-[10px] hover:opacity-70"
+                      style={{ fontFamily: "var(--font-pixel)" }}
+                    >
+                      CLEAR
+                    </button>
+                  )}
+                  {task.habitica_task_id && task.reminder_time && (
+                    <span className="text-accent text-[9px]" style={{ fontFamily: "var(--font-pixel)" }}>
+                      ⚡ synced from Habitica
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
             {task.type === "daily" && (
               <div
                 className="text-[10px] text-muted-foreground"
