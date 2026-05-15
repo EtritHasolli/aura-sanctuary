@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, animate, motion, useMotionValue } from "framer-motion";
-import { RotateCcw, Music, SkipBack, SkipForward, Play, Pause, Square, ListMusic, Volume2, VolumeX } from "lucide-react";
+import { RotateCcw, Music, SkipBack, SkipForward, Play, Pause, Square, ListMusic, Volume2, VolumeX, FolderOpen } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -943,9 +943,18 @@ function SanctuaryPage() {
             {/* Title row */}
             <div className="flex items-center gap-2 mb-2">
               <Music size={14} className="text-primary" />
-              <span className="text-sm" style={{ fontFamily: "var(--font-pixel)" }}>
+              <span className="text-sm flex-1" style={{ fontFamily: "var(--font-pixel)" }}>
                 Lo-fi Tavern
               </span>
+              {window.electronAPI && (
+                <button
+                  onClick={() => void pickFileFolder()}
+                  className="text-muted-foreground hover:text-primary transition-colors"
+                  title="Pick music folder"
+                >
+                  <FolderOpen size={14} />
+                </button>
+              )}
             </div>
             {/* Controls row: [ListMusic] [Prev/Play/Next] [Volume] */}
             <div className="flex items-center justify-between mb-2">
@@ -1079,6 +1088,19 @@ function SanctuaryPage() {
                   >
                     AMBIENT
                   </button>
+                  {window.electronAPI && (
+                    <button
+                      onClick={() => setActiveCategory("file")}
+                      className={`flex-1 py-1.5 text-center transition-colors ${
+                        activeCategory === "file"
+                          ? "bg-primary/15 text-primary border-b-2 border-primary"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/10"
+                      }`}
+                      style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}
+                    >
+                      FILE
+                    </button>
+                  )}
                 </div>
 
                 {/* Tab content */}
@@ -1170,6 +1192,47 @@ function SanctuaryPage() {
                                 className={`w-full text-left px-2 py-1.5 flex items-center gap-2 border-l-2 transition-colors ${active ? "border-l-primary text-primary bg-primary/10" : "border-l-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20 hover:border-l-primary/40"}`}
                                 style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
                                 <span className={active ? "text-primary" : "opacity-40"}>≋</span>
+                                <ScrollingName name={t.name} />
+                              </button>
+                            );
+                          })}
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {activeCategory === "file" && window.electronAPI && (
+                    <div className="px-1.5 pt-1.5 pb-1.5">
+                      {fileTracks.length === 0 ? (
+                        <div className="flex flex-col items-center gap-2 py-5 px-3 text-center">
+                          <p className="text-muted-foreground/60" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
+                            No folder selected
+                          </p>
+                          <button
+                            onClick={() => void pickFileFolder()}
+                            className="text-primary/70 hover:text-primary border border-primary/30 hover:border-primary px-2 py-1 transition-colors"
+                            style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
+                          >
+                            + Pick folder
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => void pickFileFolder()}
+                            className="w-full text-left px-2 py-1 text-muted-foreground/50 hover:text-primary/70 transition-colors border-b border-border/30 mb-1 flex items-center gap-1"
+                            style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
+                          >
+                            <FolderOpen size={9} />
+                            {fileFolder ? fileFolder.split(/[\\/]/).pop() : "Change folder"}
+                          </button>
+                          {fileTracks.map((t) => {
+                            const active = !muted && playingUserUrl === t.url;
+                            return (
+                              <button key={t.url} onClick={() => void playUserTrack(t, t.name)}
+                                className={`w-full text-left px-2 py-1.5 flex items-center gap-2 border-l-2 transition-colors ${active ? "border-l-primary text-primary bg-primary/10" : "border-l-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20 hover:border-l-primary/40"}`}
+                                style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
+                                <span className={active ? "text-primary" : "opacity-40"}>♫</span>
                                 <ScrollingName name={t.name} />
                               </button>
                             );
