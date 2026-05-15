@@ -411,18 +411,26 @@ function SanctuaryPage() {
     audio.volume = 0.35;
     audio.preload = "auto";
 
-    const onTimeUpdate = () => setAudioProgress(audio.currentTime);
-    const onDuration = () => setAudioDuration(isFinite(audio.duration) ? audio.duration : 0);
+    const onTimeUpdate = () => {
+      setAudioProgress(audio.currentTime);
+      // Fallback: grab duration on every tick in case loadedmetadata was missed
+      if (isFinite(audio.duration) && audio.duration > 0) setAudioDuration(audio.duration);
+    };
+    const onDuration = () => {
+      if (isFinite(audio.duration) && audio.duration > 0) setAudioDuration(audio.duration);
+    };
 
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("loadedmetadata", onDuration);
     audio.addEventListener("durationchange", onDuration);
+    audio.addEventListener("canplay", onDuration);
 
     audioRef.current = audio;
     return () => {
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("loadedmetadata", onDuration);
       audio.removeEventListener("durationchange", onDuration);
+      audio.removeEventListener("canplay", onDuration);
       audio.pause();
       audioRef.current = null;
     };
@@ -1067,19 +1075,6 @@ function SanctuaryPage() {
                   >
                     AMBIENT
                   </button>
-                  {window.electronAPI && (
-                    <button
-                      onClick={() => setActiveCategory("file")}
-                      className={`flex-1 py-1.5 text-center transition-colors ${
-                        activeCategory === "file"
-                          ? "bg-primary/15 text-primary border-b-2 border-primary"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/10"
-                      }`}
-                      style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}
-                    >
-                      FILE
-                    </button>
-                  )}
                 </div>
 
                 {/* Tab content */}
@@ -1134,55 +1129,6 @@ function SanctuaryPage() {
                     </div>
                   )}
 
-                  {activeCategory === "file" && window.electronAPI && (
-                    <div className="px-1.5 pt-1.5 pb-1.5">
-                      {!fileFolder ? (
-                        <button
-                          onClick={pickFileFolder}
-                          className="w-full text-left px-3 py-2.5 flex items-center gap-2 text-muted-foreground hover:text-primary hover:bg-muted/20 transition-colors"
-                          style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}
-                        >
-                          <FolderOpen size={11} />
-                          SELECT FOLDER
-                        </button>
-                      ) : (
-                        <>
-                          <div className="px-2 py-1.5 flex items-center gap-2 border-b border-border/40 mb-1">
-                            <FolderOpen size={9} className="text-primary shrink-0 opacity-70" />
-                            <span className="text-primary truncate flex-1" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
-                              {fileFolder.split(/[\\/]/).pop() ?? fileFolder}
-                            </span>
-                          </div>
-                          {fileTracks.length === 0 ? (
-                            <p className="px-3 py-1.5 text-muted-foreground/50" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
-                              No audio files found
-                            </p>
-                          ) : fileTracks.map((t) => {
-                            const active = !muted && playingUserUrl === t.url;
-                            return (
-                              <button
-                                key={t.url}
-                                onClick={() => playUserTrack(t, t.name)}
-                                className={`w-full text-left px-2 py-1.5 flex items-center gap-2 border-l-2 transition-colors ${active ? "border-l-primary text-primary bg-primary/10" : "border-l-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20 hover:border-l-primary/40"}`}
-                                style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
-                              >
-                                <span className={active ? "text-primary" : "opacity-40"}>♪</span>
-                                <ScrollingName name={t.name} />
-                              </button>
-                            );
-                          })}
-                          <button
-                            onClick={pickFileFolder}
-                            className="w-full text-left px-3 py-1.5 flex items-center gap-2 text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/10 transition-colors border-t border-border/40 mt-1"
-                            style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
-                          >
-                            <FolderOpen size={9} />
-                            SELECT ANOTHER FOLDER
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
                 </div>
               </motion.div>
             )}
@@ -1237,29 +1183,31 @@ function SanctuaryPage() {
                 />
               </div>
             )}
-            <div className="mt-2 space-y-2">
-              <div className="flex flex-col gap-1">
-                <input
-                  value={youtubeUrlInput}
-                  onChange={(e) => setYoutubeUrlInput(e.target.value)}
-                  placeholder="Paste YouTube URL..."
-                  className="w-full bg-input border-2 border-border px-3 py-2 text-sm focus:border-primary outline-none"
-                />
-                <button
-                  onClick={loadYouTubeTrack}
-                  className="w-full px-3 py-2 bg-primary text-primary-foreground text-sm"
-                  style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
-                >
-                  LOAD
-                </button>
+            {!window.electronAPI && (
+              <div className="mt-2 space-y-2">
+                <div className="flex flex-col gap-1">
+                  <input
+                    value={youtubeUrlInput}
+                    onChange={(e) => setYoutubeUrlInput(e.target.value)}
+                    placeholder="Paste YouTube URL..."
+                    className="w-full bg-input border-2 border-border px-3 py-2 text-sm focus:border-primary outline-none"
+                  />
+                  <button
+                    onClick={loadYouTubeTrack}
+                    className="w-full px-3 py-2 bg-primary text-primary-foreground text-sm"
+                    style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
+                  >
+                    LOAD
+                  </button>
+                </div>
+                {youtubeEmbedUrl && (
+                  <div
+                    id="aura-youtube-slot"
+                    className="w-full h-40 border-2 border-border bg-black/60"
+                  />
+                )}
               </div>
-              {youtubeEmbedUrl && (
-                <div
-                  id="aura-youtube-slot"
-                  className="w-full h-40 border-2 border-border bg-black/60"
-                />
-              )}
-            </div>
+            )}
             <div className="mt-2 h-7 flex items-start gap-1 w-full overflow-hidden">
               {[...Array(20)].map((_, i) => (
                 <motion.div
