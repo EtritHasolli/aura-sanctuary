@@ -391,6 +391,8 @@ function SanctuaryPage() {
   const [fileTracks, setFileTracks] = useState<UserTrack[]>([]);
   const [lofiLibPath, setLofiLibPath] = useState<string | null>(null);
   const [ambientLibPath, setAmbientLibPath] = useState<string | null>(null);
+  const [lofiLibTracks, setLofiLibTracks] = useState<UserTrack[]>([]);
+  const [ambientLibTracks, setAmbientLibTracks] = useState<UserTrack[]>([]);
   const [playingUserUrl, setPlayingUserUrl] = useState<string | null>(null);
   const [volumeMuted, setVolumeMuted] = useState(false);
   const [volume, setVolume] = useState(0.35);
@@ -480,22 +482,35 @@ function SanctuaryPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Desktop: load built-in library paths once on mount
+  // Desktop: load built-in library paths + initial scan once on mount
   useEffect(() => {
     if (!window.electronAPI) return;
     window.electronAPI.getLibraryPaths().then(({ lofi, ambient }) => {
       setLofiLibPath(lofi);
       setAmbientLibPath(ambient);
     });
+    void window.electronAPI.scanLibrary().then(({ lofi, ambient }) => {
+      setLofiLibTracks(lofi.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
+      setAmbientLibTracks(ambient.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
+    });
   }, []);
 
-  // Desktop: re-scan FILE tab folder whenever the menu opens
+  // Desktop: re-scan library + FILE tab folder whenever the menu opens
   useEffect(() => {
-    if (!menuOpen || !window.electronAPI || !fileFolder) return;
-    window.electronAPI.scanMusicFolder(fileFolder).then((tracks) => {
-      setFileTracks(tracks.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
+    if (!menuOpen || !window.electronAPI) return;
+    void window.electronAPI.scanLibrary().then(({ lofi, ambient }) => {
+      setLofiLibTracks(lofi.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
+      setAmbientLibTracks(ambient.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
     });
+    if (fileFolder) {
+      void window.electronAPI.scanMusicFolder(fileFolder).then((tracks) => {
+        setFileTracks(tracks.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
+      });
+    }
   }, [menuOpen, fileFolder]);
+
+  const lofiTracks = useMemo(() => [...BUNDLED_LOFI, ...lofiLibTracks], [lofiLibTracks]);
+  const ambientTracks = useMemo(() => [...BUNDLED_AMBIENT, ...ambientLibTracks], [ambientLibTracks]);
 
   const playUserTrack = async (track: UserTrack, name: string) => {
     const audio = audioRef.current;
@@ -540,7 +555,7 @@ function SanctuaryPage() {
           }
         }
       } else {
-        const tracks = activeCategory === "lofi" ? BUNDLED_LOFI : activeCategory === "ambient" ? BUNDLED_AMBIENT : fileTracks;
+        const tracks = activeCategory === "lofi" ? lofiTracks : activeCategory === "ambient" ? ambientTracks : fileTracks;
         if (tracks.length > 0) await playUserTrack(tracks[0], tracks[0].name);
       }
       return;
@@ -577,7 +592,7 @@ function SanctuaryPage() {
   };
 
   const prevTrack = async () => {
-    const tracks = activeCategory === "lofi" ? BUNDLED_LOFI : activeCategory === "ambient" ? BUNDLED_AMBIENT : fileTracks;
+    const tracks = activeCategory === "lofi" ? lofiTracks : activeCategory === "ambient" ? ambientTracks : fileTracks;
     if (tracks.length === 0) return;
     const idx = playingUserUrl ? tracks.findIndex((t) => t.url === playingUserUrl) : -1;
     const newIdx = idx <= 0 ? tracks.length - 1 : idx - 1;
@@ -585,7 +600,7 @@ function SanctuaryPage() {
   };
 
   const nextTrack = async () => {
-    const tracks = activeCategory === "lofi" ? BUNDLED_LOFI : activeCategory === "ambient" ? BUNDLED_AMBIENT : fileTracks;
+    const tracks = activeCategory === "lofi" ? lofiTracks : activeCategory === "ambient" ? ambientTracks : fileTracks;
     if (tracks.length === 0) return;
     const idx = playingUserUrl ? tracks.findIndex((t) => t.url === playingUserUrl) : -1;
     const newIdx = idx < 0 || idx >= tracks.length - 1 ? 0 : idx + 1;
@@ -1070,51 +1085,97 @@ function SanctuaryPage() {
                 <div className="overflow-y-auto max-h-80">
                   {activeCategory === "lofi" && (
                     <div className="px-1.5 pt-1.5 pb-1.5">
-                      {BUNDLED_LOFI.length === 0 ? (
+                      {lofiTracks.length === 0 ? (
                         <div className="flex flex-col items-center gap-2 py-5 px-3 text-center">
                           <p className="text-muted-foreground/60" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
                             No tracks yet
                           </p>
-                          <p className="text-muted-foreground/40" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
-                            Add MP3s to src/assets/music/lofi/
-                          </p>
+                          {lofiLibPath && window.electronAPI ? (
+                            <button
+                              onClick={() => window.electronAPI!.revealFolder(lofiLibPath)}
+                              className="text-primary/70 hover:text-primary border border-primary/30 hover:border-primary px-2 py-1 transition-colors"
+                              style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
+                            >
+                              + Add MP3s to folder
+                            </button>
+                          ) : (
+                            <p className="text-muted-foreground/40" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
+                              Add MP3s to src/assets/music/lofi/
+                            </p>
+                          )}
                         </div>
-                      ) : BUNDLED_LOFI.map((t) => {
-                        const active = !muted && playingUserUrl === t.url;
-                        return (
-                          <button key={t.url} onClick={() => playUserTrack(t, t.name)}
-                            className={`w-full text-left px-2 py-1.5 flex items-center gap-2 border-l-2 transition-colors ${active ? "border-l-primary text-primary bg-primary/10" : "border-l-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20 hover:border-l-primary/40"}`}
-                            style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
-                            <span className={active ? "text-primary" : "opacity-40"}>♪</span>
-                            <ScrollingName name={t.name} />
-                          </button>
-                        );
-                      })}
+                      ) : (
+                        <>
+                          {lofiLibPath && window.electronAPI && (
+                            <button
+                              onClick={() => window.electronAPI!.revealFolder(lofiLibPath)}
+                              className="w-full text-left px-2 py-1 text-muted-foreground/50 hover:text-primary/70 transition-colors border-b border-border/30 mb-1"
+                              style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
+                            >
+                              + Open music folder
+                            </button>
+                          )}
+                          {lofiTracks.map((t) => {
+                            const active = !muted && playingUserUrl === t.url;
+                            return (
+                              <button key={t.url} onClick={() => void playUserTrack(t, t.name)}
+                                className={`w-full text-left px-2 py-1.5 flex items-center gap-2 border-l-2 transition-colors ${active ? "border-l-primary text-primary bg-primary/10" : "border-l-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20 hover:border-l-primary/40"}`}
+                                style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
+                                <span className={active ? "text-primary" : "opacity-40"}>♪</span>
+                                <ScrollingName name={t.name} />
+                              </button>
+                            );
+                          })}
+                        </>
+                      )}
                     </div>
                   )}
 
                   {activeCategory === "ambient" && (
                     <div className="px-1.5 pt-1.5 pb-1.5">
-                      {BUNDLED_AMBIENT.length === 0 ? (
+                      {ambientTracks.length === 0 ? (
                         <div className="flex flex-col items-center gap-2 py-5 px-3 text-center">
                           <p className="text-muted-foreground/60" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
                             No tracks yet
                           </p>
-                          <p className="text-muted-foreground/40" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
-                            Add MP3s to src/assets/music/ambient/
-                          </p>
+                          {ambientLibPath && window.electronAPI ? (
+                            <button
+                              onClick={() => window.electronAPI!.revealFolder(ambientLibPath)}
+                              className="text-primary/70 hover:text-primary border border-primary/30 hover:border-primary px-2 py-1 transition-colors"
+                              style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
+                            >
+                              + Add MP3s to folder
+                            </button>
+                          ) : (
+                            <p className="text-muted-foreground/40" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
+                              Add MP3s to src/assets/music/ambient/
+                            </p>
+                          )}
                         </div>
-                      ) : BUNDLED_AMBIENT.map((t) => {
-                        const active = !muted && playingUserUrl === t.url;
-                        return (
-                          <button key={t.url} onClick={() => playUserTrack(t, t.name)}
-                            className={`w-full text-left px-2 py-1.5 flex items-center gap-2 border-l-2 transition-colors ${active ? "border-l-primary text-primary bg-primary/10" : "border-l-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20 hover:border-l-primary/40"}`}
-                            style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
-                            <span className={active ? "text-primary" : "opacity-40"}>≋</span>
-                            <ScrollingName name={t.name} />
-                          </button>
-                        );
-                      })}
+                      ) : (
+                        <>
+                          {ambientLibPath && window.electronAPI && (
+                            <button
+                              onClick={() => window.electronAPI!.revealFolder(ambientLibPath)}
+                              className="w-full text-left px-2 py-1 text-muted-foreground/50 hover:text-primary/70 transition-colors border-b border-border/30 mb-1"
+                              style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}
+                            >
+                              + Open music folder
+                            </button>
+                          )}
+                          {ambientTracks.map((t) => {
+                            const active = !muted && playingUserUrl === t.url;
+                            return (
+                              <button key={t.url} onClick={() => void playUserTrack(t, t.name)}
+                                className={`w-full text-left px-2 py-1.5 flex items-center gap-2 border-l-2 transition-colors ${active ? "border-l-primary text-primary bg-primary/10" : "border-l-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20 hover:border-l-primary/40"}`}
+                                style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
+                                <span className={active ? "text-primary" : "opacity-40"}>≋</span>
+                                <ScrollingName name={t.name} />
+                              </button>
+                            );
+                          })}
+                        </>
+                      )}
                     </div>
                   )}
 
