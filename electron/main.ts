@@ -246,11 +246,18 @@ app.whenReady().then(() => {
     return net.fetch(pathToFileURL(filePath).toString());
   });
 
-  mainWin = createWindow();
+  // Spoof Referer/Origin so YouTube embeds load from app:// and localhost origins.
+  // Must be registered before createWindow() so the interceptors are active
+  // when the first request fires.
+  const youtubeUrls = [
+    "*://*.youtube.com/*",
+    "*://*.youtube-nocookie.com/*",
+    "*://*.googlevideo.com/*",
+    "*://*.ytimg.com/*",
+  ];
 
-  // Spoof Referer/Origin for YouTube requests so embeds load from the app:// origin
   session.defaultSession.webRequest.onBeforeSendHeaders(
-    { urls: ["*://*.youtube.com/*", "*://*.googlevideo.com/*", "*://*.ytimg.com/*"] },
+    { urls: youtubeUrls },
     (details: { requestHeaders: Record<string, string> }, callback: (r: { requestHeaders: Record<string, string> }) => void) => {
       details.requestHeaders["Referer"] = "https://www.youtube.com/";
       details.requestHeaders["Origin"] = "https://www.youtube.com";
@@ -258,13 +265,12 @@ app.whenReady().then(() => {
     },
   );
 
-  // Strip YouTube's X-Frame-Options and CSP frame-ancestors so the embed
-  // iframe actually renders instead of showing a black screen in Electron.
+  // Strip X-Frame-Options and CSP frame-ancestors from YouTube responses so
+  // the embed iframe renders instead of showing a black screen / error 152.
   session.defaultSession.webRequest.onHeadersReceived(
-    { urls: ["*://*.youtube.com/*", "*://*.googlevideo.com/*"] },
+    { urls: youtubeUrls },
     (details: { responseHeaders?: Record<string, string[]> }, callback: (r: { responseHeaders?: Record<string, string[]> }) => void) => {
       const headers = { ...(details.responseHeaders ?? {}) };
-      // Delete case-insensitively
       for (const key of Object.keys(headers)) {
         const lower = key.toLowerCase();
         if (lower === "x-frame-options" || lower === "content-security-policy") {
@@ -274,6 +280,8 @@ app.whenReady().then(() => {
       callback({ responseHeaders: headers });
     },
   );
+
+  mainWin = createWindow();
 
   if (!isDev) {
     mainWin.webContents.once("did-finish-load", () => {

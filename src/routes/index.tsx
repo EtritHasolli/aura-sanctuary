@@ -583,7 +583,7 @@ function SanctuaryPage() {
     setMuted(false);
     setMenuOpen(false);
     setTrackLabel("youtube");
-    const embed = `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&modestbranding=1&rel=0&playsinline=1`;
+    const embed = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=1&modestbranding=1&rel=0&playsinline=1`;
     setYoutubeEmbedUrl(embed);
     window.dispatchEvent(
       new CustomEvent("aura:set-youtube-audio", { detail: { embedUrl: embed } }),

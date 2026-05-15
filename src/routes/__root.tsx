@@ -267,7 +267,12 @@ function PersistentYouTubeAudio() {
     window.addEventListener("aura:clear-youtube-audio", onClear);
 
     const saved = window.localStorage.getItem("aura:youtube-embed-url");
-    if (saved) setEmbedUrl(saved);
+    if (saved) {
+      // Migrate old youtube.com embeds to youtube-nocookie.com
+      const migrated = saved.replace("https://www.youtube.com/embed/", "https://www.youtube-nocookie.com/embed/");
+      if (migrated !== saved) window.localStorage.setItem("aura:youtube-embed-url", migrated);
+      setEmbedUrl(migrated);
+    }
 
     return () => {
       window.removeEventListener("aura:set-youtube-audio", onSet as EventListener);
@@ -354,8 +359,7 @@ function PersistentYouTubeAudio() {
       className={className}
       style={style}
       allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-      referrerPolicy="origin"
-      sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-forms"
+      referrerPolicy="no-referrer-when-downgrade"
     />
   );
 }
