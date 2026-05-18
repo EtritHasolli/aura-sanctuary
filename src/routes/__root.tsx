@@ -121,12 +121,21 @@ function RootComponent() {
 
 function MiniPlayerManager() {
   const api = window.electronAPI;
+  const isMusicPlayingRef = useRef(false);
+
+  useEffect(() => {
+    const onMusicPlaying = (e: Event) => {
+      isMusicPlayingRef.current = (e as CustomEvent<{ playing: boolean }>).detail.playing;
+    };
+    window.addEventListener("aura:music-playing", onMusicPlaying as EventListener);
+    return () => window.removeEventListener("aura:music-playing", onMusicPlaying as EventListener);
+  }, []);
+
   useEffect(() => {
     if (!api?.onWindowMinimize) return;
 
     const offMinimize = api.onWindowMinimize(() => {
-      const hasAudio = !!window.localStorage.getItem("aura:youtube-embed-url");
-      if (!hasAudio) return;
+      if (!isMusicPlayingRef.current) return;
       void api.showMiniPlayer();
     });
 
@@ -135,7 +144,7 @@ function MiniPlayerManager() {
     });
 
     const offClosed = api.onMiniPlayerClosed(() => {
-      window.dispatchEvent(new CustomEvent("aura:clear-youtube-audio"));
+      // nothing to clear for music — audio element keeps playing
     });
 
     return () => {
@@ -268,12 +277,17 @@ function PersistentYouTubeAudio() {
     window.addEventListener("aura:set-youtube-audio", onSet as EventListener);
     window.addEventListener("aura:clear-youtube-audio", onClear);
 
-    const saved = window.localStorage.getItem("aura:youtube-embed-url");
-    if (saved) {
-      // Migrate old youtube.com embeds to youtube-nocookie.com
-      const migrated = saved.replace("https://www.youtube.com/embed/", "https://www.youtube-nocookie.com/embed/");
-      if (migrated !== saved) window.localStorage.setItem("aura:youtube-embed-url", migrated);
-      setEmbedUrl(migrated);
+    if (window.electronAPI) {
+      // YouTube not supported in desktop app — clear any stale stored URL
+      window.localStorage.removeItem("aura:youtube-embed-url");
+    } else {
+      const saved = window.localStorage.getItem("aura:youtube-embed-url");
+      if (saved) {
+        // Migrate old youtube.com embeds to youtube-nocookie.com
+        const migrated = saved.replace("https://www.youtube.com/embed/", "https://www.youtube-nocookie.com/embed/");
+        if (migrated !== saved) window.localStorage.setItem("aura:youtube-embed-url", migrated);
+        setEmbedUrl(migrated);
+      }
     }
 
     return () => {

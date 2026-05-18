@@ -444,6 +444,7 @@ function SanctuaryPage() {
   }, []);
 
   useEffect(() => {
+    if (window.electronAPI) return; // YouTube not supported in desktop app
     const saved = window.localStorage.getItem("aura:youtube-embed-url");
     if (saved) {
       setYoutubeEmbedUrl(saved);
@@ -536,6 +537,7 @@ function SanctuaryPage() {
     setTrackLabel(name);
     setPlayingUserUrl(track.url);
     setMuted(false);
+    window.dispatchEvent(new CustomEvent("aura:music-playing", { detail: { playing: true, label: name } }));
   };
 
   const pickFileFolder = async () => {
@@ -574,6 +576,7 @@ function SanctuaryPage() {
 
     audio.pause();
     setMuted(true);
+    window.dispatchEvent(new CustomEvent("aura:music-playing", { detail: { playing: false } }));
   };
 
   const toggleVolume = () => {
@@ -626,6 +629,7 @@ function SanctuaryPage() {
     }
     setYoutubeEmbedUrl(null);
     window.dispatchEvent(new Event("aura:clear-youtube-audio"));
+    window.dispatchEvent(new CustomEvent("aura:music-playing", { detail: { playing: false } }));
     setPlayingUserUrl(null);
     setTrackLabel("");
     setAudioProgress(0);
