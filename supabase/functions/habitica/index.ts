@@ -20,6 +20,16 @@ const HABITICA_BASE_URL = "https://habitica.com/api/v3";
 const HABITICA_X_CLIENT = "aura-sanctuary";
 const PROVIDER = "habitica";
 
+const DIFFICULTY_XP: Record<string, number> = { trivial: 2, easy: 5, medium: 10, hard: 20 };
+const DIFFICULTY_GOLD: Record<string, number> = { trivial: 1, easy: 3, medium: 7, hard: 15 };
+const HP_REGEN_PER_LEVEL_UP = 10;
+const STAMINA_ON_LEVEL_UP = 50;
+
+function xpForLevel(level: number): number {
+  const n = Math.max(0, level - 1);
+  return Math.max(25, 45 + n * 24 + Math.floor(n * n * 3.5));
+}
+
 interface HabiticaCreds {
   external_user_id: string;
   api_token: string;
@@ -493,6 +503,8 @@ async function persistRefresh(
   habitsUpdated: number;
   dailiesUpdated: number;
   completionsApplied: number;
+  xpGranted: number;
+  goldGranted: number;
   newTasksImported: number;
   tasksUnlinked: number;
 }> {
@@ -526,7 +538,7 @@ async function persistRefresh(
 
   const { data: linked, error: linkedErr } = await ctx.adminClient
     .from("tasks")
-    .select("id, type, habitica_task_id, last_completed_local_date")
+    .select("id, type, habitica_task_id, last_completed_local_date, difficulty")
     .eq("user_id", ctx.userId)
     .not("habitica_task_id", "is", null);
   if (linkedErr) throw new Error(linkedErr.message);
@@ -536,6 +548,7 @@ async function persistRefresh(
     type: "habit" | "daily" | "todo";
     habitica_task_id: string;
     last_completed_local_date: string | null;
+    difficulty: string | null;
   };
   const linkedRows = (linked ?? []) as LinkedRow[];
   const todayUtc = new Date().toISOString().slice(0, 10);
@@ -543,6 +556,8 @@ async function persistRefresh(
   let habitsUpdated = 0;
   let dailiesUpdated = 0;
   let completionsApplied = 0;
+  let xpGranted = 0;
+  let goldGranted = 0;
   let newTasksImported = 0;
   let tasksUnlinked = 0;
 
@@ -577,6 +592,8 @@ async function persistRefresh(
           patch.last_completed_local_date = todayUtc;
           patch.last_completed_at = new Date().toISOString();
           completionsApplied += 1;
+          xpGranted += DIFFICULTY_XP[localRow.difficulty ?? "easy"] ?? 5;
+          goldGranted += DIFFICULTY_GOLD[localRow.difficulty ?? "easy"] ?? 3;
         } else if (remote.completed === false && wasCompletedToday) {
           patch.completed = false;
           patch.last_completed_local_date = null;
@@ -644,6 +661,33 @@ async function persistRefresh(
     }
   }
 
+  // --- Grant Aura XP/gold for completions synced from Habitica ---
+  if (xpGranted > 0 || goldGranted > 0) {
+    const { data: prof } = await ctx.adminClient
+      .from("profiles")
+      .select("xp, gold, level, hp, max_hp, stamina")
+      .eq("id", ctx.userId)
+      .single();
+    if (prof) {
+      let xp = ((prof.xp as number) ?? 0) + xpGranted;
+      let gold = ((prof.gold as number) ?? 0) + goldGranted;
+      let level = (prof.level as number) ?? 1;
+      let hp = (prof.hp as number) ?? 0;
+      const max_hp = (prof.max_hp as number) ?? 100;
+      let stamina = (prof.stamina as number) ?? 0;
+      while (xp >= xpForLevel(level)) {
+        xp -= xpForLevel(level);
+        level += 1;
+        hp = Math.min(max_hp, hp + HP_REGEN_PER_LEVEL_UP);
+        stamina += STAMINA_ON_LEVEL_UP;
+      }
+      await ctx.adminClient
+        .from("profiles")
+        .update({ xp, gold, level, hp, stamina })
+        .eq("id", ctx.userId);
+    }
+  }
+
   // --- Delete tasks locally that were deleted on Habitica ---
   // A linked local task whose habitica_task_id no longer appears in the remote
   // set was deleted on Habitica — delete it here too so both sides stay in sync.
@@ -688,7 +732,7 @@ async function persistRefresh(
     if (!insErr) newTasksImported += 1;
   }
 
-  return { publicProfile, habitsUpdated, dailiesUpdated, completionsApplied, newTasksImported, tasksUnlinked };
+  return { publicProfile, habitsUpdated, dailiesUpdated, completionsApplied, xpGranted, goldGranted, newTasksImported, tasksUnlinked };
 }
 
 async function actionStatus(ctx: Ctx) {
@@ -1043,6 +1087,8 @@ async function actionSyncPull(ctx: Ctx) {
     habitsUpdated: summary.habitsUpdated,
     dailiesUpdated: summary.dailiesUpdated,
     completionsApplied: summary.completionsApplied,
+    xpGranted: summary.xpGranted,
+    goldGranted: summary.goldGranted,
     newTasksImported: summary.newTasksImported,
     tasksUnlinked: summary.tasksUnlinked,
   });

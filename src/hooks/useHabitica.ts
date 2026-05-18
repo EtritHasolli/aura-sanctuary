@@ -212,6 +212,8 @@ export interface HabiticaSyncPullSummary {
   habitsUpdated: number;
   dailiesUpdated: number;
   completionsApplied: number;
+  xpGranted?: number;
+  goldGranted?: number;
   newTasksImported: number;
   tasksUnlinked: number;
 }
@@ -283,16 +285,20 @@ export function useSyncFromHabitica() {
     onSuccess: (summary, variables) => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: habiticaStatusKey(user?.id) });
+      qc.invalidateQueries({ queryKey: ["profile"] });
       const total = summary.habitsUpdated + summary.dailiesUpdated;
       const silent = !!variables?.silent;
       const newImports = summary.newTasksImported ?? 0;
       const unlinked = summary.tasksUnlinked ?? 0;
+      const xp = summary.xpGranted ?? 0;
+      const gold = summary.goldGranted ?? 0;
       if (total === 0 && summary.completionsApplied === 0 && newImports === 0 && unlinked === 0) {
         if (!silent) toast.message("Habitica sync: everything up to date.");
       } else {
         const parts: string[] = [];
         if (newImports > 0) parts.push(`${newImports} new task(s) imported`);
         if (summary.completionsApplied > 0) parts.push(`${summary.completionsApplied} completion(s) applied`);
+        if (xp > 0 || gold > 0) parts.push(`+${xp} XP · +${gold} gold`);
         if (total > 0) parts.push(`${total} task(s) updated`);
         if (unlinked > 0) parts.push(`${unlinked} deleted (removed on Habitica)`);
         toast.success(`Habitica sync: ${parts.join(", ")}.`);
