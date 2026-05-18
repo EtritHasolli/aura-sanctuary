@@ -98,6 +98,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const path = useRouterState({ select: (s) => s.location.pathname });
+  const isAuth = path === "/auth";
   return (
     <QueryClientProvider client={queryClient}>
       <NotificationsProvider>
@@ -106,8 +108,8 @@ function RootComponent() {
           <UpdateBar />
           <div className="flex-1 min-h-0 relative">
             <CustomCursorOverlay />
-            <PersistentYouTubeAudio />
-            <MiniPlayerManager />
+            {!isAuth && <PersistentYouTubeAudio />}
+            {!isAuth && <MiniPlayerManager />}
             <AppGate />
             <Toaster offset="72px" />
           </div>
