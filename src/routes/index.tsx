@@ -33,7 +33,7 @@ export const Route = createFileRoute("/")({
 
 const FALL_ASLEEP_TRANSITION_MS = 1300;
 
-// Bundled music — drop MP3s into src/assets/music/lofi/ or src/assets/music/ambient/ and rebuild
+// Bundled music — web fallback via Vite glob (empty in Electron builds; Electron uses IPC instead)
 const _lofiGlob = import.meta.glob<string>(
   "/src/assets/music/lofi/*.{mp3,flac,wav,ogg,m4a,aac,opus,wma}",
   { eager: true, as: "url" },
@@ -47,10 +47,10 @@ function _assetName(path: string) {
   const dot = file.lastIndexOf(".");
   return dot > 0 ? file.slice(0, dot) : file;
 }
-const BUNDLED_LOFI = Object.entries(_lofiGlob)
+const BUNDLED_LOFI_WEB = Object.entries(_lofiGlob)
   .map(([p, url]) => ({ name: _assetName(p), url }))
   .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
-const BUNDLED_AMBIENT = Object.entries(_ambientGlob)
+const BUNDLED_AMBIENT_WEB = Object.entries(_ambientGlob)
   .map(([p, url]) => ({ name: _assetName(p), url }))
   .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
 
@@ -394,6 +394,8 @@ function SanctuaryPage() {
   const [sharedMusicFolder, setSharedMusicFolder] = useState<string | null>(
     () => typeof window !== "undefined" ? localStorage.getItem("aura:local-music-folder") : null,
   );
+  const [bundledLofi, setBundledLofi] = useState<UserTrack[]>(BUNDLED_LOFI_WEB);
+  const [bundledAmbient, setBundledAmbient] = useState<UserTrack[]>(BUNDLED_AMBIENT_WEB);
   const [lofiLibTracks, setLofiLibTracks] = useState<UserTrack[]>([]);
   const [ambientLibTracks, setAmbientLibTracks] = useState<UserTrack[]>([]);
   const [playingUserUrl, setPlayingUserUrl] = useState<string | null>(null);
@@ -510,8 +512,16 @@ function SanctuaryPage() {
     });
   }, [sharedMusicFolder]);
 
-  const lofiTracks = useMemo(() => [...BUNDLED_LOFI, ...lofiLibTracks], [lofiLibTracks]);
-  const ambientTracks = useMemo(() => [...BUNDLED_AMBIENT, ...ambientLibTracks], [ambientLibTracks]);
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    void window.electronAPI.getBundledTracks().then(({ lofi, ambient }) => {
+      setBundledLofi(lofi.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
+      setBundledAmbient(ambient.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) })));
+    });
+  }, []);
+
+  const lofiTracks = useMemo(() => [...bundledLofi, ...lofiLibTracks], [bundledLofi, lofiLibTracks]);
+  const ambientTracks = useMemo(() => [...bundledAmbient, ...ambientLibTracks], [bundledAmbient, ambientLibTracks]);
 
   const playUserTrack = async (track: UserTrack, name: string) => {
     const audio = audioRef.current;

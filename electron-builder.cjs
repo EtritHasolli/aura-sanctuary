@@ -8,6 +8,14 @@ module.exports = {
 
   files: ["dist/**/*", "electron-dist/**/*", "package.json"],
 
+  extraResources: [
+    {
+      from: "src/assets/music",
+      to: "music",
+      filter: ["**/*.mp3", "**/*.flac", "**/*.wav", "**/*.ogg", "**/*.m4a", "**/*.aac", "**/*.opus", "**/*.wma"],
+    },
+  ],
+
   nsis: { createDesktopShortcut: "always" },
 
   win: {

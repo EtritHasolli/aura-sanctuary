@@ -265,6 +265,17 @@ ipcMain.handle("music:reveal-folder", (_event, folderPath: string) => {
   shell.openPath(folderPath);
 });
 
+ipcMain.handle("music:get-bundled-tracks", () => {
+  const base = isDev
+    ? path.join(app.getAppPath(), "src/assets/music")
+    : path.join(process.resourcesPath, "music");
+  const result: Record<string, { name: string; path: string }[]> = { lofi: [], ambient: [] };
+  for (const cat of ["lofi", "ambient"] as const) {
+    result[cat] = scanAudioDir(path.join(base, cat));
+  }
+  return result;
+});
+
 if (process.env.GH_TOKEN) {
   process.env.GITHUB_TOKEN = process.env.GH_TOKEN;
   autoUpdater.setFeedURL({
