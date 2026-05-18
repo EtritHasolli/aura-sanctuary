@@ -503,13 +503,12 @@ function SanctuaryPage() {
     setSharedMusicFolder(stored);
   }, [localModalOpen]);
 
-  // Desktop: scan shared music folder and populate both lo-fi and ambient tabs
+  // Desktop: scan shared music folder and populate My Music tab
   useEffect(() => {
     if (!window.electronAPI || !sharedMusicFolder) return;
     void window.electronAPI.scanMusicFolder(sharedMusicFolder).then((tracks) => {
       const mapped = tracks.map((t) => ({ name: t.name, url: window.electronAPI!.fileToUrl(t.path) }));
-      setLofiLibTracks(mapped);
-      setAmbientLibTracks(mapped);
+      setFileTracks(mapped);
     });
   }, [sharedMusicFolder]);
 
@@ -1103,6 +1102,19 @@ function SanctuaryPage() {
                   >
                     AMBIENT
                   </button>
+                  {(fileTracks.length > 0 || sharedMusicFolder) && (
+                    <button
+                      onClick={() => setActiveCategory("file")}
+                      className={`flex-1 py-1.5 text-center transition-colors ${
+                        activeCategory === "file"
+                          ? "bg-primary/15 text-primary border-b-2 border-primary"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/10"
+                      }`}
+                      style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}
+                    >
+                      MY MUSIC
+                    </button>
+                  )}
                 </div>
 
                 {/* Tab content */}
@@ -1112,7 +1124,7 @@ function SanctuaryPage() {
                       {lofiTracks.length === 0 ? (
                         <div className="flex flex-col items-center gap-2 py-5 px-3 text-center">
                           <p className="text-muted-foreground/60" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
-                            {sharedMusicFolder ? "No audio files found" : "Use the folder icon above to pick your music library"}
+                            No audio files found
                           </p>
                         </div>
                       ) : (
@@ -1138,7 +1150,7 @@ function SanctuaryPage() {
                       {ambientTracks.length === 0 ? (
                         <div className="flex flex-col items-center gap-2 py-5 px-3 text-center">
                           <p className="text-muted-foreground/60" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
-                            {sharedMusicFolder ? "No audio files found" : "Use the folder icon above to pick your music library"}
+                            No audio files found
                           </p>
                         </div>
                       ) : (
@@ -1150,6 +1162,32 @@ function SanctuaryPage() {
                                 className={`w-full text-left px-2 py-1.5 flex items-center gap-2 border-l-2 transition-colors ${active ? "border-l-primary text-primary bg-primary/10" : "border-l-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20 hover:border-l-primary/40"}`}
                                 style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
                                 <span className={active ? "text-primary" : "opacity-40"}>≋</span>
+                                <ScrollingName name={t.name} />
+                              </button>
+                            );
+                          })}
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {activeCategory === "file" && (
+                    <div className="px-1.5 pt-1.5 pb-1.5">
+                      {fileTracks.length === 0 ? (
+                        <div className="flex flex-col items-center gap-2 py-5 px-3 text-center">
+                          <p className="text-muted-foreground/60" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
+                            {sharedMusicFolder ? "No audio files found" : "Use the folder icon above to pick your music library"}
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          {fileTracks.map((t) => {
+                            const active = !muted && playingUserUrl === t.url;
+                            return (
+                              <button key={t.url} onClick={() => void playUserTrack(t, t.name)}
+                                className={`w-full text-left px-2 py-1.5 flex items-center gap-2 border-l-2 transition-colors ${active ? "border-l-primary text-primary bg-primary/10" : "border-l-transparent text-muted-foreground hover:text-foreground hover:bg-muted/20 hover:border-l-primary/40"}`}
+                                style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}>
+                                <span className={active ? "text-primary" : "opacity-40"}>♫</span>
                                 <ScrollingName name={t.name} />
                               </button>
                             );
