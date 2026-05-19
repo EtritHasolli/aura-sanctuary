@@ -461,7 +461,7 @@ function SanctuaryPage() {
   useEffect(() => {
     if (!menuOpen || !menuContainerRef.current) return;
     const rect = menuContainerRef.current.getBoundingClientRect();
-    const available = window.innerHeight - rect.bottom - 12;
+    const available = window.innerHeight - rect.top - 12;
     setDropdownMaxH(Math.min(480, Math.max(200, available)));
   }, [menuOpen]);
 
@@ -1005,13 +1005,13 @@ function SanctuaryPage() {
                   "absolute z-80 pixel-panel bg-card shadow-xl",
                   // mobile: full-panel overlay
                   "inset-0 flex flex-col items-center justify-center gap-3",
-                  // sm+: small floating popup above the volume button
-                  "sm:inset-auto sm:bottom-[calc(100%+8px)] sm:right-0 sm:px-2 sm:py-2.5 sm:flex-col sm:items-center sm:gap-1.5",
+                  // sm+: vertical slider popup to the RIGHT of the panel
+                  "sm:inset-auto sm:top-0 sm:left-[calc(100%+8px)] sm:px-2 sm:py-2.5 sm:flex-col sm:items-center sm:gap-1.5",
                 ].join(" ")}
-                style={{ transformOrigin: "bottom right" }}
-                initial={{ opacity: 0, scale: 0.88, y: 8 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.88, y: 8 }}
+                style={{ transformOrigin: "left top" }}
+                initial={{ opacity: 0, scale: 0.88, x: -8 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.88, x: -8 }}
                 transition={{ duration: 0.14, ease: "easeOut" }}
                 onClick={() => setShowVolumeSlider(false)}
               >
@@ -1082,13 +1082,13 @@ function SanctuaryPage() {
                   "absolute z-80 pixel-panel bg-card shadow-xl flex flex-col",
                   // mobile: full-panel overlay
                   "inset-0",
-                  // sm+: floating dropdown anchored to bottom-right of the panel
-                  "sm:inset-auto sm:w-72 sm:right-0 sm:top-full sm:mt-1.5",
+                  // sm+: floating panel to the LEFT of the Lo-fi Tavern card
+                  "sm:inset-auto sm:w-72 sm:right-[calc(100%+8px)] sm:top-0",
                 ].join(" ")}
                 style={{ transformOrigin: "right top", maxHeight: dropdownMaxH }}
-                initial={{ opacity: 0, scale: 0.92, y: -8 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.92, y: -8 }}
+                initial={{ opacity: 0, scale: 0.92, x: 8 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.92, x: 8 }}
                 transition={{ duration: 0.14, ease: "easeOut" }}
               >
                 {/* Now playing header */}
