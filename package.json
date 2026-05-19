@@ -17,7 +17,7 @@
     "test:coverage": "vitest run --coverage",
     "build:electron": "vite build --config vite.electron.config.ts",
     "electron:dev": "npm run build:electron && concurrently -k \"vite dev\" \"wait-on http://localhost:8080 && electron .\"",
-    "build:renderer-electron": "ELECTRON_BUILD=1 vite build",
+    "build:renderer-electron": "cross-env ELECTRON_BUILD=1 vite build",
     "package": "npm run build:renderer-electron && npm run build:electron && electron-builder --config electron-builder.cjs",
     "package:dir": "npm run build:renderer-electron && npm run build:electron && electron-builder --dir --config electron-builder.cjs"
   },
@@ -93,6 +93,7 @@
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
     "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
     "electron": "^42.0.1",
     "electron-builder": "^26.8.1",
     "eslint": "^9.32.0",

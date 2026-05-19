@@ -1015,17 +1015,11 @@ function SanctuaryPage() {
                 {volumeMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
               </button>
             </div>
-            {/* Volume popup — floating on desktop, full-overlay on mobile */}
+            {/* Volume popup — full-overlay on all screens */}
             <AnimatePresence>
             {showVolumeSlider && (
               <motion.div
-                className={[
-                  "absolute z-80 pixel-panel bg-card shadow-xl",
-                  // mobile: full-panel overlay
-                  "inset-0 flex flex-col items-center justify-center gap-3",
-                  // sm+: vertical slider popup to the RIGHT of the panel
-                  "sm:inset-auto sm:top-0 sm:left-[calc(100%+8px)] sm:px-2 sm:py-2.5 sm:flex-col sm:items-center sm:gap-1.5",
-                ].join(" ")}
+                className="absolute z-80 pixel-panel bg-card shadow-xl inset-0 flex flex-col items-center justify-center gap-3"
                 style={{ transformOrigin: "left top" }}
                 initial={{ opacity: 0, scale: 0.88, x: -8 }}
                 animate={{ opacity: 1, scale: 1, x: 0 }}
@@ -1033,8 +1027,8 @@ function SanctuaryPage() {
                 transition={{ duration: 0.14, ease: "easeOut" }}
                 onClick={() => setShowVolumeSlider(false)}
               >
-                {/* Mobile header row with mute toggle */}
-                <div className="flex items-center gap-2 sm:hidden">
+                {/* Header row with mute toggle */}
+                <div className="flex items-center gap-2">
                   <button onClick={(e) => { e.stopPropagation(); toggleVolume(); }} className="text-muted-foreground hover:text-primary">
                     {volumeMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
                   </button>
@@ -1042,13 +1036,9 @@ function SanctuaryPage() {
                     VOLUME — {volumeMuted ? "0" : Math.round(volume * 100)}%
                   </span>
                 </div>
-                {/* Desktop: compact percentage label */}
-                <span className="hidden sm:block text-muted-foreground/60 tabular-nums" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
-                  {volumeMuted ? "0" : Math.round(volume * 100)}
-                </span>
-                {/* Slider — horizontal on mobile, vertical on desktop */}
+                {/* Horizontal slider */}
                 <div
-                  className="relative cursor-pointer group/vol sm:hidden"
+                  className="relative cursor-pointer group/vol"
                   style={{ width: 160, height: 10 }}
                   onClick={(e) => e.stopPropagation()}
                   onMouseDown={(e) => {
@@ -1066,27 +1056,7 @@ function SanctuaryPage() {
                   <div className="absolute left-0 top-0 bottom-0 bg-primary" style={{ width: `${volumeMuted ? 0 : volume * 100}%` }} />
                   <div className="absolute top-1/2 -translate-y-1/2 w-1 h-4 bg-primary opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none" style={{ left: `calc(${volumeMuted ? 0 : volume * 100}% - 2px)` }} />
                 </div>
-                {/* Vertical slider — desktop only */}
-                <div
-                  className="relative cursor-pointer group/vol hidden sm:block"
-                  style={{ width: 8, height: 72 }}
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => {
-                    e.preventDefault(); e.stopPropagation();
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const seek = (y: number) => setAudioVolume((rect.bottom - y) / rect.height);
-                    seek(e.clientY);
-                    const onMove = (ev: MouseEvent) => seek(ev.clientY);
-                    const onUp = () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
-                    document.addEventListener("mousemove", onMove);
-                    document.addEventListener("mouseup", onUp);
-                  }}
-                >
-                  <div className="absolute inset-0 bg-border/40" />
-                  <div className="absolute bottom-0 left-0 right-0 bg-primary" style={{ height: `${volumeMuted ? 0 : volume * 100}%` }} />
-                  <div className="absolute left-1/2 -translate-x-1/2 w-3 h-1 bg-primary opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none" style={{ bottom: `calc(${volumeMuted ? 0 : volume * 100}% - 2px)` }} />
-                </div>
-                <span className="sm:hidden text-muted-foreground/40" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
+                <span className="text-muted-foreground/40" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
                   tap anywhere to close
                 </span>
               </motion.div>
@@ -1098,9 +1068,7 @@ function SanctuaryPage() {
               <motion.div
                 className={[
                   "absolute z-80 pixel-panel bg-card shadow-xl flex flex-col",
-                  // mobile: full-panel overlay
                   "inset-0",
-                  // sm+: floating panel to the LEFT of the Lo-fi Tavern card
                   "sm:inset-auto sm:w-72 sm:right-[calc(100%+8px)] sm:top-0",
                 ].join(" ")}
                 style={{ transformOrigin: "right top", maxHeight: dropdownMaxH }}
