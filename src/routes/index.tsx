@@ -997,74 +997,98 @@ function SanctuaryPage() {
                 {volumeMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
               </button>
             </div>
-            {/* Volume overlay — covers the panel */}
+            {/* Volume popup — floating on desktop, full-overlay on mobile */}
             <AnimatePresence>
             {showVolumeSlider && (
               <motion.div
-                className="absolute inset-0 z-80 pixel-panel bg-card/95 backdrop-blur-sm flex flex-col items-center justify-center gap-3"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
+                className={[
+                  "absolute z-80 pixel-panel bg-card shadow-xl",
+                  // mobile: full-panel overlay
+                  "inset-0 flex flex-col items-center justify-center gap-3",
+                  // sm+: small floating popup above the volume button
+                  "sm:inset-auto sm:bottom-[calc(100%+8px)] sm:right-0 sm:px-2 sm:py-2.5 sm:flex-col sm:items-center sm:gap-1.5",
+                ].join(" ")}
+                style={{ transformOrigin: "bottom right" }}
+                initial={{ opacity: 0, scale: 0.88, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.88, y: 8 }}
                 transition={{ duration: 0.14, ease: "easeOut" }}
                 onClick={() => setShowVolumeSlider(false)}
               >
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toggleVolume(); }}
-                    className="text-muted-foreground hover:text-primary"
-                  >
+                {/* Mobile header row with mute toggle */}
+                <div className="flex items-center gap-2 sm:hidden">
+                  <button onClick={(e) => { e.stopPropagation(); toggleVolume(); }} className="text-muted-foreground hover:text-primary">
                     {volumeMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
                   </button>
                   <span className="text-muted-foreground/60 tabular-nums" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
                     VOLUME — {volumeMuted ? "0" : Math.round(volume * 100)}%
                   </span>
                 </div>
+                {/* Desktop: compact percentage label */}
+                <span className="hidden sm:block text-muted-foreground/60 tabular-nums" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
+                  {volumeMuted ? "0" : Math.round(volume * 100)}
+                </span>
+                {/* Slider — horizontal on mobile, vertical on desktop */}
                 <div
-                  className="relative cursor-pointer group/vol"
+                  className="relative cursor-pointer group/vol sm:hidden"
                   style={{ width: 160, height: 10 }}
                   onClick={(e) => e.stopPropagation()}
                   onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
+                    e.preventDefault(); e.stopPropagation();
                     const rect = e.currentTarget.getBoundingClientRect();
-                    const seek = (clientX: number) => {
-                      setAudioVolume((clientX - rect.left) / rect.width);
-                    };
+                    const seek = (x: number) => setAudioVolume((x - rect.left) / rect.width);
                     seek(e.clientX);
                     const onMove = (ev: MouseEvent) => seek(ev.clientX);
-                    const onUp = () => {
-                      document.removeEventListener("mousemove", onMove);
-                      document.removeEventListener("mouseup", onUp);
-                    };
+                    const onUp = () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
                     document.addEventListener("mousemove", onMove);
                     document.addEventListener("mouseup", onUp);
                   }}
                 >
                   <div className="absolute inset-0 bg-border/40" />
-                  <div
-                    className="absolute left-0 top-0 bottom-0 bg-primary"
-                    style={{ width: `${volumeMuted ? 0 : volume * 100}%` }}
-                  />
-                  <div
-                    className="absolute top-1/2 -translate-y-1/2 w-1 h-4 bg-primary opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none"
-                    style={{ left: `calc(${volumeMuted ? 0 : volume * 100}% - 2px)` }}
-                  />
+                  <div className="absolute left-0 top-0 bottom-0 bg-primary" style={{ width: `${volumeMuted ? 0 : volume * 100}%` }} />
+                  <div className="absolute top-1/2 -translate-y-1/2 w-1 h-4 bg-primary opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none" style={{ left: `calc(${volumeMuted ? 0 : volume * 100}% - 2px)` }} />
                 </div>
-                <span className="text-muted-foreground/40" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
-                  click anywhere to close
+                {/* Vertical slider — desktop only */}
+                <div
+                  className="relative cursor-pointer group/vol hidden sm:block"
+                  style={{ width: 8, height: 72 }}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const seek = (y: number) => setAudioVolume((rect.bottom - y) / rect.height);
+                    seek(e.clientY);
+                    const onMove = (ev: MouseEvent) => seek(ev.clientY);
+                    const onUp = () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
+                    document.addEventListener("mousemove", onMove);
+                    document.addEventListener("mouseup", onUp);
+                  }}
+                >
+                  <div className="absolute inset-0 bg-border/40" />
+                  <div className="absolute bottom-0 left-0 right-0 bg-primary" style={{ height: `${volumeMuted ? 0 : volume * 100}%` }} />
+                  <div className="absolute left-1/2 -translate-x-1/2 w-3 h-1 bg-primary opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none" style={{ bottom: `calc(${volumeMuted ? 0 : volume * 100}% - 2px)` }} />
+                </div>
+                <span className="sm:hidden text-muted-foreground/40" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
+                  tap anywhere to close
                 </span>
               </motion.div>
             )}
             </AnimatePresence>
-            {/* Song list overlay — covers the panel */}
+            {/* Song list — floating dropdown on desktop, full-overlay on mobile */}
             <AnimatePresence>
             {menuOpen && (
               <motion.div
-                className="absolute inset-0 z-80 pixel-panel bg-card flex flex-col"
-                style={{ transformOrigin: "center top" }}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
+                className={[
+                  "absolute z-80 pixel-panel bg-card shadow-xl flex flex-col",
+                  // mobile: full-panel overlay
+                  "inset-0",
+                  // sm+: floating dropdown anchored to bottom-right of the panel
+                  "sm:inset-auto sm:w-72 sm:right-0 sm:top-full sm:mt-1.5",
+                ].join(" ")}
+                style={{ transformOrigin: "right top", maxHeight: dropdownMaxH }}
+                initial={{ opacity: 0, scale: 0.92, y: -8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.92, y: -8 }}
                 transition={{ duration: 0.14, ease: "easeOut" }}
               >
                 {/* Now playing header */}

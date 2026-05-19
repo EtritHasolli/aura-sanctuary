@@ -604,6 +604,10 @@ async function persistRefresh(
     } else if (localRow.type === "habit" && remote.type === "habit") {
       habitsUpdated += 1;
     } else if (localRow.type === "daily" && remote.type === "daily") {
+      if (typeof remote.streak === "number") {
+        patch.streak_current = remote.streak;
+        patch.streak_best = remote.streak;
+      }
       dailiesUpdated += 1;
     }
 
@@ -720,6 +724,7 @@ async function persistRefresh(
             : null;
     if (!auraType) continue;
 
+    const remoteStreak = typeof remote.streak === "number" ? remote.streak : 0;
     const { error: insErr } = await ctx.adminClient.from("tasks").insert({
       user_id: ctx.userId,
       type: auraType,
@@ -728,6 +733,8 @@ async function persistRefresh(
       difficulty: priorityToDifficulty(remote.priority),
       habitica_task_id: remote.id,
       habitica_meta: buildTaskMeta(remote),
+      streak_current: remoteStreak,
+      streak_best: remoteStreak,
     });
     if (!insErr) newTasksImported += 1;
   }
@@ -921,6 +928,7 @@ async function actionImport(ctx: Ctx) {
       skipped += 1;
       return;
     }
+    const hStreak = typeof h.streak === "number" ? h.streak : 0;
     const { error } = await ctx.adminClient.from("tasks").insert({
       user_id: ctx.userId,
       type: auraType,
@@ -929,6 +937,8 @@ async function actionImport(ctx: Ctx) {
       difficulty: priorityToDifficulty(h.priority),
       habitica_task_id: h.id,
       habitica_meta: buildTaskMeta(h),
+      streak_current: hStreak,
+      streak_best: hStreak,
     });
     if (error) {
       skipped += 1;

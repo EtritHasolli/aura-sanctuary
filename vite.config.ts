@@ -42,22 +42,7 @@ export default defineConfig(async ({ command, mode }) => {
   let config: UserConfig = {
     base: command === "build" ? "./" : "/",
     define: envDefine,
-    build: {
-      rollupOptions: {
-        plugins: [
-          {
-            name: "exclude-music-assets",
-            generateBundle(_opts, bundle) {
-              for (const key of Object.keys(bundle)) {
-                if (/\.(mp3|flac|wav|ogg|m4a|aac|opus|wma)$/.test(key)) {
-                  delete bundle[key];
-                }
-              }
-            },
-          },
-        ],
-      },
-    },
+    build: {},
     resolve: {
       alias: {
         "@": `${process.cwd()}/src`,
