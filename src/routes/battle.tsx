@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PATH_CHARACTER_SPRITES } from "@/lib/aura/pathCharacterSprites";
 import { pathCharacterFallingSpriteSrc } from "@/lib/aura/pathCharacterSprites";
 import type { AuraPath } from "@/lib/aura/types";
+import { useProfile } from "@/hooks/useProfile";
 
 export const Route = createFileRoute("/battle")({
   head: () => ({ meta: [{ title: "Battle — Aura" }] }),
@@ -172,8 +173,20 @@ function DiamondArmy({
   );
 }
 
+const OPPOSITE_PATH: Record<AuraPath, AuraPath> = {
+  swordsman: "evilswordsman",
+  mage: "evilmage",
+  tank: "evilpaladin",
+  rogue: "evilrogue",
+  evilswordsman: "swordsman",
+  evilmage: "mage",
+  evilpaladin: "tank",
+  evilrogue: "rogue",
+};
+
 function BattlePage() {
   const { data, isLoading } = useBattleScores();
+  const { data: profile } = useProfile();
 
   const good = data?.good ?? 0;
   const evil = data?.evil ?? 0;
@@ -194,54 +207,104 @@ function BattlePage() {
   const goodLabel = base.good === "stance" ? "WINNING" : goodIsLoser ? "LOSING" : "STANDOFF";
   const evilLabel = base.evil === "stance" ? "WINNING" : evilIsLoser ? "LOSING" : "STANDOFF";
 
+  const userPath = profile?.aura_path as AuraPath | undefined;
+  const opponentPath = userPath ? OPPOSITE_PATH[userPath] : undefined;
+  const userIsGood = userPath ? GOOD_PATHS.includes(userPath) : true;
+  const userIsLoser = userIsGood ? goodIsLoser : evilIsLoser;
+  const opponentIsLoser = userIsGood ? evilIsLoser : goodIsLoser;
+  const userLabel = userIsGood ? goodLabel : evilLabel;
+  const opponentLabel = userIsGood ? evilLabel : goodLabel;
+  const userLabelColor = userIsGood ? "text-[#4f8cff]" : "text-destructive";
+  const opponentLabelColor = userIsGood ? "text-destructive" : "text-[#4f8cff]";
+
+  const bar = (
+    <div className="w-full px-4 pt-4 pb-2 space-y-1">
+      <div className="flex justify-between text-[10px]" style={{ fontFamily: "var(--font-pixel)" }}>
+        <span style={{ color: "#4f8cff" }}>
+          GOOD · {isLoading ? "—" : `${goodBarPct}%`}
+        </span>
+        <span className="text-muted-foreground text-[9px]">
+          {isLoading ? "—" : isStandoff && total === 0 ? "NO TASKS YET" : `${good} vs ${evil} · ${MONTH_LABEL}`}
+        </span>
+        <span style={{ color: "#e53935" }}>
+          {isLoading ? "—" : `${evilBarPct}%`} · EVIL
+        </span>
+      </div>
+      <div className="relative h-4 w-full bg-secondary overflow-hidden">
+        {isLoading ? (
+          <div className="absolute inset-0 bg-muted animate-pulse" />
+        ) : total === 0 ? (
+          <>
+            <div className="absolute left-0 top-0 h-full" style={{ width: "50%", backgroundColor: "#4f8cff" }} />
+            <div className="absolute right-0 top-0 h-full" style={{ width: "50%", backgroundColor: "#e53935" }} />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-[8px] text-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
+                STANDOFF
+              </span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div
+              className="absolute left-0 top-0 h-full transition-all duration-700"
+              style={{ width: `${goodBarPct}%`, backgroundColor: "#4f8cff" }}
+            />
+            <div
+              className="absolute right-0 top-0 h-full transition-all duration-700"
+              style={{ width: `${evilBarPct}%`, backgroundColor: "#e53935" }}
+            />
+            <div className="absolute left-1/2 top-0 h-full w-0.5 bg-border -translate-x-1/2" />
+          </>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col min-h-full">
-      {/* Tug-of-war bar — full width, flush to top, no box */}
-      <div className="w-full px-4 pt-4 pb-2 space-y-1">
-        <div className="flex justify-between text-[10px]" style={{ fontFamily: "var(--font-pixel)" }}>
-          <span style={{ color: "#4f8cff" }}>
-            GOOD · {isLoading ? "—" : `${goodBarPct}%`}
-          </span>
-          <span className="text-muted-foreground text-[9px]">
-            {isLoading ? "—" : isStandoff && total === 0 ? "NO TASKS YET" : `${good} vs ${evil} · ${MONTH_LABEL}`}
-          </span>
-          <span style={{ color: "#e53935" }}>
-            {isLoading ? "—" : `${evilBarPct}%`} · EVIL
-          </span>
-        </div>
+      {bar}
 
-        {/* Bar — full width, no border-box around it */}
-        <div className="relative h-4 w-full bg-secondary overflow-hidden">
-          {isLoading ? (
-            <div className="absolute inset-0 bg-muted animate-pulse" />
-          ) : total === 0 ? (
-            <>
-              <div className="absolute left-0 top-0 h-full" style={{ width: "50%", backgroundColor: "#4f8cff" }} />
-              <div className="absolute right-0 top-0 h-full" style={{ width: "50%", backgroundColor: "#e53935" }} />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-[8px] text-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
-                  STANDOFF
-                </span>
-              </div>
-            </>
-          ) : (
-            <>
-              <div
-                className="absolute left-0 top-0 h-full transition-all duration-700"
-                style={{ width: `${goodBarPct}%`, backgroundColor: "#4f8cff" }}
-              />
-              <div
-                className="absolute right-0 top-0 h-full transition-all duration-700"
-                style={{ width: `${evilBarPct}%`, backgroundColor: "#e53935" }}
-              />
-              <div className="absolute left-1/2 top-0 h-full w-0.5 bg-border -translate-x-1/2" />
-            </>
-          )}
+      {/* Mobile: only show user's path vs their opposite — good always left, evil always right */}
+      {userPath && opponentPath && (
+        <div className="flex md:hidden flex-1 items-center justify-center gap-8 px-4 py-6">
+          {(() => {
+            const leftPath = userIsGood ? userPath : opponentPath;
+            const rightPath = userIsGood ? opponentPath : userPath;
+            const leftIsLoser = userIsGood ? userIsLoser : opponentIsLoser;
+            const rightIsLoser = userIsGood ? opponentIsLoser : userIsLoser;
+            const leftLabel = userIsGood ? userLabel : opponentLabel;
+            const rightLabel = userIsGood ? opponentLabel : userLabel;
+            const leftColor = "text-[#4f8cff]";
+            const rightColor = "text-destructive";
+            return (
+              <>
+                <div className="flex flex-col items-center gap-2">
+                  <CharacterSprite path={leftPath} isLoser={leftIsLoser} flip={false} />
+                  <span className="text-[8px] text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
+                    {PATH_LABELS[leftPath]}
+                  </span>
+                  <span className={`text-[9px] ${leftColor}`} style={{ fontFamily: "var(--font-pixel)" }}>
+                    {leftLabel}
+                  </span>
+                </div>
+                <span className="text-lg text-primary shrink-0" style={{ fontFamily: "var(--font-pixel)" }}>VS</span>
+                <div className="flex flex-col items-center gap-2">
+                  <CharacterSprite path={rightPath} isLoser={rightIsLoser} flip={true} />
+                  <span className="text-[8px] text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
+                    {PATH_LABELS[rightPath]}
+                  </span>
+                  <span className={`text-[9px] ${rightColor}`} style={{ fontFamily: "var(--font-pixel)" }}>
+                    {rightLabel}
+                  </span>
+                </div>
+              </>
+            );
+          })()}
         </div>
-      </div>
+      )}
 
-      {/* Characters — full width, no box */}
-      <div className="flex-1 flex items-center justify-center gap-4 px-2 py-6">
+      {/* Desktop: full diamond armies */}
+      <div className="hidden md:flex flex-1 items-center justify-center gap-4 px-2 py-6">
         <DiamondArmy
           paths={GOOD_PATHS}
           isLoser={goodIsLoser}
@@ -250,13 +313,11 @@ function BattlePage() {
           labelColor="text-[#4f8cff]"
           label={goodLabel}
         />
-
         <div className="flex flex-col items-center gap-1 shrink-0">
           <span className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
             VS
           </span>
         </div>
-
         <DiamondArmy
           paths={EVIL_PATHS}
           isLoser={evilIsLoser}
