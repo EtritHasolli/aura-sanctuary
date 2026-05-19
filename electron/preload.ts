@@ -53,6 +53,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("window:mini-player-closed", cb);
     return () => ipcRenderer.removeListener("window:mini-player-closed", cb);
   },
+  onMiniPlayerStop: (cb: () => void) => {
+    ipcRenderer.on("music:stop", cb);
+    return () => ipcRenderer.removeListener("music:stop", cb);
+  },
 
   // --- Mini player window controls (called from mini-player.html) ---
   miniPlayerExpand: (): Promise<void> => ipcRenderer.invoke("mini-player:expand"),

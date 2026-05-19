@@ -147,10 +147,15 @@ function MiniPlayerManager() {
       // nothing to clear for music — audio element keeps playing
     });
 
+    const offStop = api.onMiniPlayerStop?.(() => {
+      window.dispatchEvent(new Event("aura:mini-player-stop"));
+    }) ?? (() => {});
+
     return () => {
       offMinimize();
       offRestore();
       offClosed();
+      offStop();
     };
   }, [api]);
 

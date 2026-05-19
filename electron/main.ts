@@ -198,6 +198,7 @@ ipcMain.on("mini-player:stop", (event) => {
   miniPlayerUserClosed = true;
   const sender = BrowserWindow.fromWebContents(event.sender);
   if (sender && !sender.isDestroyed()) sender.close();
+  if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send("music:stop");
 });
 
 ipcMain.on("install-update", () => {

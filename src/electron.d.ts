@@ -20,6 +20,7 @@ declare global {
       onWindowMinimize: (cb: () => void) => () => void;
       onWindowRestore: (cb: () => void) => () => void;
       onMiniPlayerClosed: (cb: () => void) => () => void;
+      onMiniPlayerStop: (cb: () => void) => () => void;
       miniPlayerExpand: () => Promise<void>;
       miniPlayerCollapse: () => Promise<void>;
       miniPlayerClose: () => void;

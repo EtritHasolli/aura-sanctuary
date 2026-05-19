@@ -482,6 +482,24 @@ function SanctuaryPage() {
     };
   }, [menuOpen]);
 
+  // Mini player STOP button — stop all audio from the main window
+  useEffect(() => {
+    const onMiniStop = () => {
+      const audio = audioRef.current;
+      if (audio) { audio.pause(); audio.currentTime = 0; }
+      window.dispatchEvent(new Event("aura:clear-youtube-audio"));
+      window.dispatchEvent(new CustomEvent("aura:music-playing", { detail: { playing: false } }));
+      setPlayingUserUrl(null);
+      setTrackLabel("");
+      setAudioProgress(0);
+      setAudioDuration(0);
+      setMuted(true);
+    };
+    window.addEventListener("aura:mini-player-stop", onMiniStop);
+    return () => window.removeEventListener("aura:mini-player-stop", onMiniStop);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // When the local music modal starts playing, pause audio/YouTube
   useEffect(() => {
     const onLocalStart = (e: Event) => {
