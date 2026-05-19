@@ -36,11 +36,11 @@ const FALL_ASLEEP_TRANSITION_MS = 1300;
 // Bundled music — web fallback via Vite glob (empty in Electron builds; Electron uses IPC instead)
 const _lofiGlob = import.meta.glob<string>(
   "/src/assets/music/lofi/*.{mp3,flac,wav,ogg,m4a,aac,opus,wma}",
-  { eager: true, as: "url" },
+  { eager: true, query: "?url", import: "default" },
 );
 const _ambientGlob = import.meta.glob<string>(
   "/src/assets/music/ambient/*.{mp3,flac,wav,ogg,m4a,aac,opus,wma}",
-  { eager: true, as: "url" },
+  { eager: true, query: "?url", import: "default" },
 );
 function _assetName(path: string) {
   const file = path.split("/").pop() ?? path;
@@ -461,7 +461,7 @@ function SanctuaryPage() {
   useEffect(() => {
     if (!menuOpen || !menuContainerRef.current) return;
     const rect = menuContainerRef.current.getBoundingClientRect();
-    const available = window.innerHeight - rect.top - 12;
+    const available = window.innerHeight - rect.bottom - 12;
     setDropdownMaxH(Math.min(480, Math.max(200, available)));
   }, [menuOpen]);
 
@@ -993,65 +993,78 @@ function SanctuaryPage() {
                   <SkipForward size={16} />
                 </button>
               </div>
-              <div className="relative" onMouseEnter={onVolEnter} onMouseLeave={onVolLeave}>
-                <AnimatePresence>
-                {showVolumeSlider && (
-                  <motion.div
-                    className="absolute z-[80] pixel-panel bg-card shadow-xl px-2 py-2.5 flex flex-col items-center gap-1.5"
-                    style={{ left: "calc(100% + 20px)", top: "50%", translateY: "-50%", transformOrigin: "left center" }}
-                    initial={{ opacity: 0, scale: 0.88, x: -12 }}
-                    animate={{ opacity: 1, scale: 1, x: 0 }}
-                    exit={{ opacity: 0, scale: 0.88, x: -12 }}
-                    transition={{ duration: 0.14, ease: "easeOut" }}
-                  >
-                    <span className="text-muted-foreground/60 tabular-nums" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
-                      {volumeMuted ? "0" : Math.round(volume * 100)}
-                    </span>
-                    <div
-                      className="relative cursor-pointer group/vol"
-                      style={{ width: 8, height: 72 }}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const seek = (clientY: number) => {
-                          setAudioVolume((rect.bottom - clientY) / rect.height);
-                        };
-                        seek(e.clientY);
-                        const onMove = (ev: MouseEvent) => seek(ev.clientY);
-                        const onUp = () => {
-                          document.removeEventListener("mousemove", onMove);
-                          document.removeEventListener("mouseup", onUp);
-                        };
-                        document.addEventListener("mousemove", onMove);
-                        document.addEventListener("mouseup", onUp);
-                      }}
-                    >
-                      <div className="absolute inset-0 bg-border/40" />
-                      <div
-                        className="absolute bottom-0 left-0 right-0 bg-primary"
-                        style={{ height: `${volumeMuted ? 0 : volume * 100}%` }}
-                      />
-                      <div
-                        className="absolute left-1/2 -translate-x-1/2 w-3 h-1 bg-primary opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none"
-                        style={{ bottom: `calc(${volumeMuted ? 0 : volume * 100}% - 2px)` }}
-                      />
-                    </div>
-                  </motion.div>
-                )}
-                </AnimatePresence>
-                <button onClick={toggleVolume} className="text-muted-foreground hover:text-primary" title={volumeMuted ? "Unmute" : "Mute"}>
-                  {volumeMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-                </button>
-              </div>
+              <button onClick={() => setShowVolumeSlider((v) => !v)} className="text-muted-foreground hover:text-primary" title="Volume">
+                {volumeMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              </button>
             </div>
+            {/* Volume overlay — covers the panel */}
+            <AnimatePresence>
+            {showVolumeSlider && (
+              <motion.div
+                className="absolute inset-0 z-80 pixel-panel bg-card/95 backdrop-blur-sm flex flex-col items-center justify-center gap-3"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.14, ease: "easeOut" }}
+                onClick={() => setShowVolumeSlider(false)}
+              >
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleVolume(); }}
+                    className="text-muted-foreground hover:text-primary"
+                  >
+                    {volumeMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                  </button>
+                  <span className="text-muted-foreground/60 tabular-nums" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
+                    VOLUME — {volumeMuted ? "0" : Math.round(volume * 100)}%
+                  </span>
+                </div>
+                <div
+                  className="relative cursor-pointer group/vol"
+                  style={{ width: 160, height: 10 }}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const seek = (clientX: number) => {
+                      setAudioVolume((clientX - rect.left) / rect.width);
+                    };
+                    seek(e.clientX);
+                    const onMove = (ev: MouseEvent) => seek(ev.clientX);
+                    const onUp = () => {
+                      document.removeEventListener("mousemove", onMove);
+                      document.removeEventListener("mouseup", onUp);
+                    };
+                    document.addEventListener("mousemove", onMove);
+                    document.addEventListener("mouseup", onUp);
+                  }}
+                >
+                  <div className="absolute inset-0 bg-border/40" />
+                  <div
+                    className="absolute left-0 top-0 bottom-0 bg-primary"
+                    style={{ width: `${volumeMuted ? 0 : volume * 100}%` }}
+                  />
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 w-1 h-4 bg-primary opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none"
+                    style={{ left: `calc(${volumeMuted ? 0 : volume * 100}% - 2px)` }}
+                  />
+                </div>
+                <span className="text-muted-foreground/40" style={{ fontFamily: "var(--font-pixel)", fontSize: 7 }}>
+                  click anywhere to close
+                </span>
+              </motion.div>
+            )}
+            </AnimatePresence>
+            {/* Song list overlay — covers the panel */}
             <AnimatePresence>
             {menuOpen && (
               <motion.div
-                className="absolute z-[80] w-72 pixel-panel bg-card shadow-xl flex flex-col"
-                style={{ right: "calc(100% + 8px)", top: 0, transformOrigin: "right top", maxHeight: dropdownMaxH }}
-                initial={{ opacity: 0, scale: 0.88, x: 12 }}
-                animate={{ opacity: 1, scale: 1, x: 0 }}
-                exit={{ opacity: 0, scale: 0.88, x: 12 }}
+                className="absolute inset-0 z-80 pixel-panel bg-card flex flex-col"
+                style={{ transformOrigin: "center top" }}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.14, ease: "easeOut" }}
               >
                 {/* Now playing header */}
@@ -1076,6 +1089,14 @@ function SanctuaryPage() {
                       ))}
                     </div>
                   )}
+                  <button
+                    onClick={() => setMenuOpen(false)}
+                    className="ml-2 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                    style={{ fontFamily: "var(--font-pixel)", fontSize: 12, lineHeight: 1 }}
+                    title="Close"
+                  >
+                    ×
+                  </button>
                 </div>
 
                 {/* Category tabs */}
