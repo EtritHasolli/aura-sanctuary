@@ -1,5 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeImage, net, protocol, screen, session, shell } from "electron";
 import { autoUpdater } from "electron-updater";
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
 import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -301,11 +303,9 @@ autoUpdater.on("download-progress", (p) => sendToRenderer("update-download-progr
 autoUpdater.on("update-downloaded", () => sendToRenderer("update-downloaded"));
 autoUpdater.on("error", (err) => {
   const msg = err.message || String(err);
-  // Suppress 404/403 errors which happen on private repos without a token
-  if (msg.includes("404") || msg.includes("403") || msg.includes("Not Found")) {
-    console.warn("[Updater] Silent failure (Private Repo/Auth):", msg);
-    return;
-  }
+  console.error("[Updater] Error:", msg);
+  // Suppress auth/not-found errors (public repo, no token needed)
+  if (msg.includes("404") || msg.includes("403") || msg.includes("Not Found")) return;
   sendToRenderer("update-error", msg);
 });
 

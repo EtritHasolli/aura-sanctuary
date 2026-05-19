@@ -39,10 +39,28 @@ export default defineConfig(async ({ command, mode }) => {
     react(),
   ];
 
+  // When building for Electron, music files are shipped via extraResources
+  // (loaded from disk via IPC). Strip them from dist/ to avoid doubling size.
+  const isElectronBuild = process.env.ELECTRON_BUILD === "1";
+  const electronMusicExclude = isElectronBuild
+    ? [
+        {
+          name: "exclude-music-assets",
+          generateBundle(_opts: unknown, bundle: Record<string, unknown>) {
+            for (const key of Object.keys(bundle)) {
+              if (/\.(mp3|flac|wav|ogg|m4a|aac|opus|wma)$/.test(key)) delete bundle[key];
+            }
+          },
+        },
+      ]
+    : [];
+
   let config: UserConfig = {
     base: command === "build" ? "./" : "/",
     define: envDefine,
-    build: {},
+    build: {
+      rollupOptions: { plugins: electronMusicExclude },
+    },
     resolve: {
       alias: {
         "@": `${process.cwd()}/src`,

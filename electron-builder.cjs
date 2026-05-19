@@ -22,9 +22,11 @@ module.exports = {
     target: [{ target: "nsis", arch: ["x64"] }],
   },
   mac: {
+    // zip must be listed first — electron-updater uses the first file in
+    // latest-mac.yml as the auto-update artifact. DMG is first-install only.
     target: [
-      { target: "dmg", arch: ["x64", "arm64"] },
       { target: "zip", arch: ["x64", "arm64"] },
+      { target: "dmg", arch: ["x64", "arm64"] },
     ],
   },
   linux: {
