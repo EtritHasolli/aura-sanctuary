@@ -266,4 +266,69 @@
   50%       { transform: translateY(-6px); }
 }
 
+@keyframes forge-glow-pulse {
+  0%, 100% {
+    opacity: 0.8;
+    filter: brightness(1) contrast(1);
+  }
+  50% {
+    opacity: 1;
+    filter: brightness(1.25) contrast(1.1) drop-shadow(0 0 16px rgba(255, 120, 0, 0.7));
+  }
+}
+
+@keyframes forge-pounding {
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  30% {
+    transform: translate(-10px, -20px) rotate(-15deg);
+  }
+  40% {
+    transform: translate(2px, 8px) rotate(5deg);
+  }
+  50% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+
+@keyframes forge-shake {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  20% { transform: translate(-2px, 2px) rotate(-0.5deg); }
+  40% { transform: translate(2px, -1px) rotate(0.5deg); }
+  60% { transform: translate(-2px, -1px) rotate(-0.5deg); }
+  80% { transform: translate(2px, 1px) rotate(0.5deg); }
+}
+
+@keyframes forge-spark-rise {
+  0% {
+    transform: translate(0, 0) scale(0.5);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--spark-x, 20px), -120px) scale(1.2);
+    opacity: 0;
+  }
+}
+
+.animate-forge-glow {
+  animation: forge-glow-pulse 2s ease-in-out infinite;
+}
+
+.animate-forge-pounding {
+  animation: forge-pounding 0.8s ease-in-out infinite;
+}
+
+.animate-forge-shake {
+  animation: forge-shake 0.15s linear infinite;
+}
+
+.animate-forge-spark {
+  animation: forge-spark-rise 1s ease-out infinite;
+}
+
+
 

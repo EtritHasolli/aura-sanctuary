@@ -250,9 +250,10 @@ export function xpForLevel(level: number) {
 
 /** Maps a Supabase `profiles` row to app `Profile` (DB still uses `pet_name` / `pet_state`). */
 export function profileFromDbRow(row: Database["public"]["Tables"]["profiles"]["Row"]): Profile {
-  const { pet_name, pet_state, ...rest } = row;
+  const { pet_name, pet_state, aura_path, ...rest } = row;
   return {
     ...rest,
+    aura_path: aura_path as AuraPath | null,
     character_name: pet_name,
     character_state: pet_state as CharacterState,
   };
