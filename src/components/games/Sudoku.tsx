@@ -581,10 +581,10 @@ export function Sudoku() {
               solution={solutionRef.current}
             />
             {/* Digit row: 1–9 in a single horizontal line */}
-            <div className="flex justify-center w-full" style={{ gap: "clamp(0.7rem, 4vw, 2rem)" }}>
+            <div className="grid grid-cols-9 w-full">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => {
                 const filled = userSettings.removeFilledDigitsFromPad && digitCounts[n] >= 9;
-                if (filled) return <div key={n} className="flex-1 aspect-square" />;
+                if (filled) return <div key={n} className="aspect-square" />;
                 return (
                   <DigitButton
                     key={n}
