@@ -8,6 +8,12 @@ import {
   type SudokuUserSettings,
 } from "@/lib/games/sudokuUserSettings";
 import { Leaderboard } from "./Leaderboard";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type Difficulty = "easy" | "medium" | "hard";
 
@@ -213,10 +219,12 @@ export function Sudoku() {
   }, [settingsUserId]);
 
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
-  const [seed, setSeed] = useState(0);
+  const [seed] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [lockedDigit, setLockedDigit] = useState<number | null>(null);
   const [cells, setCells] = useState<Cell[]>(() => emptyBoard());
+  const [history, setHistory] = useState<Cell[][]>([]);
+  const [diffModalOpen, setDiffModalOpen] = useState(false);
   /** False in the lobby (empty grid); true after Start loads a puzzle. */
   const [sessionActive, setSessionActive] = useState(false);
   const [solved, setSolved] = useState(false);
@@ -241,6 +249,7 @@ export function Sudoku() {
     setCells(emptyBoard());
     setSelected(null);
     setLockedDigit(null);
+    setHistory([]);
     setSessionActive(false);
     setSolved(false);
     setStartedAt(null);
@@ -267,12 +276,13 @@ export function Sudoku() {
     return counts;
   }, [cells]);
 
-  const startGame = useCallback(() => {
-    if (sessionActive) return;
-    const { puzzle, solution } = generatePuzzle(difficulty);
+  const startGame = useCallback((diff: Difficulty) => {
+    const { puzzle, solution } = generatePuzzle(diff);
     solutionRef.current = solution;
     setCells(parsePuzzle(puzzle));
     setSelected(null);
+    setLockedDigit(null);
+    setHistory([]);
     setSolved(false);
     setCompletedAt(null);
     setSubmitResult(null);
@@ -281,7 +291,7 @@ export function Sudoku() {
     setStartedAt(t);
     setNow(t);
     setSessionActive(true);
-  }, [difficulty, sessionActive]);
+  }, []);
 
   const place = useCallback(
     (value: number) => {
@@ -290,6 +300,7 @@ export function Sudoku() {
       const cell = cells[selected];
       if (cell.given) return;
       if (cell.value === value) return;
+      setHistory((h) => [...h, cells]);
       setCells((prev) => {
         const next = prev.slice();
         next[selected] = { ...prev[selected], value };
@@ -304,12 +315,24 @@ export function Sudoku() {
     if (selected == null) return;
     const cell = cells[selected];
     if (cell.given) return;
+    if (cell.value === 0) return;
+    setHistory((h) => [...h, cells]);
     setCells((prev) => {
       const next = prev.slice();
       next[selected] = { ...prev[selected], value: 0 };
       return next;
     });
   }, [selected, cells, sessionActive, solved]);
+
+  const undo = useCallback(() => {
+    if (!sessionActive || solved) return;
+    setHistory((h) => {
+      if (h.length === 0) return h;
+      const prev = h[h.length - 1]!;
+      setCells(prev);
+      return h.slice(0, -1);
+    });
+  }, [sessionActive, solved]);
 
   useEffect(() => {
     if (!solved && isComplete(cells)) {
@@ -405,40 +428,163 @@ export function Sudoku() {
   const ss = (elapsedSeconds % 60).toString().padStart(2, "0");
   const timerVisible = sessionActive && startedAt != null;
 
+  const boardOnSelect = (i: number) => {
+    if (userSettings.stickyDigitMode && lockedDigit != null) {
+      const cell = cells[i];
+      if (!cell.given) {
+        setHistory((h) => [...h, cells]);
+        setCells((prev) => {
+          const next = prev.slice();
+          next[i] = { ...prev[i], value: cell.value === lockedDigit ? 0 : lockedDigit };
+          return next;
+        });
+        return;
+      }
+    }
+    setSelected(i);
+  };
+
+  const digitPad = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => {
+    const filled = userSettings.removeFilledDigitsFromPad && digitCounts[n] >= 9;
+    if (filled) return <div key={n} className="aspect-square w-full" />;
+    return (
+      <DigitButton
+        key={n}
+        digit={n}
+        disabled={!sessionActive || solved}
+        locked={userSettings.stickyDigitMode && lockedDigit === n}
+        stickyMode={userSettings.stickyDigitMode}
+        onClick={() => {
+          if (userSettings.stickyDigitMode) {
+            if (lockedDigit === n) { setLockedDigit(null); return; }
+            place(n);
+          } else {
+            place(n);
+          }
+        }}
+        onLongPress={() => {
+          if (!userSettings.stickyDigitMode) return;
+          setLockedDigit((prev) => (prev === n ? null : n));
+        }}
+      />
+    );
+  });
+
   return (
-    <div className="grid xl:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] gap-4">
-      <div className="space-y-3 min-w-0">
-        <div className="flex flex-col items-center lg:flex-row lg:items-start gap-4">
-          <SudokuBoard
-            cells={cells}
-            selected={selected}
-            conflicts={conflicts}
-            interactive={sessionActive && !solved}
-            onSelect={(i) => {
-              if (userSettings.stickyDigitMode && lockedDigit != null) {
-                const cell = cells[i];
-                if (!cell.given) {
-                  setCells((prev) => {
-                    const next = prev.slice();
-                    // Toggle: erase if the cell already holds the locked digit, otherwise place it
-                    next[i] = { ...prev[i], value: cell.value === lockedDigit ? 0 : lockedDigit };
-                    return next;
-                  });
-                  return;
-                }
-              }
-              setSelected(i);
-            }}
-            highlightHouses={userSettings.highlightHouses}
-            highlightSameNumbers={userSettings.highlightSameNumbers}
-            lockedDigit={userSettings.stickyDigitMode ? lockedDigit : null}
-            solution={solutionRef.current}
-          />
-          <div className="flex flex-col gap-2 w-full lg:w-auto">
-            <div className="grid grid-cols-3 gap-1 w-full max-w-[180px] mx-auto">
+    <>
+      {/* Difficulty picker modal */}
+      <Dialog open={diffModalOpen} onOpenChange={setDiffModalOpen}>
+        <DialogContent className="max-w-xs w-[calc(100vw-2rem)] p-5 gap-4">
+          <DialogHeader>
+            <DialogTitle
+              className="text-primary text-base text-center"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              SELECT DIFFICULTY
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            {(["easy", "medium", "hard"] as const).map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => {
+                  setDifficulty(d);
+                  startGame(d);
+                  setDiffModalOpen(false);
+                }}
+                className={`px-3 py-3 border-2 text-sm uppercase ${
+                  difficulty === d
+                    ? "border-primary text-primary bg-primary/10"
+                    : "border-border text-muted-foreground hover:border-primary/60"
+                }`}
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <div className="grid xl:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] gap-4">
+        <div className="space-y-3 min-w-0">
+
+          {/* ── DESKTOP layout: board + controls side by side ── */}
+          <div className="hidden lg:flex items-start gap-4">
+            <SudokuBoard
+              cells={cells}
+              selected={selected}
+              conflicts={conflicts}
+              interactive={sessionActive && !solved}
+              onSelect={boardOnSelect}
+              highlightHouses={userSettings.highlightHouses}
+              highlightSameNumbers={userSettings.highlightSameNumbers}
+              lockedDigit={userSettings.stickyDigitMode ? lockedDigit : null}
+              solution={solutionRef.current}
+            />
+            {/* Desktop controls: 3×3 pad + action row */}
+            <div className="flex flex-col gap-2 w-[180px] shrink-0">
+              <div className="grid grid-cols-3 gap-1">{digitPad}</div>
+              {/* Undo / Erase / New */}
+              <div className="grid grid-cols-3 gap-1">
+                <button
+                  type="button"
+                  disabled={!sessionActive || solved || history.length === 0}
+                  onClick={undo}
+                  className="py-2 border-2 border-border hover:border-primary text-[9px] flex items-center justify-center disabled:opacity-40 disabled:pointer-events-none"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
+                  UNDO
+                </button>
+                <button
+                  type="button"
+                  disabled={!sessionActive || solved}
+                  onClick={erase}
+                  className="py-2 border-2 border-border hover:border-destructive text-[9px] flex items-center justify-center disabled:opacity-40 disabled:pointer-events-none"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
+                  ERASE
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDiffModalOpen(true)}
+                  className="py-2 border-2 border-border hover:border-primary text-[9px] flex items-center justify-center"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
+                  NEW
+                </button>
+              </div>
+              {/* Timer */}
+              {timerVisible && userSettings.showTimer && (
+                <div
+                  className="py-2 border-2 border-border text-[11px] flex items-center justify-center gap-1"
+                  style={{ fontFamily: "var(--font-pixel)" }}
+                >
+                  ⌛ {mm}:{ss}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── MOBILE layout: board full-width, controls below ── */}
+          <div className="lg:hidden space-y-3">
+            <SudokuBoard
+              cells={cells}
+              selected={selected}
+              conflicts={conflicts}
+              interactive={sessionActive && !solved}
+              onSelect={boardOnSelect}
+              highlightHouses={userSettings.highlightHouses}
+              highlightSameNumbers={userSettings.highlightSameNumbers}
+              lockedDigit={userSettings.stickyDigitMode ? lockedDigit : null}
+              solution={solutionRef.current}
+            />
+            {/* Digit row: 1–9 in a single horizontal line */}
+            <div className="flex gap-3 justify-center">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => {
                 const filled = userSettings.removeFilledDigitsFromPad && digitCounts[n] >= 9;
-                if (filled) return <div key={n} className="aspect-square w-full" />;
+                if (filled) return <div key={n} className="flex-1 aspect-square" />;
                 return (
                   <DigitButton
                     key={n}
@@ -446,6 +592,7 @@ export function Sudoku() {
                     disabled={!sessionActive || solved}
                     locked={userSettings.stickyDigitMode && lockedDigit === n}
                     stickyMode={userSettings.stickyDigitMode}
+                    borderless
                     onClick={() => {
                       if (userSettings.stickyDigitMode) {
                         if (lockedDigit === n) { setLockedDigit(null); return; }
@@ -462,95 +609,76 @@ export function Sudoku() {
                 );
               })}
             </div>
-            <button
-              type="button"
-              disabled={!sessionActive || solved}
-              onClick={erase}
-              className="px-3 py-2 border-2 border-border hover:border-destructive text-[10px] flex items-center justify-center disabled:opacity-40 disabled:pointer-events-none disabled:hover:border-border"
-              style={{ fontFamily: "var(--font-pixel)" }}
-            >
-              ERASE
-            </button>
-            {timerVisible ? (
-              userSettings.showTimer ? (
+            {/* Erase + Undo row */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={!sessionActive || solved || history.length === 0}
+                onClick={undo}
+                className="flex-1 py-2 border-2 border-border hover:border-primary text-[10px] flex items-center justify-center disabled:opacity-40 disabled:pointer-events-none"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                UNDO
+              </button>
+              <button
+                type="button"
+                disabled={!sessionActive || solved}
+                onClick={erase}
+                className="flex-1 py-2 border-2 border-border hover:border-destructive text-[10px] flex items-center justify-center disabled:opacity-40 disabled:pointer-events-none"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                ERASE
+              </button>
+            </div>
+            {/* New game + timer row */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setDiffModalOpen(true)}
+                className="flex-1 py-2 border-2 border-border hover:border-primary text-[10px] flex items-center justify-center"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                NEW GAME
+              </button>
+              {timerVisible && userSettings.showTimer && (
                 <div
-                  className="px-3 py-2 border-2 border-border text-[11px] flex items-center justify-center gap-1 text-foreground"
+                  className="flex-1 py-2 border-2 border-border text-[10px] flex items-center justify-center gap-1"
                   style={{ fontFamily: "var(--font-pixel)" }}
                 >
                   ⌛ {mm}:{ss}
                 </div>
-              ) : (
-                <div
-                  className="min-h-[38px] border-2 border-transparent"
-                  aria-hidden
-                />
-              )
-            ) : (
-              <button
-                type="button"
-                onClick={startGame}
-                className="px-3 py-2 border-2 border-primary bg-primary/10 hover:bg-primary/20 text-[11px] flex items-center justify-center gap-1 text-primary"
-                style={{ fontFamily: "var(--font-pixel)" }}
-              >
-                START
-              </button>
-            )}
+              )}
+            </div>
           </div>
+
+          {solved && (
+            <div
+              className="pixel-panel p-3 flex flex-wrap items-center gap-2 text-xs text-primary"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              <Trophy size={16} className="text-primary" />
+              <span>SOLVED in {mm}:{ss}!</span>
+              <Sparkles size={14} className="text-accent" />
+              {submitResult?.isNewHigh && (
+                <span className="ml-auto px-2 py-0.5 bg-accent text-card text-[10px]">
+                  NEW BEST!
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
-        {solved && (
-          <div
-            className="pixel-panel p-3 flex flex-wrap items-center gap-2 text-xs text-primary"
-            style={{ fontFamily: "var(--font-pixel)" }}
-          >
-            <Trophy size={16} className="text-primary" />
-            <span>SOLVED in {mm}:{ss}!</span>
-            <Sparkles size={14} className="text-accent" />
-            {submitResult?.isNewHigh && (
-              <span className="ml-auto px-2 py-0.5 bg-accent text-card text-[10px]">
-                NEW BEST!
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="min-w-0 space-y-3">
-        <div className="pixel-panel p-3 space-y-2">
-          <div className="grid grid-cols-3">
-            {(["easy", "medium", "hard"] as const).map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setDifficulty(d)}
-                className={`px-1 py-1.5 border-2 text-[9px] uppercase truncate ${
-                  difficulty === d
-                    ? "border-primary text-primary bg-primary/10"
-                    : "border-border text-muted-foreground hover:border-primary/60"
-                }`}
-                style={{ fontFamily: "var(--font-pixel)" }}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => setSeed((s) => s + 1)}
-            className="w-full px-3 py-2 border-2 border-border hover:border-primary text-[10px] flex items-center justify-center"
-            style={{ fontFamily: "var(--font-pixel)" }}
-          >
-            NEW PUZZLE
-          </button>
+        {/* Right sidebar: leaderboard only */}
+        <div className="min-w-0 space-y-3">
+          <Leaderboard
+            gameSlug={SUDOKU_GAME_SLUG}
+            category={difficulty}
+            formatScore={formatSudokuScore}
+            title={`${difficulty.toUpperCase()} · LEADERBOARD`}
+          />
         </div>
-        <Leaderboard
-          gameSlug={SUDOKU_GAME_SLUG}
-          category={difficulty}
-          formatScore={formatSudokuScore}
-          title={`${difficulty.toUpperCase()} · LEADERBOARD`}
-        />
       </div>
-    </div>
+    </>
   );
 }
 
@@ -631,6 +759,7 @@ function DigitButton({
   disabled,
   locked,
   stickyMode,
+  borderless = false,
   onClick,
   onLongPress,
 }: {
@@ -638,6 +767,7 @@ function DigitButton({
   disabled: boolean;
   locked: boolean;
   stickyMode: boolean;
+  borderless?: boolean;
   onClick: () => void;
   onLongPress: () => void;
 }) {
@@ -675,10 +805,14 @@ function DigitButton({
         if (didLongPress.current) return; // long-press already handled
         onClick();
       }}
-      className={`aspect-square border-2 text-base disabled:opacity-40 disabled:pointer-events-none ${
-        locked
-          ? "border-primary bg-primary/20 text-primary"
-          : "border-border hover:border-primary disabled:hover:border-border"
+      className={`aspect-square text-base disabled:opacity-40 disabled:pointer-events-none ${
+        borderless
+          ? locked
+            ? "text-primary underline underline-offset-2"
+            : "text-foreground"
+          : locked
+            ? "border-2 border-primary bg-primary/20 text-primary"
+            : "border-2 border-border hover:border-primary disabled:hover:border-border"
       }`}
       style={{ fontFamily: "var(--font-pixel)" }}
     >
