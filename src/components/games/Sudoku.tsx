@@ -342,13 +342,24 @@ export function Sudoku() {
     );
   }, [solved, completedAt, startedAt, difficulty, seed, submitMutation]);
 
-  // Keyboard input
+  // Keyboard input + sticky digit hold on desktop
+  const keyHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const keyHoldDigit = useRef<number | null>(null);
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       if (!sessionActive || solved) return;
-      if (selected == null) return;
       if (e.key >= "1" && e.key <= "9") {
-        place(Number(e.key));
+        const n = Number(e.key);
+        if (!e.repeat && userSettings.stickyDigitMode) {
+          keyHoldDigit.current = n;
+          keyHoldTimer.current = setTimeout(() => {
+            setLockedDigit((prev) => (prev === n ? null : n));
+            keyHoldDigit.current = null; // mark as long-press so keyup won't place
+          }, 500);
+        }
+        // In sticky mode placement happens on keyup; otherwise place immediately
+        if (!userSettings.stickyDigitMode && !e.repeat && selected != null) place(n);
       } else if (e.key === "Backspace" || e.key === "Delete" || e.key === "0") {
         erase();
       } else if (e.key === "ArrowLeft") {
@@ -361,9 +372,27 @@ export function Sudoku() {
         setSelected((s) => (s == null ? null : Math.min(80, s + 9)));
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [selected, place, erase, sessionActive, solved]);
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key >= "1" && e.key <= "9") {
+        const n = Number(e.key);
+        if (keyHoldTimer.current != null) {
+          // Timer still running = short tap, place the digit
+          clearTimeout(keyHoldTimer.current);
+          keyHoldTimer.current = null;
+          if (selected != null) place(n);
+        }
+        keyHoldDigit.current = null;
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, [selected, place, erase, sessionActive, solved, userSettings.stickyDigitMode]);
 
   const elapsedSeconds =
     startedAt == null
@@ -402,9 +431,10 @@ export function Sudoku() {
           />
           <div className="flex flex-col gap-2 w-full lg:w-auto">
             <div className="grid grid-cols-3 gap-1 w-full max-w-[180px] mx-auto">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9]
-                .filter((n) => !userSettings.removeFilledDigitsFromPad || digitCounts[n] < 9)
-                .map((n) => (
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => {
+                const filled = userSettings.removeFilledDigitsFromPad && digitCounts[n] >= 9;
+                if (filled) return <div key={n} className="aspect-square w-full" />;
+                return (
                   <DigitButton
                     key={n}
                     digit={n}
@@ -413,7 +443,6 @@ export function Sudoku() {
                     stickyMode={userSettings.stickyDigitMode}
                     onClick={() => {
                       if (userSettings.stickyDigitMode) {
-                        // Short tap in sticky mode: deselect if already locked, else place normally
                         if (lockedDigit === n) { setLockedDigit(null); return; }
                         place(n);
                       } else {
@@ -425,7 +454,8 @@ export function Sudoku() {
                       setLockedDigit((prev) => (prev === n ? null : n));
                     }}
                   />
-                ))}
+                );
+              })}
             </div>
             <button
               type="button"
@@ -556,8 +586,8 @@ function SudokuBoard({
           highlightDigit > 0 && cell.value === highlightDigit && !isSelected;
         const isConflict = conflicts.has(i);
 
-        const borderTop = r % 3 === 0 && r !== 0 ? "border-t-2 border-t-primary/70" : "";
-        const borderLeft = c % 3 === 0 && c !== 0 ? "border-l-2 border-l-primary/70" : "";
+        const borderTop = r % 3 === 0 && r !== 0 ? "border-t-2 border-t-black" : "";
+        const borderLeft = c % 3 === 0 && c !== 0 ? "border-l-2 border-l-black" : "";
 
         // Layer: house tint, matching digits, selection / locked-digit highlight (strongest).
         let bg = "";
