@@ -29,48 +29,116 @@ function formatSudokuScore(_score: number, metadata: Record<string, unknown> | n
   return `${mm}:${ss}`;
 }
 
-/**
- * Each puzzle is 81 characters (row-major). 0 = empty, 1..9 = given.
- * Win is detected via classic Sudoku rules (no duplicate in row/col/box) so
- * we don't need to store the solution.
- */
-const PUZZLE_BANK: Record<Difficulty, string[]> = {
-  easy: [
-    "530070000600195000098000060800060003400803001700020006060000280000419005000080079",
-    "100489006730000040000001295007120600500703008006095700914600000020000037800512004",
-    "020608000580009700000040000370000500600000004008000013000020000009800036000305070",
-    "300040000050780020906100000800009005060030070500200001000007309030014050000050006",
-  ],
-  medium: [
-    "000260701680070090190004500820100040004602900050003028009300074040050036703018000",
-    "002030008000008000031020000060050270010000050097060030000040910000700000400090700",
-    "008007000200008100000049000020000600000060040000300920080000004500004001070090030",
-  ],
-  hard: [
-    "800000000003600000070090200050007000000045700000100030001000068008500010090000400",
-    "000000010400000000020000000000050407008000300001090000300400200050100000000806000",
-  ],
-};
+// ---------------------------------------------------------------------------
+// Puzzle generation
+// ---------------------------------------------------------------------------
 
 type Cell = {
   value: number; // 0 = empty
   given: boolean;
 };
 
-function parsePuzzle(puzzle: string): Cell[] {
-  return puzzle.split("").map((c) => {
-    const n = Number(c);
-    return { value: Number.isFinite(n) && n >= 1 && n <= 9 ? n : 0, given: n >= 1 };
-  });
-}
-
 function emptyBoard(): Cell[] {
   return Array.from({ length: 81 }, () => ({ value: 0, given: false }));
 }
 
-function pickPuzzle(difficulty: Difficulty): string {
-  const bank = PUZZLE_BANK[difficulty];
-  return bank[Math.floor(Math.random() * bank.length)];
+function shuffle<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j]!, arr[i]!];
+  }
+  return arr;
+}
+
+/** Returns true if placing `val` at index `i` in board `b` is legal. */
+function canPlace(b: number[], i: number, val: number): boolean {
+  const r = Math.floor(i / 9);
+  const c = i % 9;
+  const br = Math.floor(r / 3) * 3;
+  const bc = Math.floor(c / 3) * 3;
+  for (let j = 0; j < 9; j++) {
+    if (b[r * 9 + j] === val) return false;
+    if (b[j * 9 + c] === val) return false;
+    if (b[(br + Math.floor(j / 3)) * 9 + bc + (j % 3)] === val) return false;
+  }
+  return true;
+}
+
+/** Fills `b` with a complete valid grid using randomised backtracking. */
+function fillGrid(b: number[], i = 0): boolean {
+  if (i === 81) return true;
+  if (b[i] !== 0) return fillGrid(b, i + 1);
+  const digits = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  for (const v of digits) {
+    if (canPlace(b, i, v)) {
+      b[i] = v;
+      if (fillGrid(b, i + 1)) return true;
+      b[i] = 0;
+    }
+  }
+  return false;
+}
+
+/**
+ * Counts solutions in `b`, stopping early once `maxCount` is reached.
+ * Used to verify a puzzle has exactly one solution.
+ */
+function countSolutions(b: number[], maxCount = 2): number {
+  const empty = b.indexOf(0);
+  if (empty === -1) return 1;
+  let count = 0;
+  for (let v = 1; v <= 9; v++) {
+    if (canPlace(b, empty, v)) {
+      b[empty] = v;
+      count += countSolutions(b, maxCount);
+      b[empty] = 0;
+      if (count >= maxCount) return count;
+    }
+  }
+  return count;
+}
+
+// Target number of givens per difficulty
+const GIVENS: Record<Difficulty, number> = { easy: 38, medium: 30, hard: 24 };
+
+/**
+ * Generates a fresh puzzle string (81 chars, 0 = blank) with a unique solution.
+ * Algorithm:
+ *  1. Fill a complete grid with randomised backtracking.
+ *  2. Shuffle all 81 cell indices and remove them one by one.
+ *  3. After each removal, verify the puzzle still has a unique solution;
+ *     restore the cell if uniqueness breaks.
+ *  4. Stop once the target number of givens is reached.
+ */
+function generatePuzzle(difficulty: Difficulty): string {
+  const solved = new Array<number>(81).fill(0);
+  fillGrid(solved);
+
+  const puzzle = solved.slice();
+  const target = GIVENS[difficulty];
+  const indices = shuffle(Array.from({ length: 81 }, (_, i) => i));
+
+  let givens = 81;
+  for (const idx of indices) {
+    if (givens <= target) break;
+    const backup = puzzle[idx]!;
+    puzzle[idx] = 0;
+    if (countSolutions(puzzle.slice()) !== 1) {
+      puzzle[idx] = backup; // restoring keeps uniqueness
+    } else {
+      givens--;
+    }
+  }
+
+  return puzzle.join("");
+}
+
+function parsePuzzle(puzzle: string): Cell[] {
+  return puzzle.split("").map((c) => {
+    const n = Number(c);
+    const isGiven = Number.isFinite(n) && n >= 1 && n <= 9;
+    return { value: isGiven ? n : 0, given: isGiven };
+  });
 }
 
 function rowOf(i: number) {
@@ -191,7 +259,7 @@ export function Sudoku() {
 
   const startGame = useCallback(() => {
     if (sessionActive) return;
-    setCells(parsePuzzle(pickPuzzle(difficulty)));
+    setCells(parsePuzzle(generatePuzzle(difficulty)));
     setSelected(null);
     setSolved(false);
     setCompletedAt(null);
@@ -210,19 +278,13 @@ export function Sudoku() {
       const cell = cells[selected];
       if (cell.given) return;
       if (cell.value === value) return;
-      if (userSettings.removeFilledDigitsFromPad) {
-        const alreadyElsewhere = cells.filter(
-          (c, i) => i !== selected && c.value === value,
-        ).length;
-        if (alreadyElsewhere >= 9) return;
-      }
       setCells((prev) => {
         const next = prev.slice();
         next[selected] = { ...prev[selected], value };
         return next;
       });
     },
-    [selected, cells, sessionActive, solved, userSettings.removeFilledDigitsFromPad],
+    [selected, cells, sessionActive, solved],
   );
 
   const erase = useCallback(() => {

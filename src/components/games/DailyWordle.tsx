@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Sparkles, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -157,7 +157,6 @@ const KEYBOARD_ROWS = [
 
 export function DailyWordle() {
   const { user, loading: authLoading } = useAuth();
-  const queryClient = useQueryClient();
   const submitMutation = useSubmitMinigameScore();
   const bank = useMemo(() => getWordBank(), []);
   const dayKey = useMemo(() => getLocalDayKey(), []);
@@ -427,26 +426,6 @@ export function DailyWordle() {
 
   const stats = loadStats();
 
-  const resetToday = async () => {
-    if (!confirm("Clear today's progress? This cannot be undone.")) return;
-    setGuesses([]);
-    setCurrent("");
-    setPlayStartedAt(null);
-    lastLbSig.current = null;
-    setLbNotice(null);
-    savePersisted({ v: 1, dayKey, guesses: [], playStartedAt: null });
-    localStorage.removeItem(`aura-daily-wordle-done-${dayKey}`);
-    if (user) {
-      const { error } = await supabase
-        .from("daily_wordle_progress")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("day_key", dayKey);
-      if (error) console.error("[daily wordle] reset failed", error.message);
-      queryClient.setQueryData(["daily_wordle_progress", user.id, dayKey], null);
-    }
-  };
-
   const tiles: { letter: string; state: TileState }[][] = useMemo(() => {
     const rows: { letter: string; state: TileState }[][] = [];
     for (let r = 0; r < ROWS; r++) {
@@ -616,14 +595,6 @@ export function DailyWordle() {
       </div>
 
       <div className="min-w-0 space-y-3 flex flex-col">
-        <button
-          type="button"
-          onClick={() => void resetToday()}
-          className="flex items-center justify-center px-3 py-2 border-2 border-border hover:border-primary text-xs w-full text-muted-foreground hover:text-primary"
-          style={{ fontFamily: "var(--font-pixel)" }}
-        >
-          Reset today
-        </button>
         <Leaderboard
           gameSlug={DAILY_WORDLE_GAME_SLUG}
           category={dayKey}
