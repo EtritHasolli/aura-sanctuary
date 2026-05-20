@@ -215,6 +215,7 @@ export function Sudoku() {
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [seed, setSeed] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
+  const [lockedDigit, setLockedDigit] = useState<number | null>(null);
   const [cells, setCells] = useState<Cell[]>(() => emptyBoard());
   /** False in the lobby (empty grid); true after Start loads a puzzle. */
   const [sessionActive, setSessionActive] = useState(false);
@@ -238,6 +239,7 @@ export function Sudoku() {
   useEffect(() => {
     setCells(emptyBoard());
     setSelected(null);
+    setLockedDigit(null);
     setSessionActive(false);
     setSolved(false);
     setStartedAt(null);
@@ -245,6 +247,13 @@ export function Sudoku() {
     setSubmitResult(null);
     submittedKey.current = null;
   }, [difficulty, seed]);
+
+  // Auto-clear locked digit once all 9 of that digit are placed
+  useEffect(() => {
+    if (lockedDigit == null) return;
+    const count = cells.filter((c) => c.value === lockedDigit).length;
+    if (count >= 9) setLockedDigit(null);
+  }, [cells, lockedDigit]);
 
   const conflicts = useMemo(() => findConflicts(cells), [cells]);
 
@@ -373,25 +382,49 @@ export function Sudoku() {
             selected={selected}
             conflicts={conflicts}
             interactive={sessionActive && !solved}
-            onSelect={setSelected}
+            onSelect={(i) => {
+              if (userSettings.stickyDigitMode && lockedDigit != null) {
+                const cell = cells[i];
+                if (!cell.given && cell.value === 0) {
+                  setCells((prev) => {
+                    const next = prev.slice();
+                    next[i] = { ...prev[i], value: lockedDigit };
+                    return next;
+                  });
+                  return;
+                }
+              }
+              setSelected(i);
+            }}
             highlightHouses={userSettings.highlightHouses}
             highlightSameNumbers={userSettings.highlightSameNumbers}
+            lockedDigit={userSettings.stickyDigitMode ? lockedDigit : null}
           />
           <div className="flex flex-col gap-2 w-full lg:w-auto">
             <div className="grid grid-cols-3 gap-1 w-full max-w-[180px] mx-auto">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9]
                 .filter((n) => !userSettings.removeFilledDigitsFromPad || digitCounts[n] < 9)
                 .map((n) => (
-                  <button
+                  <DigitButton
                     key={n}
-                    type="button"
+                    digit={n}
                     disabled={!sessionActive || solved}
-                    onClick={() => place(n)}
-                    className="aspect-square border-2 border-border hover:border-primary text-base disabled:opacity-40 disabled:pointer-events-none disabled:hover:border-border"
-                    style={{ fontFamily: "var(--font-pixel)" }}
-                  >
-                    {n}
-                  </button>
+                    locked={userSettings.stickyDigitMode && lockedDigit === n}
+                    stickyMode={userSettings.stickyDigitMode}
+                    onClick={() => {
+                      if (userSettings.stickyDigitMode) {
+                        // Short tap in sticky mode: deselect if already locked, else place normally
+                        if (lockedDigit === n) { setLockedDigit(null); return; }
+                        place(n);
+                      } else {
+                        place(n);
+                      }
+                    }}
+                    onLongPress={() => {
+                      if (!userSettings.stickyDigitMode) return;
+                      setLockedDigit((prev) => (prev === n ? null : n));
+                    }}
+                  />
                 ))}
             </div>
             <button
@@ -494,6 +527,7 @@ function SudokuBoard({
   onSelect,
   highlightHouses,
   highlightSameNumbers,
+  lockedDigit,
 }: {
   cells: Cell[];
   selected: number | null;
@@ -502,29 +536,33 @@ function SudokuBoard({
   onSelect: (i: number) => void;
   highlightHouses: boolean;
   highlightSameNumbers: boolean;
+  lockedDigit: number | null;
 }) {
   const selectedValue = selected != null ? cells[selected].value : 0;
+  // In sticky mode the "active digit" for highlighting is the locked digit, not the selected cell's value.
+  const highlightDigit = lockedDigit ?? selectedValue;
   return (
     <div className="grid grid-cols-9 border-2 border-border bg-card aspect-square w-full max-w-[420px]">
       {cells.map((cell, i) => {
         const r = rowOf(i);
         const c = colOf(i);
-        const isSelected = i === selected;
-        // Highlight the selected cell's row, column, and 3×3 box (classic Sudoku “houses”).
-        const inSameRow = selected != null && rowOf(selected) === r;
-        const inSameCol = selected != null && colOf(selected) === c;
-        const inSameBox = selected != null && boxOf(selected) === boxOf(i);
+        const isSelected = i === selected && lockedDigit == null;
+        // Highlight the selected cell's row, column, and 3x3 box (classic Sudoku "houses").
+        const inSameRow = selected != null && lockedDigit == null && rowOf(selected) === r;
+        const inSameCol = selected != null && lockedDigit == null && colOf(selected) === c;
+        const inSameBox = selected != null && lockedDigit == null && boxOf(selected) === boxOf(i);
         const isPeer = inSameRow || inSameCol || inSameBox;
         const sameValue =
-          selectedValue > 0 && cell.value === selectedValue && i !== selected;
+          highlightDigit > 0 && cell.value === highlightDigit && !isSelected;
         const isConflict = conflicts.has(i);
 
         const borderTop = r % 3 === 0 && r !== 0 ? "border-t-2 border-t-primary/70" : "";
         const borderLeft = c % 3 === 0 && c !== 0 ? "border-l-2 border-l-primary/70" : "";
 
-        // Layer: house (row/col/box) tint, then matching digits, then selection (strongest).
+        // Layer: house tint, matching digits, selection / locked-digit highlight (strongest).
         let bg = "";
         if (isSelected) bg = "bg-primary/40";
+        else if (lockedDigit != null && cell.value === 0 && !cell.given) bg = "bg-primary/10";
         else if (highlightSameNumbers && sameValue) bg = "bg-primary/28";
         else if (highlightHouses && isPeer) bg = "bg-primary/16";
 
@@ -548,6 +586,65 @@ function SudokuBoard({
         );
       })}
     </div>
+  );
+}
+
+function DigitButton({
+  digit,
+  disabled,
+  locked,
+  stickyMode,
+  onClick,
+  onLongPress,
+}: {
+  digit: number;
+  disabled: boolean;
+  locked: boolean;
+  stickyMode: boolean;
+  onClick: () => void;
+  onLongPress: () => void;
+}) {
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didLongPress = useRef(false);
+
+  const startHold = () => {
+    if (!stickyMode) return;
+    didLongPress.current = false;
+    holdTimer.current = setTimeout(() => {
+      didLongPress.current = true;
+      onLongPress();
+    }, 1000);
+  };
+
+  const cancelHold = () => {
+    if (holdTimer.current != null) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onMouseDown={startHold}
+      onMouseUp={cancelHold}
+      onMouseLeave={cancelHold}
+      onTouchStart={startHold}
+      onTouchEnd={cancelHold}
+      onClick={() => {
+        if (didLongPress.current) return; // long-press already handled
+        onClick();
+      }}
+      className={`aspect-square border-2 text-base disabled:opacity-40 disabled:pointer-events-none ${
+        locked
+          ? "border-primary bg-primary/20 text-primary"
+          : "border-border hover:border-primary disabled:hover:border-border"
+      }`}
+      style={{ fontFamily: "var(--font-pixel)" }}
+    >
+      {digit}
+    </button>
   );
 }
 

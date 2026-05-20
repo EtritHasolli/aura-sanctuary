@@ -120,6 +120,13 @@ export function SudokuSettingsButton() {
               checked={draft.showTimer}
               onCheckedChange={(v) => patch({ showTimer: v })}
             />
+            <SettingRow
+              id="sudoku-sticky-digit"
+              label="Sticky digit mode"
+              description="Hold a number on the pad for 1 second to lock it. Tap any empty cell to place it. Auto-clears when all 9 are placed."
+              checked={draft.stickyDigitMode}
+              onCheckedChange={(v) => patch({ stickyDigitMode: v })}
+            />
           </div>
         </DialogContent>
       </Dialog>

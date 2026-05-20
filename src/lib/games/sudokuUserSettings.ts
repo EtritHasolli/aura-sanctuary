@@ -10,6 +10,11 @@ export type SudokuUserSettings = {
    * from keyboard entry; when false, all 1–9 stay available.
    */
   removeFilledDigitsFromPad: boolean;
+  /**
+   * When true, holding a pad digit for 1 second locks it as the active digit.
+   * Tapping any empty cell then places that digit. Auto-clears when all 9 are placed.
+   */
+  stickyDigitMode: boolean;
 };
 
 export const SUDOKU_USER_SETTINGS_DEFAULT: SudokuUserSettings = {
@@ -17,6 +22,7 @@ export const SUDOKU_USER_SETTINGS_DEFAULT: SudokuUserSettings = {
   highlightSameNumbers: true,
   showTimer: true,
   removeFilledDigitsFromPad: true,
+  stickyDigitMode: false,
 };
 
 export const SUDOKU_SETTINGS_CHANGED_EVENT = "aura-sudoku-user-settings";
