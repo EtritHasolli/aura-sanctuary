@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { ChevronRight, ChevronLeft, ChevronDown, MoreVertical, Info, Pencil } from "lucide-react";
+import { ChevronRight, ChevronLeft, ChevronDown, MoreVertical, Info, Pencil, Minus, Folder, FileText } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useNotes, useCreateNote, useUpdateNote, useDeleteNote } from "@/hooks/useNotes";
 import { BugLoader } from "@/components/aura/BugLoader";
@@ -107,7 +107,7 @@ function ChecklistContent({ content, onChange }: { content: string; onChange: (n
               >
                 {checked && <span style={{ fontFamily: "var(--font-pixel)", fontSize: "0.5rem", lineHeight: 1 }}>✓</span>}
               </button>
-              <span className={`flex-1 text-sm ${checked ? "line-through text-muted-foreground" : ""}`}>{label}</span>
+              <span className={`flex-1 ${checked ? "line-through text-muted-foreground" : ""}`} style={{ fontSize: "clamp(0.95rem, 2.5vw, 1.1rem)" }}>{label}</span>
             </div>
           );
         }
@@ -129,15 +129,15 @@ function ChecklistContent({ content, onChange }: { content: string; onChange: (n
         );
 
         if (/^\s*- /.test(line) && !/^\s*-\s*\[/.test(line)) return (
-          <div key={i} className="flex items-start gap-2 text-sm py-0.5">
-            <span className="text-primary mt-0.5 shrink-0">•</span>
+          <div key={i} className="flex items-center gap-2 py-0.5" style={{ fontSize: "clamp(0.95rem, 2.5vw, 1.1rem)" }}>
+            <Minus size={14} strokeWidth={3} className="text-primary shrink-0" />
             <span>{line.replace(/^\s*- /, "")}</span>
           </div>
         );
 
         if (line.trim() === "") return <div key={i} className="h-2" />;
         return (
-          <div key={i} className="prose prose-invert max-w-none text-sm leading-relaxed">
+          <div key={i} className="prose prose-invert max-w-none leading-relaxed" style={{ fontSize: "clamp(0.95rem, 2.5vw, 1.1rem)" }}>
             <ReactMarkdown>{line}</ReactMarkdown>
           </div>
         );
@@ -243,9 +243,12 @@ function SidebarNode({
         >
           {hasChildren ? (expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />) : <span className="w-3" />}
         </button>
-        <div onClick={(e) => e.stopPropagation()}>
-          <ColorPicker value={node.note.color} onChange={(c) => onUpdateColor(node.note.id, c)} />
-        </div>
+        {node.note.is_folder
+          ? <Folder size={12} className="shrink-0 text-primary/70" />
+          : <div onClick={(e) => e.stopPropagation()}>
+              <ColorPicker value={node.note.color} onChange={(c) => onUpdateColor(node.note.id, c)} />
+            </div>
+        }
         <span className="flex-1 text-xs truncate ml-1">{node.note.title || "Untitled"}</span>
         <span className="text-[10px] text-muted-foreground/60 shrink-0 hidden group-hover:block">
           {formatDistanceToNow(new Date(node.note.updated_at), { addSuffix: true })}
@@ -336,7 +339,7 @@ function ArchivesPage() {
   };
 
   const newFolder = async () => {
-    const n = await create.mutateAsync({ title: "New Folder", content: "", parent_id: null });
+    const n = await create.mutateAsync({ title: "New Folder", content: "", parent_id: null, is_folder: true });
     selectNote(n.id);
   };
 
@@ -558,15 +561,17 @@ function ArchivesPage() {
                   </button>
                   {/* Consistent action buttons */}
                   <div className="flex items-center gap-1 ml-auto shrink-0">
-                    <button
-                      onClick={() => setPreview((p) => !p)}
-                      className="h-6 border-2 border-border hover:border-primary text-muted-foreground hover:text-foreground flex items-center justify-center md:px-2 w-6 md:w-auto"
-                      style={{ fontFamily: "var(--font-pixel)", fontSize: "0.55rem" }}
-                      title={preview ? "Edit" : "Preview"}
-                    >
-                      <span className="hidden md:inline">{preview ? "EDIT" : "PREVIEW"}</span>
-                      <span className="md:hidden"><Pencil size={11} /></span>
-                    </button>
+                    {!selected.is_folder && (
+                      <button
+                        onClick={() => setPreview((p) => !p)}
+                        className="h-6 border-2 border-border hover:border-primary text-muted-foreground hover:text-foreground flex items-center justify-center md:px-2 w-6 md:w-auto"
+                        style={{ fontFamily: "var(--font-pixel)", fontSize: "0.55rem" }}
+                        title={preview ? "Edit" : "Preview"}
+                      >
+                        <span className="hidden md:inline">{preview ? "EDIT" : "PREVIEW"}</span>
+                        <span className="md:hidden"><Pencil size={11} /></span>
+                      </button>
+                    )}
                     <div ref={moreRef} className="relative">
                       <button
                         onClick={() => setMoreOpen((v) => !v)}
@@ -583,27 +588,29 @@ function ArchivesPage() {
                           >
                             Add sub-page
                           </button>
-                          <button
-                            onClick={async () => {
-                              setMoreOpen(false);
-                              setConverting(true);
-                              try {
-                                const task = await createTask.mutateAsync({ type: "todo", title: title || "Untitled", notes: content, source_note_id: selected.id });
-                                const checklistLines = content.split("\n").filter((l) => /^\s*-\s*\[[ x]\]/i.test(l));
-                                for (const line of checklistLines) {
-                                  const itemTitle = line.replace(/^\s*-\s*\[[ x]\]\s*/i, "").trim();
-                                  if (itemTitle) await createChecklistItem.mutateAsync({ taskId: task.id, title: itemTitle });
+                          {!selected.is_folder && (
+                            <button
+                              onClick={async () => {
+                                setMoreOpen(false);
+                                setConverting(true);
+                                try {
+                                  const task = await createTask.mutateAsync({ type: "todo", title: title || "Untitled", notes: content, source_note_id: selected.id });
+                                  const checklistLines = content.split("\n").filter((l) => /^\s*-\s*\[[ x]\]/i.test(l));
+                                  for (const line of checklistLines) {
+                                    const itemTitle = line.replace(/^\s*-\s*\[[ x]\]\s*/i, "").trim();
+                                    if (itemTitle) await createChecklistItem.mutateAsync({ taskId: task.id, title: itemTitle });
+                                  }
+                                  toast.success("Quest added to To-Dos.");
+                                } finally {
+                                  setConverting(false);
                                 }
-                                toast.success("Quest added to To-Dos.");
-                              } finally {
-                                setConverting(false);
-                              }
-                            }}
-                            className="text-left px-3 py-2 text-xs hover:bg-secondary"
-                            style={{ fontFamily: "var(--font-pixel)", fontSize: "0.6rem" }}
-                          >
-                            Convert to task
-                          </button>
+                              }}
+                              className="text-left px-3 py-2 text-xs hover:bg-secondary"
+                              style={{ fontFamily: "var(--font-pixel)", fontSize: "0.6rem" }}
+                            >
+                              Convert to task
+                            </button>
+                          )}
                           <button
                             onClick={() => { del.mutate(selected.id); setSelectedId(null); setMoreOpen(false); }}
                             className="text-left px-3 py-2 text-xs text-destructive hover:bg-destructive/10"
@@ -625,7 +632,30 @@ function ArchivesPage() {
 
               {/* Content */}
               <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
-                {preview ? (
+                {selected.is_folder ? (
+                  <div className="space-y-1">
+                    {tree.find(n => n.note.id === selected.id)?.children.length === 0 && (
+                      <p className="text-muted-foreground/50 text-sm italic">This folder is empty. Add notes using the sidebar.</p>
+                    )}
+                    {(tree.find(n => n.note.id === selected.id)?.children ?? []).map((child) => (
+                      <button
+                        key={child.note.id}
+                        type="button"
+                        onClick={() => selectNote(child.note.id)}
+                        className="w-full flex items-center gap-2 px-3 py-2 border-2 border-border hover:border-primary text-left group"
+                      >
+                        {child.note.is_folder
+                          ? <Folder size={13} className="shrink-0 text-primary/70" />
+                          : <FileText size={13} className="shrink-0 text-muted-foreground group-hover:text-foreground" />
+                        }
+                        <span className="flex-1 text-sm truncate">{child.note.title || "Untitled"}</span>
+                        <span className="text-xs text-muted-foreground/50 shrink-0">
+                          {formatDistanceToNow(new Date(child.note.updated_at), { addSuffix: true })}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : preview ? (
                   <ChecklistContent
                     content={content || "*Empty page.*"}
                     onChange={(next) => { setContent(next); save(title, next); }}

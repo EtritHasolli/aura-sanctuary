@@ -30,6 +30,7 @@ export function useCreateNote() {
       source_task_id?: string;
       parent_id?: string | null;
       color?: string | null;
+      is_folder?: boolean;
     }) => {
       const { data, error } = await supabase
         .from("notes")
@@ -40,6 +41,7 @@ export function useCreateNote() {
           source_task_id: input.source_task_id ?? null,
           parent_id: input.parent_id ?? null,
           color: input.color ?? null,
+          is_folder: input.is_folder ?? false,
         })
         .select()
         .single();

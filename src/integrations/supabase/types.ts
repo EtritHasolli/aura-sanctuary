@@ -79,6 +79,7 @@ export type Database = {
           created_at: string
           color: string | null
           id: string
+          is_folder: boolean
           parent_id: string | null
           source_task_id: string | null
           title: string
@@ -90,6 +91,7 @@ export type Database = {
           created_at?: string
           color?: string | null
           id?: string
+          is_folder?: boolean
           parent_id?: string | null
           source_task_id?: string | null
           title?: string
@@ -101,6 +103,7 @@ export type Database = {
           created_at?: string
           color?: string | null
           id?: string
+          is_folder?: boolean
           parent_id?: string | null
           source_task_id?: string | null
           title?: string

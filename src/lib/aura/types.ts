@@ -210,6 +210,7 @@ export interface Note {
   source_task_id: string | null;
   parent_id: string | null;
   color: string | null;
+  is_folder: boolean;
   created_at: string;
   updated_at: string;
 }

@@ -1,0 +1,2 @@
+ALTER TABLE public.notes
+  ADD COLUMN IF NOT EXISTS is_folder BOOLEAN NOT NULL DEFAULT false;
