@@ -2,22 +2,7 @@ import { useEffect, useRef } from "react";
 import { useTasks } from "./useTasks";
 import { useProfile } from "./useProfile";
 import { calendarDateInTimeZone } from "@/lib/aura/dates";
-
-const DESKTOP_NOTIF_KEY = "aura:desktop-notifications";
-
-function desktopNotifsEnabled() {
-  return (
-    typeof window !== "undefined" &&
-    typeof Notification !== "undefined" &&
-    Notification.permission === "granted" &&
-    window.localStorage.getItem(DESKTOP_NOTIF_KEY) === "true"
-  );
-}
-
-function fireNotification(title: string, body: string) {
-  if (!desktopNotifsEnabled()) return;
-  new Notification(title, { body, icon: "/favicon.ico" });
-}
+import { desktopNotifsEnabled, fireLocalNotification } from "@/lib/notifications";
 
 /**
  * Resolves when a reminder should fire:
@@ -91,7 +76,7 @@ export function useTaskReminders() {
         if (task.type !== "todo") {
           firedToday.current.add(`${task.id}:${todayKey}`);
         }
-        fireNotification("Quest Reminder", task.title);
+        void fireLocalNotification("⚔️ Quest Reminder", task.title, { tag: `quest-${task.id}`, url: "/quests" });
       }, msUntil);
 
       timers.current.set(task.id, timer);
