@@ -562,7 +562,6 @@ function SudokuBoard({
         // Layer: house tint, matching digits, selection / locked-digit highlight (strongest).
         let bg = "";
         if (isSelected) bg = "bg-primary/40";
-        else if (lockedDigit != null && cell.value === 0 && !cell.given) bg = "bg-primary/10";
         else if (highlightSameNumbers && sameValue) bg = "bg-primary/28";
         else if (highlightHouses && isPeer) bg = "bg-primary/16";
 
@@ -607,13 +606,14 @@ function DigitButton({
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didLongPress = useRef(false);
 
-  const startHold = () => {
+  const startHold = (e: React.TouchEvent | React.MouseEvent) => {
     if (!stickyMode) return;
+    e.preventDefault();
     didLongPress.current = false;
     holdTimer.current = setTimeout(() => {
       didLongPress.current = true;
       onLongPress();
-    }, 1000);
+    }, 500);
   };
 
   const cancelHold = () => {
@@ -632,6 +632,7 @@ function DigitButton({
       onMouseLeave={cancelHold}
       onTouchStart={startHold}
       onTouchEnd={cancelHold}
+      onContextMenu={(e) => e.preventDefault()}
       onClick={() => {
         if (didLongPress.current) return; // long-press already handled
         onClick();
