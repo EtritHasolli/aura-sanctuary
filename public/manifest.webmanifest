@@ -1,0 +1,17 @@
+{
+  "name": "Aura — The Desktop Sanctuary",
+  "short_name": "Aura",
+  "description": "A productivity RPG where your habits power your sanctuary.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1410",
+  "theme_color": "#d99630",
+  "icons": [
+    {
+      "src": "/aura-logo-full.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
