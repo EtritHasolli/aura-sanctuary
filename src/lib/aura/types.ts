@@ -208,6 +208,8 @@ export interface Note {
   title: string;
   content: string;
   source_task_id: string | null;
+  parent_id: string | null;
+  color: string | null;
   created_at: string;
   updated_at: string;
 }

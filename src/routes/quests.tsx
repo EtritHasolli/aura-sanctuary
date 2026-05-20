@@ -819,10 +819,10 @@ function TaskRow({
                           ? "border-primary bg-primary/10 text-foreground"
                           : "border-border bg-input text-muted-foreground hover:border-primary/60"
                       }`}
-                      style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
+                      style={{ fontFamily: "var(--font-pixel)", fontSize: "0.6rem" }}
                     >
                       <span>{labels[d].name}</span>
-                      <span style={{ color: "var(--color-gold)" }}>{labels[d].stars}</span>
+                      <span style={{ color: "var(--color-gold)", fontSize: "0.85rem", lineHeight: 1 }}>{labels[d].stars}</span>
                     </button>
                   );
                 })}
@@ -843,14 +843,14 @@ function TaskRow({
                       const val = e.target.value || null;
                       update.mutate({ id: task.id, patch: { reminder_time: val } });
                     }}
-                    className="px-1 py-0.5 bg-input border border-border text-xs"
+                    className="px-1 py-0.5 bg-input border border-border" style={{ fontSize: "0.6rem", fontFamily: "var(--font-pixel)" }}
                   />
                   {task.reminder_time && (
                     <button
                       type="button"
                       onClick={() => update.mutate({ id: task.id, patch: { reminder_time: null } })}
-                      className="text-destructive text-[10px] hover:opacity-70"
-                      style={{ fontFamily: "var(--font-pixel)" }}
+                      className="text-destructive hover:opacity-70"
+                      style={{ fontFamily: "var(--font-pixel)", fontSize: "0.6rem" }}
                     >
                       CLEAR
                     </button>
@@ -866,7 +866,7 @@ function TaskRow({
                       const val = e.target.value || null;
                       update.mutate({ id: task.id, patch: { reminder_time: val } });
                     }}
-                    className="px-1 py-0.5 bg-input border border-border text-xs"
+                    className="px-1 py-0.5 bg-input border border-border" style={{ fontSize: "0.6rem", fontFamily: "var(--font-pixel)" }}
                   />
                   {task.reminder_time && (
                     <button
@@ -919,25 +919,30 @@ function TaskRow({
 
             {(task.type === "todo" || task.type === "daily") && (
               <div className="space-y-1">
-                <div className="text-xs text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+                <div className="text-base text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
                   QUEST STEPS
                 </div>
                 {(task.checklist ?? []).map((c) => (
-                  <div key={c.id} className="flex items-center gap-1 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={c.done}
-                      onChange={(e) =>
-                        patchCl.mutate({ id: c.id, patch: { done: e.target.checked } })
-                      }
-                    />
-                    <span className="flex-1">{c.title}</span>
+                  <div key={c.id} className="flex items-center gap-2 text-base">
                     <button
                       type="button"
-                      className="text-destructive text-[10px]"
+                      onClick={() => patchCl.mutate({ id: c.id, patch: { done: !c.done } })}
+                      className={`shrink-0 w-4 h-4 border-2 flex items-center justify-center transition-colors ${
+                        c.done
+                          ? "border-primary bg-primary/20 text-primary"
+                          : "border-border bg-input hover:border-primary"
+                      }`}
+                      style={{ imageRendering: "pixelated" }}
+                    >
+                      {c.done && <span style={{ fontFamily: "var(--font-pixel)", fontSize: "0.5rem", lineHeight: 1 }}>✓</span>}
+                    </button>
+                    <span className={`flex-1 ${c.done ? "line-through text-muted-foreground" : ""}`}>{c.title}</span>
+                    <button
+                      type="button"
+                      className="text-destructive text-base font-bold leading-none"
                       onClick={() => delCl.mutate(c.id)}
                     >
-                      ×
+                      Delete
                     </button>
                   </div>
                 ))}
@@ -1004,7 +1009,7 @@ function TaskRow({
                 className="flex items-center justify-between"
                 style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
               >
-                <span className="text-accent truncate">↗ {linkedNote.title}</span>
+                <span className="text-accent truncate">{linkedNote.title}</span>
                 <button
                   onClick={() => navigate({ to: "/archives", search: { id: linkedNote.id } })}
                   className="text-muted-foreground hover:text-primary ml-2 shrink-0"

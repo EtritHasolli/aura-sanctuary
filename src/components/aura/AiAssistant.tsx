@@ -144,9 +144,11 @@ export function AiAssistant() {
     };
     e.currentTarget.setPointerCapture(e.pointerId);
     e.preventDefault();
+    e.stopPropagation();
   };
 
-  const endBubbleDrag = () => {
+  const endBubbleDrag = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
     const moved = !!dragRef.current?.moved;
     if (dragRef.current) dragRef.current.dragging = false;
     if (!moved) setOpen(true);
@@ -155,6 +157,7 @@ export function AiAssistant() {
   useEffect(() => {
     const move = (e: PointerEvent) => {
       if (!dragRef.current?.dragging) return;
+      e.preventDefault();
       const dx = dragRef.current.startX - e.clientX;
       const dy = dragRef.current.startY - e.clientY;
       if (Math.abs(dx) + Math.abs(dy) > 3) dragRef.current.moved = true;
@@ -164,7 +167,7 @@ export function AiAssistant() {
       if (!dragRef.current) return;
       dragRef.current.dragging = false;
     };
-    window.addEventListener("pointermove", move);
+    window.addEventListener("pointermove", move, { passive: false });
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
     return () => {
@@ -303,6 +306,7 @@ export function AiAssistant() {
             onPointerDown={startBubbleDrag}
             onPointerUp={endBubbleDrag}
             className="pointer-events-auto bg-transparent border-none shadow-none p-0"
+            style={{ touchAction: "none" }}
             title="Open Aura assistant"
           >
             <AiChatIcon size={80} evil={isEvil} />
@@ -322,6 +326,7 @@ export function AiAssistant() {
               onPointerDown={startBubbleDrag}
               onPointerUp={endBubbleDrag}
               className="pointer-events-auto bg-transparent border-none shadow-none p-0"
+              style={{ touchAction: "none" }}
               title="Open Aura assistant"
             >
               <AiChatIcon size={72} evil={isEvil} />
