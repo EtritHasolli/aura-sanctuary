@@ -416,6 +416,7 @@ export function WordSearchGame() {
               className="grid gap-0 border-2 border-border p-1 sm:p-2 bg-card w-full xl:w-auto xl:inline-grid"
               style={{
                 gridTemplateColumns: `repeat(${puzzle.size}, minmax(0, 1fr))`,
+                touchAction: "none",
               }}
             >
               {puzzle.grid.map((row, r) =>
