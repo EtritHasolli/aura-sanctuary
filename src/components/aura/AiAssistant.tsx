@@ -12,20 +12,22 @@ type ChatRole = "user" | "assistant";
 type ChatMessage = { role: ChatRole; content: string };
 
 const STORAGE_KEY = "aura:assistant-pos";
+const BUBBLE_SIZE = 80;
+const MARGIN = 8;
+const MOBILE_NAV_HEIGHT = 72; // bottom nav bar height on mobile
 
 function defaultBottomOffset() {
   if (typeof window === "undefined") return 24;
-  return window.innerWidth < 768 ? 72 : 24;
+  return window.innerWidth < 768 ? MOBILE_NAV_HEIGHT + MARGIN : 24;
 }
-
-const BUBBLE_SIZE = 80;
-const MARGIN = 8;
 
 function clampBubble(x: number, y: number): { x: number; y: number } {
   if (typeof window === "undefined") return { x: Math.max(MARGIN, x), y: Math.max(MARGIN, y) };
+  const isMobile = window.innerWidth < 768;
+  const minBottom = isMobile ? MOBILE_NAV_HEIGHT + MARGIN : MARGIN;
   return {
     x: Math.min(Math.max(MARGIN, x), window.innerWidth - BUBBLE_SIZE - MARGIN),
-    y: Math.min(Math.max(MARGIN, y), window.innerHeight - BUBBLE_SIZE - MARGIN),
+    y: Math.min(Math.max(minBottom, y), window.innerHeight - BUBBLE_SIZE - MARGIN),
   };
 }
 
@@ -131,7 +133,7 @@ export function AiAssistant() {
   };
 
   const startBubbleDrag = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 && e.pointerType === "mouse") return;
     dragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
@@ -140,6 +142,7 @@ export function AiAssistant() {
       dragging: true,
       moved: false,
     };
+    e.currentTarget.setPointerCapture(e.pointerId);
     e.preventDefault();
   };
 
@@ -307,17 +310,30 @@ export function AiAssistant() {
         ) : chatPanel}
       </div>
 
-      {/* ── Mobile: fixed bottom-right, no drag ── */}
-      <div className="md:hidden fixed z-[140] bottom-[72px] right-3 pointer-events-none">
-        {!open ? (
-          <button
-            onClick={() => setOpen(true)}
-            className="pointer-events-auto bg-transparent border-none shadow-none p-0"
-            title="Open Aura assistant"
+      {/* ── Mobile: draggable bubble, fixed chat panel ── */}
+      <div className="md:hidden">
+        {/* Draggable bubble */}
+        {!open && (
+          <div
+            className="fixed z-140 pointer-events-none"
+            style={{ right: `${offset.x}px`, bottom: `${offset.y}px` }}
           >
-            <AiChatIcon size={72} evil={isEvil} />
-          </button>
-        ) : chatPanel}
+            <button
+              onPointerDown={startBubbleDrag}
+              onPointerUp={endBubbleDrag}
+              className="pointer-events-auto bg-transparent border-none shadow-none p-0"
+              title="Open Aura assistant"
+            >
+              <AiChatIcon size={72} evil={isEvil} />
+            </button>
+          </div>
+        )}
+        {/* Chat panel: always fixed bottom-right, not affected by bubble position */}
+        {open && (
+          <div className="fixed z-140 bottom-18 right-3 pointer-events-none">
+            {chatPanel}
+          </div>
+        )}
       </div>
     </>
   );

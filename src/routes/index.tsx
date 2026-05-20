@@ -676,7 +676,7 @@ function SanctuaryPage() {
   return (
     <>
     <div className="p-3 md:p-6 max-w-6xl mx-auto">
-      <div className="mb-3 flex items-center justify-end">
+      <div className="mb-3 hidden md:flex items-center justify-end">
         <div className="px-2 py-1 border border-border bg-secondary/30 text-xs text-muted-foreground capitalize">
           Path: {profile?.aura_path ? pathLabel : "unbound"}
         </div>
