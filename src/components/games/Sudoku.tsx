@@ -110,7 +110,7 @@ const GIVENS: Record<Difficulty, number> = { easy: 38, medium: 30, hard: 24 };
  *     restore the cell if uniqueness breaks.
  *  4. Stop once the target number of givens is reached.
  */
-function generatePuzzle(difficulty: Difficulty): string {
+function generatePuzzle(difficulty: Difficulty): { puzzle: string; solution: number[] } {
   const solved = new Array<number>(81).fill(0);
   fillGrid(solved);
 
@@ -124,13 +124,13 @@ function generatePuzzle(difficulty: Difficulty): string {
     const backup = puzzle[idx]!;
     puzzle[idx] = 0;
     if (countSolutions(puzzle.slice()) !== 1) {
-      puzzle[idx] = backup; // restoring keeps uniqueness
+      puzzle[idx] = backup;
     } else {
       givens--;
     }
   }
 
-  return puzzle.join("");
+  return { puzzle: puzzle.join(""), solution: solved };
 }
 
 function parsePuzzle(puzzle: string): Cell[] {
@@ -229,6 +229,7 @@ export function Sudoku() {
   >(null);
   const submitMutation = useSubmitMinigameScore();
   const submittedKey = useRef<string | null>(null);
+  const solutionRef = useRef<number[]>([]);
 
   useEffect(() => {
     if (startedAt == null || completedAt != null) return;
@@ -268,7 +269,9 @@ export function Sudoku() {
 
   const startGame = useCallback(() => {
     if (sessionActive) return;
-    setCells(parsePuzzle(generatePuzzle(difficulty)));
+    const { puzzle, solution } = generatePuzzle(difficulty);
+    solutionRef.current = solution;
+    setCells(parsePuzzle(puzzle));
     setSelected(null);
     setSolved(false);
     setCompletedAt(null);
@@ -414,10 +417,11 @@ export function Sudoku() {
             onSelect={(i) => {
               if (userSettings.stickyDigitMode && lockedDigit != null) {
                 const cell = cells[i];
-                if (!cell.given && cell.value === 0) {
+                if (!cell.given) {
                   setCells((prev) => {
                     const next = prev.slice();
-                    next[i] = { ...prev[i], value: lockedDigit };
+                    // Toggle: erase if the cell already holds the locked digit, otherwise place it
+                    next[i] = { ...prev[i], value: cell.value === lockedDigit ? 0 : lockedDigit };
                     return next;
                   });
                   return;
@@ -428,6 +432,7 @@ export function Sudoku() {
             highlightHouses={userSettings.highlightHouses}
             highlightSameNumbers={userSettings.highlightSameNumbers}
             lockedDigit={userSettings.stickyDigitMode ? lockedDigit : null}
+            solution={solutionRef.current}
           />
           <div className="flex flex-col gap-2 w-full lg:w-auto">
             <div className="grid grid-cols-3 gap-1 w-full max-w-[180px] mx-auto">
@@ -558,6 +563,7 @@ function SudokuBoard({
   highlightHouses,
   highlightSameNumbers,
   lockedDigit,
+  solution,
 }: {
   cells: Cell[];
   selected: number | null;
@@ -567,6 +573,7 @@ function SudokuBoard({
   highlightHouses: boolean;
   highlightSameNumbers: boolean;
   lockedDigit: number | null;
+  solution: number[];
 }) {
   const selectedValue = selected != null ? cells[selected].value : 0;
   // In sticky mode the "active digit" for highlighting is the locked digit, not the selected cell's value.
@@ -595,9 +602,10 @@ function SudokuBoard({
         else if (highlightSameNumbers && sameValue) bg = "bg-primary/28";
         else if (highlightHouses && isPeer) bg = "bg-primary/16";
 
+        const isWrong = !cell.given && cell.value !== 0 && solution.length > 0 && cell.value !== solution[i];
         const valueColor = cell.given
           ? "text-foreground"
-          : isConflict
+          : isWrong || isConflict
             ? "text-destructive"
             : "text-primary";
 
