@@ -1,14 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Trophy, Info, X, Check, Pencil } from "lucide-react";
+import { Trophy, Info, X, Check } from "lucide-react";
 import {
   useChallengeTemplates,
   useCreateChallengeTemplate,
   useUpdateChallengeTemplate,
   useStartChallengeRun,
   useMyRuns,
+  useChallengeRunTasks,
   type BlueprintTask,
   type ChallengeTemplate,
+  type MyRun,
 } from "@/hooks/useChallenges";
 import { useTasks } from "@/hooks/useTasks";
 import { toast } from "sonner";
@@ -196,12 +198,11 @@ function ChallengesPage() {
                 onClick={() => openEdit(t)}
               >
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center justify-between gap-2">
                     <h2 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>{t.name}</h2>
-                    <Pencil size={11} className="text-muted-foreground shrink-0" />
                     {activeRun && (
                       <span
-                        className="px-1.5 py-0.5 bg-green-500/15 border border-green-500 text-green-400 text-[9px]"
+                        className="px-1.5 py-0.5 bg-green-500/15 border border-green-500 text-green-400 text-[9px] shrink-0"
                         style={{ fontFamily: "var(--font-pixel)" }}
                       >
                         ACTIVE · ends {activeRun.ends_on}
@@ -212,6 +213,8 @@ function ChallengesPage() {
                   <p className="text-[10px] text-muted-foreground mt-2" style={{ fontFamily: "var(--font-pixel)" }}>
                     {t.duration_days} days · tracks your existing quests
                   </p>
+                  {activeRun && <ChallengeProgress run={activeRun} totalDays={t.duration_days} />}
+                  {activeRun && <ChallengeStats runId={activeRun.run_id} run={activeRun} totalDays={t.duration_days} />}
                 </div>
                 {!activeRun && (
                   <button
@@ -247,8 +250,6 @@ function ChallengesPage() {
                 </span>
                 <Check size={14} className={createPicker.selectedIds.size > 0 ? "text-primary" : "text-muted-foreground"} />
               </button>
-
-              <QuestChips tasks={createPicker.selectedTasks} overrides={{}} onRemove={createPicker.toggle} />
             </div>
 
             <button onClick={() => void onCreate()} disabled={create.isPending}
@@ -302,8 +303,6 @@ function ChallengesPage() {
                   </span>
                   <Check size={14} className={editPicker.selectedIds.size > 0 ? "text-primary" : "text-muted-foreground"} />
                 </button>
-
-                <QuestChips tasks={editPicker.selectedTasks} overrides={{}} onRemove={editPicker.toggle} />
               </div>
             </div>
 
@@ -361,42 +360,123 @@ function ChallengesPage() {
   );
 }
 
-// ── Quest chip display grouped by type ───────────────────────────────────────
-type AnyTask = { id: string; title: string; type: string };
+// ── Challenge stats ───────────────────────────────────────────────────────────
+function ChallengeStats({ runId, run, totalDays }: { runId: string; run: MyRun; totalDays: number }) {
+  const { data: tasks = [] } = useChallengeRunTasks(runId);
 
-function QuestChips({ tasks, overrides, onRemove }: {
-  tasks: AnyTask[];
-  overrides: OverrideMap;
-  onRemove: (id: string) => void;
-}) {
   if (tasks.length === 0) return null;
 
-  const habits  = tasks.filter((t) => (overrides[t.id]?.type ?? t.type) === "habit");
-  const dailies = tasks.filter((t) => (overrides[t.id]?.type ?? t.type) === "daily");
-  const todos   = tasks.filter((t) => (overrides[t.id]?.type ?? t.type) === "todo");
+  const habits  = tasks.filter((t) => t.type === "habit");
+  const dailies = tasks.filter((t) => t.type === "daily");
+  const todos   = tasks.filter((t) => t.type === "todo");
 
-  const Group = ({ label, items }: { label: string; items: AnyTask[] }) => {
-    if (items.length === 0) return null;
-    return (
-      <div className="space-y-1">
-        <p className="text-[9px] text-muted-foreground uppercase tracking-wider" style={{ fontFamily: "var(--font-pixel)" }}>{label}</p>
-        <div className="flex flex-wrap gap-1">
-          {items.map((t) => (
-            <span key={t.id} className="flex items-center gap-1 px-1.5 py-0.5 bg-primary/15 border border-primary text-[9px] text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
-              {t.title}
-              <button type="button" onClick={() => onRemove(t.id)} className="hover:text-destructive"><X size={9} /></button>
-            </span>
-          ))}
-        </div>
-      </div>
-    );
-  };
+  const start = new Date(run.starts_on);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const elapsed = Math.max(1, Math.min(totalDays, Math.floor((today.getTime() - start.getTime()) / 86_400_000) + 1));
+
+  const completedTodos = todos.filter((t) => t.completed).length;
+  const totalTodos = todos.length;
+
+  const bestDailyStreak = dailies.reduce((max, t) => Math.max(max, t.streak_best ?? 0), 0);
+  const currentDailyStreak = dailies.reduce((max, t) => Math.max(max, t.streak_current ?? 0), 0);
+  const totalHabitTaps = habits.reduce((sum, t) => sum + (t.positive_count ?? 0), 0);
+
+  // Dailies completed today
+  const todayStr = today.toISOString().slice(0, 10);
+  const dailiesHitToday = dailies.filter((t) => t.last_completed_local_date === todayStr).length;
+
+  const statItems = [
+    ...(dailies.length > 0 ? [
+      { label: "CURRENT STREAK", value: `${currentDailyStreak}d`, sub: "dailies" },
+      { label: "BEST STREAK", value: `${bestDailyStreak}d`, sub: "dailies" },
+      { label: "TODAY", value: `${dailiesHitToday}/${dailies.length}`, sub: "dailies done" },
+    ] : []),
+    ...(todos.length > 0 ? [
+      { label: "TO-DOS DONE", value: `${completedTodos}/${totalTodos}`, sub: "completed" },
+    ] : []),
+    ...(habits.length > 0 ? [
+      { label: "HABIT TAPS", value: String(totalHabitTaps), sub: `over ${elapsed} days` },
+    ] : []),
+    { label: "SCORE", value: String(run.score), sub: "total points" },
+  ];
+
+  // Mini bar chart: daily completions heat — use streak_current as proxy for recent activity
+  const dailyCompletionPct = dailies.length > 0
+    ? Math.round((dailies.filter((t) => (t.streak_current ?? 0) > 0).length / dailies.length) * 100)
+    : null;
 
   return (
-    <div className="space-y-2 pt-1">
-      <Group label="Habits"  items={habits} />
-      <Group label="Dailies" items={dailies} />
-      <Group label="To-dos"  items={todos} />
+    <div className="mt-4 pt-3 border-t border-border space-y-3">
+      <p className="text-[9px] text-muted-foreground uppercase tracking-wider" style={{ fontFamily: "var(--font-pixel)" }}>STATS</p>
+
+      {/* Stat grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {statItems.map((s) => (
+          <div key={s.label} className="bg-secondary/40 border border-border px-2 py-2 space-y-0.5">
+            <p className="text-[8px] text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>{s.label}</p>
+            <p className="text-base text-primary leading-none" style={{ fontFamily: "var(--font-pixel)" }}>{s.value}</p>
+            <p className="text-[8px] text-muted-foreground">{s.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Dailies on-streak bar */}
+      {dailies.length > 0 && dailyCompletionPct !== null && (
+        <div className="space-y-1">
+          <div className="flex justify-between items-center">
+            <span className="text-[8px] text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>DAILIES ON STREAK</span>
+            <span className="text-[8px] text-primary" style={{ fontFamily: "var(--font-pixel)" }}>{dailyCompletionPct}%</span>
+          </div>
+          <div className="w-full h-1.5 bg-secondary border border-border overflow-hidden">
+            <div className="h-full bg-green-500 transition-all" style={{ width: `${dailyCompletionPct}%` }} />
+          </div>
+        </div>
+      )}
+
+      {/* To-do completion bar */}
+      {todos.length > 0 && (
+        <div className="space-y-1">
+          <div className="flex justify-between items-center">
+            <span className="text-[8px] text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>TO-DO PROGRESS</span>
+            <span className="text-[8px] text-primary" style={{ fontFamily: "var(--font-pixel)" }}>{completedTodos}/{totalTodos}</span>
+          </div>
+          <div className="w-full h-1.5 bg-secondary border border-border overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all"
+              style={{ width: totalTodos > 0 ? `${Math.round((completedTodos / totalTodos) * 100)}%` : "0%" }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Challenge progress bar ────────────────────────────────────────────────────
+function ChallengeProgress({ run, totalDays }: { run: MyRun; totalDays: number }) {
+  const start = new Date(run.starts_on);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const elapsed = Math.max(0, Math.min(totalDays, Math.floor((today.getTime() - start.getTime()) / 86_400_000) + 1));
+  const pct = Math.round((elapsed / totalDays) * 100);
+
+  return (
+    <div className="mt-3 space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[9px] text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
+          DAY {elapsed}/{totalDays}
+        </span>
+        <span className="text-[9px] text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+          SCORE: {run.score}
+        </span>
+      </div>
+      <div className="w-full h-2 bg-secondary border border-border overflow-hidden">
+        <div
+          className="h-full bg-primary transition-all duration-300"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 }

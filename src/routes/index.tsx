@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, animate, motion, useMotionValue } from "framer-motion";
 import { RotateCcw, Music, SkipBack, SkipForward, Play, Pause, Square, ListMusic, Volume2, VolumeX, FolderOpen } from "lucide-react";
 import { LocalMusicModal } from "@/components/aura/LocalMusicModal";
+import { StudyCallModal } from "@/components/aura/StudyCallModal";
+import { useStudyCall } from "@/hooks/useStudyCall";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -135,6 +137,11 @@ function SanctuaryPage() {
   const updateChecklist = useUpdateChecklistItem();
   const [muted, setMuted] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Study Call
+  const { callState, isLoading: callLoading, error: callError, createCall, joinCall, leaveCall } = useStudyCall();
+  const [joinCode, setJoinCode] = useState("");
+  const [showJoinInput, setShowJoinInput] = useState(false);
 
   const focused = characterState === "working";
   const pathLabel = useMemo(
@@ -1326,9 +1333,64 @@ function SanctuaryPage() {
               ))}
             </div>
           </div>
+          {/* Study Call */}
+          <div className="pixel-panel p-4 space-y-3">
+            <p className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>STUDY CALL</p>
+            <p className="text-xs text-muted-foreground">Study together in a live video call.</p>
+            {callError && <p className="text-xs text-destructive">{callError}</p>}
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => void createCall(profile?.display_name ?? "Adventurer")}
+                disabled={callLoading}
+                className="px-3 py-2 bg-primary text-primary-foreground disabled:opacity-50 w-full"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+              >
+                {callLoading ? "CONNECTING..." : "CREATE CALL"}
+              </button>
+              {!showJoinInput ? (
+                <button
+                  onClick={() => setShowJoinInput(true)}
+                  className="px-3 py-2 border-2 border-border hover:border-primary w-full"
+                  style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+                >
+                  JOIN CALL
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && joinCode.trim()) {
+                        void joinCall(joinCode, profile?.display_name ?? "Adventurer");
+                      }
+                      if (e.key === "Escape") { setShowJoinInput(false); setJoinCode(""); }
+                    }}
+                    placeholder="ROOM CODE"
+                    maxLength={6}
+                    className="flex-1 px-2 py-1.5 bg-input border-2 border-border focus:border-primary outline-none text-sm uppercase"
+                    style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => {
+                      if (joinCode.trim()) void joinCall(joinCode, profile?.display_name ?? "Adventurer");
+                    }}
+                    disabled={callLoading || !joinCode.trim()}
+                    className="px-3 py-1.5 bg-primary text-primary-foreground disabled:opacity-50"
+                    style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
+                  >
+                    GO
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
+
+    {callState && <StudyCallModal callState={callState} onLeave={leaveCall} />}
 
     {window.electronAPI && (
       <LocalMusicModal isOpen={localModalOpen} onClose={() => setLocalModalOpen(false)} />

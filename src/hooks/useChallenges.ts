@@ -38,7 +38,9 @@ export function useChallengeTemplates() {
 export interface MyRun {
   template_id: string;
   run_id: string;
+  starts_on: string;
   ends_on: string;
+  score: number;
 }
 
 export function useMyRuns() {
@@ -47,10 +49,27 @@ export function useMyRuns() {
     queryKey: ["myRuns", user?.id],
     enabled: !!user,
     queryFn: async () => {
+      const today = new Date().toISOString().slice(0, 10);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)("get_my_challenge_runs");
+      const { data, error } = await (supabase as any)
+        .from("challenge_participants")
+        .select("score, run_id, challenge_runs(template_id, starts_on, ends_on)")
+        .eq("user_id", user!.id)
+        .gte("challenge_runs.ends_on", today);
       if (error) throw error;
-      return ((data ?? []) as unknown) as MyRun[];
+      return ((data ?? []) as {
+        score: number;
+        run_id: string;
+        challenge_runs: { template_id: string; starts_on: string; ends_on: string } | null;
+      }[])
+        .filter((r) => r.challenge_runs !== null)
+        .map((r) => ({
+          template_id: r.challenge_runs!.template_id,
+          run_id: r.run_id,
+          starts_on: r.challenge_runs!.starts_on,
+          ends_on: r.challenge_runs!.ends_on,
+          score: r.score,
+        })) as MyRun[];
     },
   });
 }
@@ -94,6 +113,35 @@ export function useUpdateChallengeTemplate() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["challengeTemplates"] });
+    },
+  });
+}
+
+export interface RunTask {
+  id: string;
+  title: string;
+  type: "habit" | "daily" | "todo";
+  completed: boolean;
+  positive_count: number;
+  streak_current: number;
+  streak_best: number;
+  last_completed_local_date: string | null;
+}
+
+export function useChallengeRunTasks(runId: string | undefined) {
+  return useQuery({
+    queryKey: ["challengeRunTasks", runId],
+    enabled: !!runId,
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("challenge_task_links")
+        .select("tasks(id, title, type, completed, positive_count, streak_current, streak_best, last_completed_local_date)")
+        .eq("run_id", runId);
+      if (error) throw error;
+      return ((data ?? []) as { tasks: RunTask | null }[])
+        .map((r) => r.tasks)
+        .filter(Boolean) as RunTask[];
     },
   });
 }
