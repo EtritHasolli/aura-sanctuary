@@ -435,7 +435,7 @@ function RoomLayout() {
   };
 
   return (
-    <div className="flex h-full w-full">
+    <div className="flex h-full w-full relative">
       {/* ── Video column ── */}
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
         <div className="flex-1 min-h-0 bg-black">
@@ -466,12 +466,27 @@ function RoomLayout() {
         )}
       </div>
 
-      {/* ── Chat side panel ── */}
+      {/* ── Chat panel ──
+            Mobile:  absolute bottom sheet (50% height), overlays the video
+            Desktop: static side column (280px wide)               ── */}
       {chatOpen && (
-        <div
-          className="shrink-0 flex flex-col border-l-2 border-border bg-card"
-          style={{ width: 280 }}
-        >
+        <div className="
+          flex flex-col bg-card
+          absolute bottom-0 left-3 right-3 z-10 h-[45vh]
+          rounded-t-xl border border-border shadow-2xl overflow-hidden
+          md:static md:rounded-none md:left-auto md:right-auto md:shrink-0
+          md:border-0 md:border-l-2 md:border-border md:shadow-none md:w-[280px] md:h-auto md:z-auto md:overflow-visible
+        ">
+          {/* Close button — mobile only */}
+          <div className="md:hidden shrink-0 flex items-center justify-between px-4 py-2 border-b border-border">
+            <span className="text-xs text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>CHAT</span>
+            <button
+              onClick={() => layoutCtx?.widget.dispatch?.({ msg: "toggle_chat" })}
+              className="p-1 hover:text-destructive transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
           <div className="flex-1 min-h-0 [&_.lk-chat]:h-full [&_.lk-chat]:flex [&_.lk-chat]:flex-col [&_.lk-chat-header]:hidden [&_.lk-message-input]:shrink-0 [&_.lk-chat-messages]:flex-1 [&_.lk-chat-messages]:min-h-0 [&_.lk-chat-messages]:overflow-y-auto [&_.lk-empty-state]:flex [&_.lk-empty-state]:items-center [&_.lk-empty-state]:justify-center">
             <Chat />
           </div>
@@ -536,7 +551,7 @@ export function StudyCallModal({
         ) : (
           <div className="fixed inset-0 z-[500] flex flex-col bg-black">
             <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-card border-b-2 border-border">
-              <span className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+              <span className="text-sm text-primary hidden md:inline" style={{ fontFamily: "var(--font-pixel)" }}>
                 STUDY CALL
               </span>
               <InvitePanel roomName={callState.roomName} />

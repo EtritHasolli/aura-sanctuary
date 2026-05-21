@@ -275,21 +275,47 @@
 
 /* ── Mobile: icon-only control bar ──────────────────────────────────────────── */
 @media (max-width: 767px) {
+  /* Center buttons vertically in the bar */
+  .lk-control-bar {
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 2px !important;
+    padding: 0 4px !important;
+  }
+  /* Align button-groups (mic+chevron, cam+chevron) the same as solo buttons */
+  .lk-button-group {
+    display: flex !important;
+    align-items: center !important;
+  }
   /* Collapse text labels — SVGs are unaffected by font-size */
   .lk-control-bar .lk-button {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     font-size: 0 !important;
     padding: 10px 8px !important;
     min-width: 44px !important;
+    height: 44px !important;
     gap: 0 !important;
+  }
+  /* Buttons inside a group (mic/camera) — narrower since the chevron is beside them */
+  .lk-button-group .lk-button {
+    min-width: 32px !important;
+    padding: 10px 6px !important;
   }
   .lk-control-bar .lk-button svg {
     width: 20px !important;
     height: 20px !important;
+    flex-shrink: 0 !important;
   }
   /* Tighten the chevron group menu button */
   .lk-button-group-menu {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     padding: 10px 4px !important;
-    min-width: 20px !important;
+    min-width: 16px !important;
+    height: 44px !important;
   }
 }
 
@@ -306,6 +332,13 @@
   grid-template-rows: 1fr auto !important;
   width: 100% !important;
   height: 100% !important;
+  /* Prevent LiveKit's @media (max-width:600px) from making this position:fixed */
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  max-width: 100% !important;
   background: var(--card) !important;
   border: none !important;
 }
