@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json() as { user_id?: string; title: string; message: string; tag?: string; url?: string };
 
-    let query = supabase.from("push_subscriptions").select("endpoint, p256dh, auth");
+    let query = supabase.from("push_subscriptions").select("endpoint, p256dh, auth").order("created_at", { ascending: false }).limit(1);
     if (body.user_id) query = query.eq("user_id", body.user_id);
 
     const { data: subs, error } = await query;
