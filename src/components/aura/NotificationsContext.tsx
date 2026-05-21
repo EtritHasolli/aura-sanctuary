@@ -87,9 +87,20 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         (payload) => {
           const notif = toAppNotif(payload.new as NotificationRow);
           setNotifications((prev) => [notif, ...prev].slice(0, 50));
-          // Fire a local notification if the app is in the background/minimised
+          // Only fire local notification if app is backgrounded AND no push subscription exists
+          // (push subscription means FCM/SW already handles background delivery)
           if (document.visibilityState !== "visible") {
-            void fireLocalNotification("Aura", notif.message, { tag: notif.id });
+            navigator.serviceWorker?.ready.then((reg) =>
+              reg.pushManager.getSubscription()
+            ).then((sub) => {
+              if (!sub) {
+                const displayMsg = notif.message.replace(/\s*\/\S+\?\S+\s*$/, "").trim();
+                void fireLocalNotification("Aura", displayMsg, { tag: notif.id });
+              }
+            }).catch(() => {
+              const displayMsg = notif.message.replace(/\s*\/\S+\?\S+\s*$/, "").trim();
+              void fireLocalNotification("Aura", displayMsg, { tag: notif.id });
+            });
           }
         },
       )
