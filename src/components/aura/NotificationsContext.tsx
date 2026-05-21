@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { fireLocalNotification } from "@/lib/notifications";
 
 export interface AppNotification {
   id: string;
@@ -84,9 +85,12 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          setNotifications((prev) =>
-            [toAppNotif(payload.new as NotificationRow), ...prev].slice(0, 50),
-          );
+          const notif = toAppNotif(payload.new as NotificationRow);
+          setNotifications((prev) => [notif, ...prev].slice(0, 50));
+          // Fire a local notification if the app is in the background/minimised
+          if (document.visibilityState !== "visible") {
+            void fireLocalNotification("Aura", notif.message, { tag: notif.id });
+          }
         },
       )
       .subscribe();

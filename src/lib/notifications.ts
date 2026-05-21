@@ -10,7 +10,7 @@ export function desktopNotifsEnabled() {
 }
 
 export async function fireLocalNotification(title: string, body: string, options?: { tag?: string; url?: string }) {
-  if (!desktopNotifsEnabled()) return;
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
   if ("serviceWorker" in navigator) {
     const reg = await navigator.serviceWorker.ready.catch(() => null);
     if (reg) {
