@@ -273,6 +273,26 @@
   display: none !important;
 }
 
+/* ── Mobile: icon-only control bar ──────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Collapse text labels — SVGs are unaffected by font-size */
+  .lk-control-bar .lk-button {
+    font-size: 0 !important;
+    padding: 10px 8px !important;
+    min-width: 44px !important;
+    gap: 0 !important;
+  }
+  .lk-control-bar .lk-button svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  /* Tighten the chevron group menu button */
+  .lk-button-group-menu {
+    padding: 10px 4px !important;
+    min-width: 20px !important;
+  }
+}
+
 /* ── LiveKit chat panel overrides ─────────────────────────────────────────── */
 
 /* Reset font so pixel font doesn't break word-wrapping */

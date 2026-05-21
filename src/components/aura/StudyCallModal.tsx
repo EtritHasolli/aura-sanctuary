@@ -7,13 +7,14 @@ import {
   ParticipantTile,
   ControlBar,
   Chat,
+  RoomAudioRenderer,
   LayoutContextProvider,
   useLayoutContext,
   useTracks,
   CarouselLayout,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
-import { X, Copy, Check, UserPlus, Users, Minimize2, Maximize2, Settings } from "lucide-react";
+import { X, Check, UserPlus, Minimize2, Maximize2, Settings } from "lucide-react";
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useFriends } from "@/hooks/useFriends";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,7 +74,6 @@ function InvitePanel({ roomName }: { roomName: string }) {
         className="flex items-center gap-1.5 px-2.5 py-1 border border-border hover:border-primary bg-black/40 transition-colors"
         style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
       >
-        {codeCopied ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
         {codeCopied ? "COPIED!" : `CODE: ${roomName}`}
       </button>
 
@@ -83,7 +83,6 @@ function InvitePanel({ roomName }: { roomName: string }) {
           className="flex items-center gap-1.5 px-2.5 py-1 border border-border hover:border-primary bg-black/40 transition-colors"
           style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
         >
-          <Users size={11} />
           INVITE
         </button>
         {showFriends && (
@@ -169,7 +168,7 @@ function SettingsModal({
 
   return (
     <div
-      className="fixed inset-0 z-[160] flex items-center justify-center bg-black/70"
+      className="fixed inset-0 z-[510] flex items-center justify-center bg-black/70"
       onMouseDown={onClose}
     >
       <div
@@ -525,16 +524,17 @@ export function StudyCallModal({
       audio
       onDisconnected={onLeave}
     >
+      <RoomAudioRenderer />
       <LayoutContextProvider>
         {pip ? (
           <div
-            className="fixed bottom-6 right-6 z-[200] pixel-panel bg-card overflow-hidden shadow-2xl"
+            className="fixed bottom-6 right-6 z-[520] pixel-panel bg-card overflow-hidden shadow-2xl"
             style={{ width: 260, height: 190 }}
           >
             <PipLayout onExpand={() => setPip(false)} onLeave={onLeave} />
           </div>
         ) : (
-          <div className="fixed inset-0 z-[150] flex flex-col bg-black">
+          <div className="fixed inset-0 z-[500] flex flex-col bg-black">
             <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-card border-b-2 border-border">
               <span className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
                 STUDY CALL

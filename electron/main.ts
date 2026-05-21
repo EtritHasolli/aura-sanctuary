@@ -363,11 +363,17 @@ app.whenReady().then(() => {
     },
   );
 
-  // Grant camera/microphone permissions for LiveKit study calls
-  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    const allowed = ["media", "camera", "microphone", "audio-capture", "video-capture"];
-    callback(allowed.includes(permission));
-  });
+  // Grant camera/microphone permissions for LiveKit study calls.
+  // Both handlers are required: setPermissionCheckHandler gates whether the
+  // request is even allowed to proceed; setPermissionRequestHandler decides
+  // the outcome. Electron silently denies media access if either is missing.
+  const MEDIA_PERMISSIONS = ["media", "camera", "microphone", "audio-capture", "video-capture", "display-capture"];
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission) =>
+    MEDIA_PERMISSIONS.includes(permission),
+  );
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) =>
+    callback(MEDIA_PERMISSIONS.includes(permission)),
+  );
 
   mainWin = createWindow();
 
