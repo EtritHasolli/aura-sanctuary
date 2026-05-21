@@ -20,9 +20,9 @@ BEGIN
   RETURN QUERY
   SELECT
     f.user_id AS requester_id,
-    COALESCE(NULLIF(trim(p.display_name), ''), split_part(u.email, '@', 1), 'Unknown') AS display_name,
-    COALESCE(u.email, '') AS email,
-    p.avatar_url,
+    COALESCE(NULLIF(trim(p.display_name), ''), split_part(u.email, '@', 1), 'Unknown')::TEXT AS display_name,
+    COALESCE(u.email, '')::TEXT AS email,
+    p.avatar_url::TEXT,
     f.created_at
   FROM public.friendships f
   LEFT JOIN public.profiles p ON p.id = f.user_id

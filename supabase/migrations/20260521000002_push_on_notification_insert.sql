@@ -10,7 +10,11 @@ SET search_path = public
 AS $$
 DECLARE
   v_has_sub BOOLEAN;
+  v_net_exists BOOLEAN;
 BEGIN
+  SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_net') INTO v_net_exists;
+  IF NOT v_net_exists THEN RETURN NEW; END IF;
+
   SELECT EXISTS (
     SELECT 1 FROM public.push_subscriptions WHERE user_id = NEW.user_id LIMIT 1
   ) INTO v_has_sub;
