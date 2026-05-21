@@ -266,6 +266,13 @@
   50%       { transform: translateY(-6px); }
 }
 
+/* ── LiveKit general overrides ───────────────────────────────────────────── */
+
+/* Hide the built-in per-tile focus/maximize toggle button */
+.lk-focus-toggle-button {
+  display: none !important;
+}
+
 /* ── LiveKit chat panel overrides ─────────────────────────────────────────── */
 
 /* Reset font so pixel font doesn't break word-wrapping */

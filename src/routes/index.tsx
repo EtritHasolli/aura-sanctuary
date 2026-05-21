@@ -1368,7 +1368,7 @@ function SanctuaryPage() {
                     }}
                     placeholder="ROOM CODE"
                     maxLength={6}
-                    className="flex-1 px-2 py-1.5 bg-input border-2 border-border focus:border-primary outline-none text-sm uppercase"
+                    className="flex-1 min-w-0 px-2 py-1.5 bg-input border-2 border-border focus:border-primary outline-none text-sm uppercase"
                     style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
                     autoFocus
                   />

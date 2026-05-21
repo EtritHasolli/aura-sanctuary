@@ -363,6 +363,12 @@ app.whenReady().then(() => {
     },
   );
 
+  // Grant camera/microphone permissions for LiveKit study calls
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    const allowed = ["media", "camera", "microphone", "audio-capture", "video-capture"];
+    callback(allowed.includes(permission));
+  });
+
   mainWin = createWindow();
 
   if (!isDev) {
