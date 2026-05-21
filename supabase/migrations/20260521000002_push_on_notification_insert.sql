@@ -32,9 +32,12 @@ BEGIN
     body    := jsonb_build_object(
       'user_id', NEW.user_id,
       'title',   'Aura',
-      'message', NEW.message,
+      'message', regexp_replace(NEW.message, '\s*/\S+\?[^\s]*', '', 'g'),
       'tag',     COALESCE(NEW.type, 'info'),
-      'url',     '/'
+      'url',     COALESCE(
+        (regexp_match(NEW.message, '\s*(/\S+\?\S+)'))[1],
+        '/'
+      )
     )
   );
 

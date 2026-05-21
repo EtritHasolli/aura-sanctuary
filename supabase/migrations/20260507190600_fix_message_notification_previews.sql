@@ -19,7 +19,7 @@ BEGIN
   VALUES (
     NEW.recipient_id,
     format(
-      'New message from %s: %s /friends?friend=%s&message=%s',
+      '%s: %s /friends?friend=%s&message=%s',
       COALESCE(v_sender_name, 'A friend'),
       v_preview,
       NEW.sender_id,
