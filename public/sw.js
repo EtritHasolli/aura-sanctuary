@@ -1,12 +1,15 @@
 self.addEventListener("push", (event) => {
-  if (!event.data) return;
+  const raw = event.data ? event.data.text() : null;
+  console.log("[sw] push received, raw:", raw);
 
   let payload;
   try {
-    payload = event.data.json();
+    payload = JSON.parse(raw ?? "");
   } catch {
-    payload = { title: "Aura", body: event.data.text() };
+    payload = { title: "Aura", body: raw ?? "New notification" };
   }
+
+  console.log("[sw] payload:", JSON.stringify(payload));
 
   const title = payload.title ?? "Aura";
   const options = {
