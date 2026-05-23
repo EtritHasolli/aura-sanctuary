@@ -219,3 +219,33 @@ export function pathCharacterBedSpriteSrc(path: AuraPath): string | null {
   return s?.bed ?? null;
 }
 
+const PATH_BED_FILE: Record<AuraPath, string> = {
+  swordsman: "/beds/swordsman.png",
+  mage: "/beds/mage.png",
+  tank: "/beds/paladin.png",
+  rogue: "/beds/rogue.png",
+  evilswordsman: "/beds/evilswordsman.png",
+  evilmage: "/beds/evilmage.png",
+  evilpaladin: "/beds/evilpaladin.png",
+  evilrogue: "/beds/evilrogue.png",
+};
+
+export function pathCharacterBedFileSrc(path: AuraPath): string {
+  return PATH_BED_FILE[path];
+}
+
+const PATH_TABLE_FILE: Record<AuraPath, string> = {
+  swordsman: "/tables/swordsman.png",
+  mage: "/tables/mage.png",
+  tank: "/tables/paladin.png",
+  rogue: "/tables/rogue.png",
+  evilswordsman: "/tables/evilswordsman.png",
+  evilmage: "/tables/evilmage.png",
+  evilpaladin: "/tables/evilpaladin.png",
+  evilrogue: "/tables/evilrogue.png",
+};
+
+export function pathCharacterTableSrc(path: AuraPath): string {
+  return PATH_TABLE_FILE[path];
+}
+

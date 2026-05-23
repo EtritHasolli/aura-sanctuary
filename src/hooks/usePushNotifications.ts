@@ -72,12 +72,9 @@ export function usePushNotifications() {
     try {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
-      if (sub) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase as any).from("push_subscriptions").delete()
-          .eq("user_id", user.id).eq("endpoint", sub.endpoint);
-        await sub.unsubscribe();
-      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("push_subscriptions").delete().eq("user_id", user.id);
+      if (sub) await sub.unsubscribe();
       setStatus("prompt");
       return true;
     } catch (e) {

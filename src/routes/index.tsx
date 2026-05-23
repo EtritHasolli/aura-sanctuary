@@ -14,7 +14,8 @@ import {
   pathCharacterFallingSpriteSrc,
   pathCharacterSpriteSrc,
   pathCharacterWalkSpriteSrc,
-  pathCharacterBedSpriteSrc,
+  pathCharacterTableSrc,
+  pathCharacterBedFileSrc,
 } from "@/lib/aura/pathCharacterSprites";
 import {
   SANCTUARY_CHARACTER_WALK_SPEED_PX_PER_SEC,
@@ -200,7 +201,7 @@ function SanctuaryPage() {
     if (sanctuaryTapAcknowledge) return pathCharacterSpriteSrc(path, "working");
 
     if (isWalkingToBed) {
-      return pathCharacterWalkSpriteSrc(path, xPan.get() > -60 ? "left" : "right");
+      return pathCharacterWalkSpriteSrc(path, xPan.get() < 200 ? "right" : "left");
     }
 
     if (characterState === "sleeping" && showFallingSleepTransition) {
@@ -267,7 +268,7 @@ function SanctuaryPage() {
     if (!isWalkingToBed) return;
 
     const from = xPan.get();
-    const to = -130;
+    const to = 200;
     const walkSpeed = SANCTUARY_CHARACTER_WALK_SPEED_PX_PER_SEC;
     const dur = Math.max(0.05, Math.abs(to - from) / walkSpeed);
 
@@ -694,107 +695,57 @@ function SanctuaryPage() {
           <div
             className="relative aspect-[16/10] pixel-panel overflow-hidden scanlines"
             style={{
-              background: focused
-                ? "linear-gradient(180deg, color-mix(in oklab, var(--sanctuary-wall) 70%, var(--color-primary)) 0%, color-mix(in oklab, var(--sanctuary-wall) 88%, black) 60%, color-mix(in oklab, var(--sanctuary-wall) 75%, var(--sanctuary-floor)) 100%)"
-                : "linear-gradient(180deg, color-mix(in oklab, var(--sanctuary-wall) 80%, var(--color-primary)) 0%, color-mix(in oklab, var(--sanctuary-wall) 92%, black) 55%, color-mix(in oklab, var(--sanctuary-floor) 85%, black) 100%)",
-              transition: "background 1.4s ease",
+              background: `
+                linear-gradient(rgba(0,0,0,0.25) 2px, transparent 2px),
+                linear-gradient(90deg, rgba(0,0,0,0.25) 2px, transparent 2px),
+                #1a1614
+              `,
+              backgroundSize: "32px 32px, 32px 32px",
             }}
           >
-            {/* rainy outside ambience */}
+            {/* Ground / floor — bottom 45%, perspective tilt */}
             <div
-              className="absolute inset-0 opacity-30"
-              style={{
-                background: focused
-                  ? "linear-gradient(180deg, color-mix(in oklab, var(--color-background) 10%, transparent), color-mix(in oklab, var(--sanctuary-wall) 35%, transparent))"
-                  : "linear-gradient(180deg, color-mix(in oklab, var(--color-background) 20%, transparent), color-mix(in oklab, var(--sanctuary-wall) 45%, transparent))",
-              }}
-            />
-            <div
-              className="absolute inset-0 pointer-events-none opacity-25"
-              style={{
-                background:
-                  "repeating-linear-gradient(105deg, transparent 0 10px, color-mix(in oklab, var(--color-foreground) 20%, transparent) 10px 12px)",
-              }}
-            />
+              className="absolute bottom-0 left-0 w-full pointer-events-none"
+              style={{ height: "35%", perspective: "300px", perspectiveOrigin: "50% 0%" }}
+            >
+              <div
+                className="absolute bottom-0 left-0 w-full h-full border-t-2 border-[#2e2820]"
+                style={{
+                  background: `
+                    linear-gradient(rgba(255,255,255,0.04) 2px, transparent 2px),
+                    linear-gradient(90deg, rgba(0,0,0,0.28) 2px, transparent 2px),
+                    #201c18
+                  `,
+                  backgroundSize: "48px 24px, 48px 24px",
+                  transform: "rotateX(45deg)",
+                  transformOrigin: "50% 0%",
+                }}
+              />
+            </div>
 
-            {/* Isometric room shell */}
-            <div
-              className="absolute left-[18%] right-[18%] top-[14%] h-[48%] border-2 border-border/70"
-              style={{
-                background: "color-mix(in oklab, var(--sanctuary-wall) 95%, var(--color-primary))",
-                clipPath: "polygon(50% 0%, 100% 28%, 100% 100%, 0% 100%, 0% 28%)",
-              }}
-            />
-            <div
-              className="absolute left-[16%] right-[16%] bottom-[10%] h-[38%] border-2 border-border/70"
-              style={{
-                background: "color-mix(in oklab, var(--sanctuary-floor) 92%, var(--color-primary))",
-                clipPath: "polygon(50% 0%, 100% 35%, 50% 100%, 0% 35%)",
-              }}
-            />
-
-            {/* left fireplace block */}
-            <div className="absolute left-[23%] top-[45%] w-[12%] h-[24%] border-2 border-border/70 bg-card/80" />
-            <div className="absolute left-[25.2%] top-[53%] w-[7.6%] h-[9%] border border-border/70 bg-secondary/80" />
-            {/* character bed — replaces glowing square */}
-            {profile?.aura_path && pathCharacterBedSpriteSrc(profile.aura_path) ? (
-              <div className="absolute left-[2%] top-[37%] w-[58%] h-[45%] pointer-events-none">
+            {/* Path-specific table — left side of sanctuary */}
+            {profile?.aura_path && (
+              <div className="absolute left-[3%] bottom-[8%] w-[42%] pointer-events-none">
                 <img
-                  src={pathCharacterBedSpriteSrc(profile.aura_path)!}
-                  alt="Character bed"
-                  className="w-full h-full object-contain"
+                  src={pathCharacterTableSrc(profile.aura_path)}
+                  alt="Character table"
+                  className="w-full h-auto object-contain"
                   style={{ imageRendering: "pixelated" }}
                 />
               </div>
-            ) : (
-              <motion.div
-                className="absolute left-[27.8%] top-[55.5%] w-[2.4%] h-[4.5%]"
-                animate={{ opacity: [0.45, 0.95, 0.45], y: [0, -1, 0] }}
-                transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
-                style={{ background: "var(--color-primary)" }}
-              />
             )}
 
-            {/* desk + task tablet */}
-            <div
-              className="absolute left-[39%] top-[64%] w-[22%] h-[11%] border-2 border-border/70"
-              style={{
-                background:
-                  "color-mix(in oklab, var(--sanctuary-floor) 85%, var(--color-background))",
-                clipPath: "polygon(10% 0%, 92% 0%, 100% 25%, 8% 25%)",
-              }}
-            />
-            <div className="absolute left-[46%] top-[67%] w-[7%] h-[5%] border border-border/70 bg-muted/80" />
-
-            {/* garden bed */}
-            <div
-              className="absolute right-[20%] top-[58%] w-[19%] h-[21%] border-2 border-border/70"
-              style={{
-                background: "color-mix(in oklab, var(--sanctuary-floor) 70%, #3b2a1f)",
-                clipPath: "polygon(8% 0%, 100% 12%, 92% 100%, 0% 88%)",
-              }}
-            />
-            <div className="absolute right-[29%] top-[56%] w-[1.2%] h-[8%] bg-[color:var(--color-hp)]" />
-            <div className="absolute right-[24.5%] top-[53%] w-[1.2%] h-[11%] bg-[color:var(--color-hp)]" />
-            <div className="absolute right-[20.5%] top-[57%] w-[1.2%] h-[7%] bg-[color:var(--color-hp)]" />
-
-            {/* shelf + rewards */}
-            <div className="absolute right-[25%] top-[35%] w-[18%] h-[2.5%] border border-border/70 bg-secondary/90" />
-            <div className="absolute right-[37%] top-[30%] w-[3.2%] h-[4.7%] border border-border/70 bg-muted" />
-            <div className="absolute right-[32%] top-[30.5%] w-[3.2%] h-[4.2%] border border-border/70 bg-[color:var(--color-accent)]/80" />
-            <div className="absolute right-[27%] top-[30.5%] w-[3.2%] h-[4.2%] border border-border/70 bg-[color:var(--color-primary)]/80" />
-
-            {/* glow */}
-            <motion.div
-              className="absolute inset-0"
-              animate={{ opacity: focused ? [0.35, 0.6, 0.35] : [0.12, 0.25, 0.12] }}
-              transition={{ duration: 4, repeat: Infinity }}
-              style={{
-                background: focused
-                  ? `radial-gradient(ellipse at 50% 70%, color-mix(in oklab, var(--sanctuary-glow) 72%, var(--color-accent)), transparent 62%)`
-                  : `radial-gradient(ellipse at 50% 65%, color-mix(in oklab, var(--sanctuary-glow) 55%, var(--sanctuary-wall)), transparent 62%)`,
-              }}
-            />
+            {/* Path-specific bed — right side of sanctuary, mirrored */}
+            {profile?.aura_path && (
+              <div className="absolute right-[3%] bottom-[20%] w-[36%] pointer-events-none">
+                <img
+                  src={pathCharacterBedFileSrc(profile.aura_path)}
+                  alt="Character bed"
+                  className="w-full h-auto object-contain"
+                  style={{ imageRendering: "pixelated", transform: "scaleX(-1)" }}
+                />
+              </div>
+            )}
 
             {/* Path character — hidden on mobile, visible on md+ */}
             <div className="absolute bottom-[21%] left-1/2 -translate-x-1/2 overflow-visible px-10 hidden md:block">
