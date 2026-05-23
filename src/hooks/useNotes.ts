@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Note } from "@/lib/aura/types";
 import { useAuth } from "./useAuth";
+import { toast } from "sonner";
 
 export function useNotes() {
   const { user } = useAuth();
@@ -49,6 +50,7 @@ export function useCreateNote() {
       return data as Note;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notes"] }),
+    onError: (err: Error) => toast.error(err.message),
   });
 }
 

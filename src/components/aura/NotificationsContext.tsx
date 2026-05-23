@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { fireLocalNotification } from "@/lib/notifications";
 
 export interface AppNotification {
   id: string;
@@ -84,9 +85,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          setNotifications((prev) =>
-            [toAppNotif(payload.new as NotificationRow), ...prev].slice(0, 50),
-          );
+          const notif = toAppNotif(payload.new as NotificationRow);
+          setNotifications((prev) => [notif, ...prev].slice(0, 50));
+          // Fire local notification only when app is backgrounded and push is not subscribed
+          if (document.visibilityState !== "visible") {
+            const displayMsg = notif.message.replace(/\s*\/\S+\?\S+\s*$/, "").trim();
+            void fireLocalNotification("Aura", displayMsg, { tag: notif.id });
+          }
         },
       )
       .subscribe();

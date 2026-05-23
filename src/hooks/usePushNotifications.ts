@@ -45,13 +45,16 @@ export function usePushNotifications() {
       });
 
       const json = sub.toJSON();
+      // Remove all old subscriptions for this user first, then insert fresh
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any).from("push_subscriptions").upsert({
+      await (supabase as any).from("push_subscriptions").delete().eq("user_id", user.id);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("push_subscriptions").insert({
         user_id: user.id,
         endpoint: json.endpoint!,
         p256dh: json.keys!.p256dh,
         auth: json.keys!.auth,
-      }, { onConflict: "user_id,endpoint" });
+      });
 
       if (error) throw error;
       setStatus("subscribed");

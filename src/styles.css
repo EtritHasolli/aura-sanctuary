@@ -266,6 +266,257 @@
   50%       { transform: translateY(-6px); }
 }
 
+/* ── LiveKit general overrides ───────────────────────────────────────────── */
+
+/* Hide the built-in per-tile focus/maximize toggle button */
+.lk-focus-toggle-button {
+  display: none !important;
+}
+
+/* ── Mobile: icon-only control bar ──────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Center buttons vertically in the bar */
+  .lk-control-bar {
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 2px !important;
+    padding: 0 4px !important;
+  }
+  /* Align button-groups (mic+chevron, cam+chevron) the same as solo buttons */
+  .lk-button-group {
+    display: flex !important;
+    align-items: center !important;
+  }
+  /* Collapse text labels — SVGs are unaffected by font-size */
+  .lk-control-bar .lk-button {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 0 !important;
+    padding: 10px 8px !important;
+    min-width: 44px !important;
+    height: 44px !important;
+    gap: 0 !important;
+  }
+  /* Buttons inside a group (mic/camera) — narrower since the chevron is beside them */
+  .lk-button-group .lk-button {
+    min-width: 32px !important;
+    padding: 10px 6px !important;
+  }
+  .lk-control-bar .lk-button svg {
+    width: 20px !important;
+    height: 20px !important;
+    flex-shrink: 0 !important;
+  }
+  /* Tighten the chevron group menu button */
+  .lk-button-group-menu {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 10px 4px !important;
+    min-width: 16px !important;
+    height: 44px !important;
+  }
+}
+
+/* ── LiveKit chat panel overrides ─────────────────────────────────────────── */
+
+/* Reset font so pixel font doesn't break word-wrapping */
+.lk-chat,
+.lk-chat * {
+  font-family: system-ui, -apple-system, sans-serif !important;
+}
+
+.lk-chat {
+  display: grid !important;
+  grid-template-rows: 1fr auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  /* Prevent LiveKit's @media (max-width:600px) from making this position:fixed */
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  max-width: 100% !important;
+  background: var(--card) !important;
+  border: none !important;
+}
+
+.lk-chat-header {
+  display: none !important;
+}
+
+.lk-chat-messages {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  gap: 6px !important;
+  overflow-y: auto !important;
+  padding: 12px !important;
+  min-height: 0 !important;
+}
+
+/* All entries: reset LiveKit defaults */
+.lk-chat-entry {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  max-width: 80% !important;
+  align-self: flex-start !important;
+  margin: 0 !important;
+}
+
+/* Own messages: right side */
+.lk-chat-entry[data-lk-message-origin="local"] {
+  align-self: flex-end !important;
+  align-items: flex-end !important;
+}
+
+.lk-chat-entry .lk-meta-data {
+  font-size: 10px !important;
+  color: var(--muted-foreground) !important;
+  padding: 0 4px !important;
+  display: flex !important;
+  gap: 4px !important;
+}
+
+.lk-chat-entry .lk-meta-data .lk-timestamp {
+  margin-left: 0 !important;
+}
+
+/* Message bubble */
+.lk-chat-entry .lk-message-body {
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+  padding: 6px 10px !important;
+  border-radius: 12px !important;
+  word-break: break-word !important;
+  white-space: pre-wrap !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  color: var(--foreground) !important;
+}
+
+/* Remote: left-aligned bubble */
+.lk-chat-entry[data-lk-message-origin="remote"] .lk-message-body {
+  background: var(--secondary) !important;
+  border-bottom-left-radius: 4px !important;
+}
+
+/* Local: right-aligned primary bubble */
+.lk-chat-entry[data-lk-message-origin="local"] .lk-message-body {
+  background: color-mix(in oklab, var(--primary) 25%, var(--card)) !important;
+  border: 1px solid color-mix(in oklab, var(--primary) 50%, transparent) !important;
+  border-bottom-right-radius: 4px !important;
+}
+
+/* Input form */
+.lk-chat-form {
+  display: flex !important;
+  gap: 6px !important;
+  padding: 8px !important;
+  border-top: 1px solid var(--border) !important;
+  background: var(--card) !important;
+  max-height: none !important;
+}
+
+.lk-chat-form-input {
+  background: var(--input) !important;
+  color: var(--foreground) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px !important;
+  padding: 6px 10px !important;
+  font-size: 13px !important;
+  flex: 1 !important;
+}
+
+.lk-chat-form-input:focus {
+  outline: none !important;
+  border-color: var(--primary) !important;
+}
+
+.lk-chat-form button[type="submit"] {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  border: none !important;
+  border-radius: 6px !important;
+  padding: 6px 12px !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+}
+
+/* Empty state */
+.lk-empty-state {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 100% !important;
+  color: var(--muted-foreground) !important;
+  font-size: 12px !important;
+}
+.lk-message-input {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border) !important;
+  padding: 8px !important;
+  background: var(--card) !important;
+}
+.lk-message-input input,
+.lk-message-input textarea {
+  background: var(--input) !important;
+  color: var(--foreground) !important;
+  border: 1px solid var(--border) !important;
+  font-size: 12px !important;
+}
+/* Center the "Messages" empty state */
+.lk-empty-state {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 100% !important;
+  color: var(--muted-foreground) !important;
+  font-size: 12px !important;
+}
+
+/* ── LiveKit control bar device-picker overrides ──────────────────────────── */
+.lk-device-menu {
+  background: var(--card) !important;
+  border: 2px solid var(--border) !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.6) !important;
+  min-width: 220px !important;
+}
+
+.lk-device-menu button,
+.lk-device-menu [role="menuitem"],
+.lk-device-menu [role="option"] {
+  background: transparent !important;
+  color: var(--foreground) !important;
+  padding: 8px 12px !important;
+  font-size: 12px !important;
+  border-bottom: 1px solid var(--border) !important;
+  cursor: pointer !important;
+}
+
+.lk-device-menu button:last-child,
+.lk-device-menu [role="menuitem"]:last-child,
+.lk-device-menu [role="option"]:last-child {
+  border-bottom: none !important;
+}
+
+.lk-device-menu button:hover,
+.lk-device-menu [role="menuitem"]:hover,
+.lk-device-menu [role="option"]:hover {
+  background: color-mix(in oklab, var(--primary) 15%, transparent) !important;
+  color: var(--primary) !important;
+}
+
+.lk-device-menu button[aria-checked="true"],
+.lk-device-menu [aria-selected="true"] {
+  color: var(--primary) !important;
+  background: color-mix(in oklab, var(--primary) 10%, transparent) !important;
+}
+
 @keyframes forge-glow-pulse {
   0%, 100% {
     opacity: 0.8;

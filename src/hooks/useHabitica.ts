@@ -77,6 +77,8 @@ interface InvokeOptions {
 }
 
 async function invokeHabitica<T>({ action, payload }: InvokeOptions): Promise<T> {
+  // Ensure the session is fresh before invoking — stale access tokens cause 401s
+  await supabase.auth.getSession();
   const { data, error } = await supabase.functions.invoke("habitica", {
     body: { action, ...(payload ?? {}) },
   });

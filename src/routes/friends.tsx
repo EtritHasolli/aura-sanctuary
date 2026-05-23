@@ -4,6 +4,7 @@ import { z } from "zod";
 import { Users } from "lucide-react";
 import {
   useAcceptFriendRequest,
+  useDeclineFriendRequest,
   useFriendDetail,
   useFriends,
   useInviteFriendToParty,
@@ -101,6 +102,7 @@ function FriendsPage() {
   const sendFriendRequestByEmail = useSendFriendRequestByEmail();
   const sendFriendRequestByFriendCode = useSendFriendRequestByFriendCode();
   const acceptFriendRequest = useAcceptFriendRequest();
+  const declineFriendRequest = useDeclineFriendRequest();
   const markMessageScopeRead = useMarkMessageScopeRead();
   const { notifications, markFriendMessagesRead } = useNotifications();
   const [copiedCode, setCopiedCode] = useState(false);
@@ -483,15 +485,26 @@ function FriendsPage() {
                     </div>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => acceptFriendRequest.mutate(req.requesterId)}
-                  disabled={acceptFriendRequest.isPending}
-                  className="px-2 py-1 bg-primary text-primary-foreground disabled:opacity-60 text-xs"
-                  style={{ fontFamily: "var(--font-pixel)" }}
-                >
-                  ACCEPT
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => acceptFriendRequest.mutate(req.requesterId)}
+                    disabled={acceptFriendRequest.isPending || declineFriendRequest.isPending}
+                    className="px-2 py-1 bg-primary text-primary-foreground disabled:opacity-60 text-xs"
+                    style={{ fontFamily: "var(--font-pixel)" }}
+                  >
+                    ACCEPT
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => declineFriendRequest.mutate(req.requesterId)}
+                    disabled={acceptFriendRequest.isPending || declineFriendRequest.isPending}
+                    className="px-2 py-1 border border-border hover:border-destructive hover:text-destructive disabled:opacity-60 text-xs transition-colors"
+                    style={{ fontFamily: "var(--font-pixel)" }}
+                  >
+                    DECLINE
+                  </button>
+                </div>
               </div>
             ))
           )}

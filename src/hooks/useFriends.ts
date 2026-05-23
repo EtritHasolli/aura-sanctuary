@@ -179,7 +179,10 @@ export function useSendFriendRequestByEmail() {
       const { data, error } = await supabase.rpc("send_friend_request_by_email", {
         p_email: email,
       });
-      if (error) throw error;
+      if (error) {
+        console.error("send_friend_request_by_email error:", JSON.stringify(error));
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
@@ -214,6 +217,7 @@ export function usePendingFriendRequests() {
     enabled: !!user,
     queryFn: async () => {
       const rpc = await supabase.rpc("list_pending_friend_requests");
+      if (rpc.error) console.error("list_pending_friend_requests error:", JSON.stringify(rpc.error));
       if (!rpc.error) {
         const rows = (rpc.data ?? []) as Array<{
           requester_id: string;
@@ -267,11 +271,36 @@ export function useAcceptFriendRequest() {
       const { data, error } = await supabase.rpc("accept_friend_request", {
         p_user_id: requesterId,
       });
-      if (error) throw error;
+      if (error) {
+        console.error("accept_friend_request error:", JSON.stringify(error));
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["friends", user?.id] });
+      qc.invalidateQueries({ queryKey: ["friendRequests", user?.id] });
+    },
+  });
+}
+
+export function useDeclineFriendRequest() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (requesterId: string) => {
+      const { error } = await supabase
+        .from("friendships" as never)
+        .delete()
+        .eq("user_id" as never, requesterId)
+        .eq("friend_id" as never, user!.id)
+        .eq("status" as never, "pending");
+      if (error) {
+        console.error("decline_friend_request error:", JSON.stringify(error));
+        throw error;
+      }
+    },
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["friendRequests", user?.id] });
     },
   });

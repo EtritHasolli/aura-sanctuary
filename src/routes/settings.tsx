@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Clock3, Info, Link2, Link2Off, ShieldCheck, Smartphone, Trash2, UserRound } from "lucide-react";
+import { Bell, Clock3, Info, Link2, Link2Off, ScrollText, ShieldCheck, Smartphone, Trash2, UserRound } from "lucide-react";
 import { useProfile, useUpdateProfile, useIsAdmin } from "@/hooks/useProfile";
 import { useNotifications } from "@/components/aura/NotificationsContext";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
@@ -144,6 +144,8 @@ function SettingsPage() {
   const [nextSessionPlan, setNextSessionPlan] = useState(sessionPlan);
   const [avatarDraft, setAvatarDraft] = useState<string | null>(null);
   const [avatarBlob, setAvatarBlob] = useState<Blob | null>(null);
+  const [termsOpen, setTermsOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
   const [imageOffset, setImageOffset] = useState<{ x: number; y: number }>({
     x: 0,
@@ -944,6 +946,36 @@ function SettingsPage() {
         </section>
 
         <HabiticaSection />
+
+        <section className="pixel-panel p-5 space-y-4 xl:col-span-2">
+          <div className="flex items-center gap-2">
+            <ScrollText size={18} className="text-primary" />
+            <h2 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+              LEGAL
+            </h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Read our terms of service and privacy policy.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => setTermsOpen(true)}
+              className="px-4 py-2.5 border-2 border-border hover:border-primary text-xs"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              TERMS &amp; CONDITIONS
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrivacyOpen(true)}
+              className="px-4 py-2.5 border-2 border-border hover:border-primary text-xs"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              PRIVACY POLICY
+            </button>
+          </div>
+        </section>
       </div>
 
       <Dialog open={avatarModalOpen} onOpenChange={setAvatarModalOpen}>
@@ -1021,6 +1053,130 @@ function SettingsPage() {
           )}
         </DialogContent>
       </Dialog>
+      <Dialog open={termsOpen} onOpenChange={setTermsOpen}>
+        <DialogContent className="max-w-2xl max-h-[80dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle style={{ fontFamily: "var(--font-pixel)" }}>
+              Terms &amp; Conditions
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
+            <p className="text-xs text-muted-foreground">Last updated: May 2026</p>
+            <h3 className="text-foreground font-semibold">1. Acceptance of Terms</h3>
+            <p>
+              By creating an account or using Aura — The Desktop Sanctuary ("the App"), you agree to
+              these Terms &amp; Conditions. If you do not agree, do not use the App.
+            </p>
+            <h3 className="text-foreground font-semibold">2. Use of the App</h3>
+            <p>
+              Aura is a personal productivity application. You may use it only for lawful purposes
+              and in accordance with these Terms. You are responsible for all activity that occurs
+              under your account.
+            </p>
+            <h3 className="text-foreground font-semibold">3. Subscriptions &amp; Payments</h3>
+            <p>
+              Paid subscription plans are billed monthly through Lemon Squeezy, our Merchant of
+              Record. Prices are shown at checkout. Cancellation stops future charges; you retain
+              access until the end of the current billing period. Refunds are not issued for partial
+              billing periods unless required by law.
+            </p>
+            <h3 className="text-foreground font-semibold">4. User Content</h3>
+            <p>
+              You retain ownership of any tasks, notes, or other content you create in the App. By
+              using the App you grant us a limited license to store and process your content solely
+              to provide the service.
+            </p>
+            <h3 className="text-foreground font-semibold">5. Account Termination</h3>
+            <p>
+              We reserve the right to suspend or terminate accounts that violate these Terms, engage
+              in abuse, or attempt to circumvent technical restrictions of the service.
+            </p>
+            <h3 className="text-foreground font-semibold">6. Disclaimer of Warranties</h3>
+            <p>
+              The App is provided "as is" without warranties of any kind. We do not guarantee
+              uninterrupted or error-free operation.
+            </p>
+            <h3 className="text-foreground font-semibold">7. Limitation of Liability</h3>
+            <p>
+              To the fullest extent permitted by law, we are not liable for any indirect,
+              incidental, or consequential damages arising from your use of the App.
+            </p>
+            <h3 className="text-foreground font-semibold">8. Changes to Terms</h3>
+            <p>
+              We may update these Terms at any time. Continued use of the App after changes
+              constitutes acceptance of the new Terms.
+            </p>
+            <h3 className="text-foreground font-semibold">9. Contact</h3>
+            <p>
+              For questions about these Terms, contact us at{" "}
+              <span className="text-primary">support@aurasanctuary.app</span>.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={privacyOpen} onOpenChange={setPrivacyOpen}>
+        <DialogContent className="max-w-2xl max-h-[80dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle style={{ fontFamily: "var(--font-pixel)" }}>
+              Privacy Policy
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
+            <p className="text-xs text-muted-foreground">Last updated: May 2026</p>
+            <h3 className="text-foreground font-semibold">1. What We Collect</h3>
+            <p>
+              We collect information you provide directly: email address, display name, character
+              name, tasks, notes, and preferences. We also collect basic usage data (e.g. session
+              timestamps) to operate and improve the service.
+            </p>
+            <h3 className="text-foreground font-semibold">2. How We Use Your Data</h3>
+            <p>
+              Your data is used exclusively to provide and improve the Aura service — to sync your
+              progress across devices, send notifications you enable, and calculate your in-game
+              stats. We do not sell your personal data to third parties.
+            </p>
+            <h3 className="text-foreground font-semibold">3. Third-Party Services</h3>
+            <p>
+              We use Supabase for authentication and data storage, and Lemon Squeezy as our payment
+              processor. Each has their own privacy policy governing how they handle data. We share
+              only what is necessary to operate these integrations.
+            </p>
+            <h3 className="text-foreground font-semibold">4. Data Storage</h3>
+            <p>
+              Your data is stored on Supabase servers (AWS us-east-2). Profile pictures are stored
+              in Supabase Storage. All data is encrypted in transit (TLS) and at rest.
+            </p>
+            <h3 className="text-foreground font-semibold">5. Your Rights</h3>
+            <p>
+              You may request export or deletion of your personal data at any time by contacting us.
+              Account deletion removes your profile and all associated data from our systems within
+              30 days.
+            </p>
+            <h3 className="text-foreground font-semibold">6. Cookies</h3>
+            <p>
+              We use only necessary cookies and local storage to maintain your session and
+              preferences. No advertising or tracking cookies are used.
+            </p>
+            <h3 className="text-foreground font-semibold">7. Children's Privacy</h3>
+            <p>
+              The App is not directed at children under 13. We do not knowingly collect personal
+              information from children under 13.
+            </p>
+            <h3 className="text-foreground font-semibold">8. Changes to This Policy</h3>
+            <p>
+              We may update this Privacy Policy. We will notify users of material changes via the
+              App or email.
+            </p>
+            <h3 className="text-foreground font-semibold">9. Contact</h3>
+            <p>
+              For privacy inquiries, contact us at{" "}
+              <span className="text-primary">support@aurasanctuary.app</span>.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog
         open={pathModalOpen}
         onOpenChange={(next) => {

@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { ChevronRight, ChevronLeft, ChevronDown, MoreVertical, Info, Pencil, Minus, Folder, FileText } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import { ChevronRight, ChevronLeft, ChevronDown, MoreVertical, Info, Pencil, Folder, FileText } from "lucide-react";
+import { MarkdownEditor } from "@/components/aura/MarkdownEditor";
+import React from "react";
 import { useNotes, useCreateNote, useUpdateNote, useDeleteNote } from "@/hooks/useNotes";
 import { BugLoader } from "@/components/aura/BugLoader";
 import { useCreateTask, useCreateChecklistItem } from "@/hooks/useTasks";
@@ -73,75 +74,6 @@ function ColorPicker({ value, onChange }: { value: string | null; onChange: (c: 
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function ChecklistContent({ content, onChange }: { content: string; onChange: (next: string) => void }) {
-  const lines = content.split("\n");
-
-  const toggleLine = (i: number, checked: boolean) => {
-    const next = lines.map((l, idx) => {
-      if (idx !== i) return l;
-      return checked ? l.replace(/^(\s*)-\s*\[ \]/, "$1- [x]") : l.replace(/^(\s*)-\s*\[x\]/i, "$1- [ ]");
-    });
-    onChange(next.join("\n"));
-  };
-
-  return (
-    <div className="space-y-0.5">
-      {lines.map((line, i) => {
-        const unchecked = /^\s*-\s*\[ \]/.test(line);
-        const checked = /^\s*-\s*\[x\]/i.test(line);
-
-        if (unchecked || checked) {
-          const label = line.replace(/^\s*-\s*\[[ x]\]\s*/i, "");
-          return (
-            <div key={i} className="flex items-center gap-2 group py-0.5">
-              <button
-                type="button"
-                onClick={() => toggleLine(i, !checked)}
-                className={`shrink-0 w-4 h-4 border-2 flex items-center justify-center transition-colors ${
-                  checked ? "border-primary bg-primary/20 text-primary" : "border-border bg-input hover:border-primary"
-                }`}
-              >
-                {checked && <span style={{ fontFamily: "var(--font-pixel)", fontSize: "0.5rem", lineHeight: 1 }}>✓</span>}
-              </button>
-              <span className={`flex-1 ${checked ? "line-through text-muted-foreground" : ""}`} style={{ fontSize: "clamp(0.95rem, 2.5vw, 1.1rem)" }}>{label}</span>
-            </div>
-          );
-        }
-
-        if (/^### /.test(line)) return (
-          <h3 key={i} className="font-bold text-foreground mt-3 mb-0.5 wrap-break-word" style={{ fontFamily: "var(--font-pixel)", fontSize: "clamp(0.6rem, 2.5vw, 0.85rem)" }}>
-            {line.replace(/^### /, "")}
-          </h3>
-        );
-        if (/^## /.test(line)) return (
-          <h2 key={i} className="font-bold text-foreground mt-4 mb-1 wrap-break-word" style={{ fontFamily: "var(--font-pixel)", fontSize: "clamp(0.7rem, 3vw, 1rem)" }}>
-            {line.replace(/^## /, "")}
-          </h2>
-        );
-        if (/^# /.test(line)) return (
-          <h1 key={i} className="font-bold text-primary mt-5 mb-1 wrap-break-word" style={{ fontFamily: "var(--font-pixel)", fontSize: "clamp(0.8rem, 3.5vw, 1.15rem)" }}>
-            {line.replace(/^# /, "")}
-          </h1>
-        );
-
-        if (/^\s*- /.test(line) && !/^\s*-\s*\[/.test(line)) return (
-          <div key={i} className="flex items-center gap-2 py-0.5" style={{ fontSize: "clamp(0.95rem, 2.5vw, 1.1rem)" }}>
-            <Minus size={14} strokeWidth={3} className="text-primary shrink-0" />
-            <span>{line.replace(/^\s*- /, "")}</span>
-          </div>
-        );
-
-        if (line.trim() === "") return <div key={i} className="h-2" />;
-        return (
-          <div key={i} className="prose prose-invert max-w-none leading-relaxed" style={{ fontSize: "clamp(0.95rem, 2.5vw, 1.1rem)" }}>
-            <ReactMarkdown>{line}</ReactMarkdown>
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -566,9 +498,9 @@ function ArchivesPage() {
                         onClick={() => setPreview((p) => !p)}
                         className="h-6 border-2 border-border hover:border-primary text-muted-foreground hover:text-foreground flex items-center justify-center md:px-2 w-6 md:w-auto"
                         style={{ fontFamily: "var(--font-pixel)", fontSize: "0.55rem" }}
-                        title={preview ? "Edit" : "Preview"}
+                        title={preview ? "Switch to raw editor" : "Switch to live editor"}
                       >
-                        <span className="hidden md:inline">{preview ? "EDIT" : "PREVIEW"}</span>
+                        <span className="hidden md:inline">{preview ? "RAW" : "LIVE"}</span>
                         <span className="md:hidden"><Pencil size={11} /></span>
                       </button>
                     )}
@@ -656,9 +588,10 @@ function ArchivesPage() {
                     ))}
                   </div>
                 ) : preview ? (
-                  <ChecklistContent
-                    content={content || "*Empty page.*"}
-                    onChange={(next) => { setContent(next); save(title, next); }}
+                  <MarkdownEditor
+                    key={selected.id}
+                    content={content}
+                    onChange={(next) => { setContent(next); scheduleAutoSave(title, next); }}
                   />
                 ) : (
                   <textarea

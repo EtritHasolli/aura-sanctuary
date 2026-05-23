@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Pencil, Sparkles, Trash2, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -16,11 +16,17 @@ import {
 
 const MAX_ACTIVE_TIERS = 3;
 
+const CHECKOUT_URLS: Record<string, string> = {
+  adventurer: "https://aurasanctuary.lemonsqueezy.com/checkout/buy/1e30b4a6-fc0c-4eea-a7ee-71a0c96cb06e",
+  legend: "https://aurasanctuary.lemonsqueezy.com/checkout/buy/acbc9f4b-9907-4457-a80c-490ffb69d136",
+};
+
 export function SubscriptionPanel() {
   const { user } = useAuth();
   const { data: tiers = [], isLoading: tiersLoading } = useSubscriptionTiers();
   const { data: limits } = useSubscriptionLimits();
   const { data: isAdmin = false } = useIsAdmin();
+
 
   const upsertTier = useUpsertSubscriptionTier();
   const deleteTier = useDeleteSubscriptionTier();
@@ -52,7 +58,8 @@ export function SubscriptionPanel() {
   };
 
   return (
-    <section className="pixel-panel p-4 space-y-4">
+    <>
+      <section className="pixel-panel p-4 space-y-4">
       {tiersLoading ? (
         <p className="text-xs text-muted-foreground">Loading plans…</p>
       ) : sortedTiers.length === 0 ? (
@@ -67,6 +74,7 @@ export function SubscriptionPanel() {
               tier={tier}
               current={tier.slug === currentTierSlug}
               isAdmin={isAdmin}
+              checkoutUrl={CHECKOUT_URLS[tier.slug] ?? null}
               onAssign={() => void handleAssignSelf(tier.slug)}
               onEdit={() => setEditing(tier)}
               onDelete={async () => {
@@ -130,6 +138,7 @@ export function SubscriptionPanel() {
         />
       )}
     </section>
+    </>
   );
 }
 
@@ -176,6 +185,7 @@ function TierCard({
   tier,
   current,
   isAdmin,
+  checkoutUrl,
   onAssign,
   onEdit,
   onDelete,
@@ -183,6 +193,7 @@ function TierCard({
   tier: SubscriptionTier;
   current: boolean;
   isAdmin: boolean;
+  checkoutUrl: string | null;
   onAssign: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -196,6 +207,8 @@ function TierCard({
   const perks: string[] = [
     `${tier.max_parties_owned} parties you can lead`,
     `${tier.max_parties_joined} parties you can join`,
+    tier.max_notes != null ? `${tier.max_notes} archive notes` : "Unlimited archive notes",
+    tier.max_tasks != null ? `${tier.max_tasks} active tasks` : "Unlimited active tasks",
   ];
   if (tier.monthly_moonshards > 0) {
     perks.push(`+${tier.monthly_moonshards} moonshards / month`);
@@ -309,15 +322,26 @@ function TierCard({
           </button>
         ) : (
           <>
-            <button
-              type="button"
-              disabled
-              title="Real payments are not wired yet — admins can assign for testing."
-              className="w-full px-2 py-2.5 bg-primary/40 text-primary-foreground text-xs cursor-not-allowed"
-              style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
-            >
-              SUBSCRIBE (SOON)
-            </button>
+            {checkoutUrl ? (
+              <a
+                href={checkoutUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full block text-center px-2 py-2.5 bg-primary text-primary-foreground text-xs hover:opacity-90"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
+              >
+                SUBSCRIBE
+              </a>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="w-full px-2 py-2.5 bg-primary/40 text-primary-foreground text-xs cursor-not-allowed"
+                style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
+              >
+                SUBSCRIBE (SOON)
+              </button>
+            )}
             {isAdmin && (
               <button
                 type="button"
@@ -354,6 +378,8 @@ function TierEditorDialog({
           price_usd: tier.price_usd,
           max_parties_owned: tier.max_parties_owned,
           max_parties_joined: tier.max_parties_joined,
+          max_notes: tier.max_notes,
+          max_tasks: tier.max_tasks,
           monthly_moonshards: tier.monthly_moonshards,
           signup_bonus_moonshards: tier.signup_bonus_moonshards,
           perks: tier.perks ?? {},
@@ -367,6 +393,8 @@ function TierEditorDialog({
           price_usd: 0,
           max_parties_owned: 3,
           max_parties_joined: 5,
+          max_notes: null,
+          max_tasks: null,
           monthly_moonshards: 0,
           signup_bonus_moonshards: 0,
           perks: {},
@@ -385,6 +413,8 @@ function TierEditorDialog({
         price_usd: tier.price_usd,
         max_parties_owned: tier.max_parties_owned,
         max_parties_joined: tier.max_parties_joined,
+        max_notes: tier.max_notes,
+        max_tasks: tier.max_tasks,
         monthly_moonshards: tier.monthly_moonshards,
         signup_bonus_moonshards: tier.signup_bonus_moonshards,
         perks: tier.perks ?? {},
@@ -489,6 +519,38 @@ function TierEditorDialog({
                 value={form.max_parties_joined ?? 0}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, max_parties_joined: Number(e.target.value) }))
+                }
+                className="w-full px-2 py-1.5 bg-input border-2 border-border text-xs"
+              />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Max notes (blank = unlimited)">
+              <input
+                type="number"
+                min="1"
+                placeholder="unlimited"
+                value={form.max_notes ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    max_notes: e.target.value === "" ? null : Number(e.target.value),
+                  }))
+                }
+                className="w-full px-2 py-1.5 bg-input border-2 border-border text-xs"
+              />
+            </Field>
+            <Field label="Max tasks (blank = unlimited)">
+              <input
+                type="number"
+                min="1"
+                placeholder="unlimited"
+                value={form.max_tasks ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    max_tasks: e.target.value === "" ? null : Number(e.target.value),
+                  }))
                 }
                 className="w-full px-2 py-1.5 bg-input border-2 border-border text-xs"
               />
