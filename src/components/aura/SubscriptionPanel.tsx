@@ -44,6 +44,17 @@ export function SubscriptionPanel() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Show a floating X button whenever the LS checkout iframe is in the DOM.
+  const [lsOpen, setLsOpen] = useState(false);
+  useEffect(() => {
+    if (IS_ELECTRON) return;
+    const check = () =>
+      setLsOpen(!!document.querySelector('iframe[src*="lemonsqueezy.com"]'));
+    const obs = new MutationObserver(check);
+    obs.observe(document.body, { childList: true, subtree: true });
+    return () => obs.disconnect();
+  }, []);
+
   const upsertTier = useUpsertSubscriptionTier();
   const deleteTier = useDeleteSubscriptionTier();
   const setUserSub = useSetUserSubscription();
@@ -74,7 +85,22 @@ export function SubscriptionPanel() {
   };
 
   return (
-    <section className="pixel-panel p-4 space-y-4">
+    <>
+      {lsOpen && (
+        <button
+          type="button"
+          onClick={() => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (window as any).LemonSqueezy?.Url?.Close();
+          }}
+          className="fixed top-4 right-4 z-[99999] flex items-center justify-center w-9 h-9 bg-black/80 hover:bg-black text-white border border-white/20 rounded-full shadow-lg"
+          title="Close checkout"
+          aria-label="Close checkout"
+        >
+          ✕
+        </button>
+      )}
+      <section className="pixel-panel p-4 space-y-4">
       {tiersLoading ? (
         <p className="text-xs text-muted-foreground">Loading plans…</p>
       ) : sortedTiers.length === 0 ? (
@@ -153,6 +179,7 @@ export function SubscriptionPanel() {
         />
       )}
     </section>
+    </>
   );
 }
 
