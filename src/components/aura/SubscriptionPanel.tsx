@@ -29,6 +29,21 @@ export function SubscriptionPanel() {
   const { data: limits } = useSubscriptionLimits();
   const { data: isAdmin = false } = useIsAdmin();
 
+  // Initialise Lemon Squeezy embed and wire up ESC-to-close.
+  useEffect(() => {
+    if (IS_ELECTRON) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).createLemonSqueezy?.();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).LemonSqueezy?.Url?.Close();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const upsertTier = useUpsertSubscriptionTier();
   const deleteTier = useDeleteSubscriptionTier();
   const setUserSub = useSetUserSubscription();
