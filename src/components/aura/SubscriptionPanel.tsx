@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Pencil, Sparkles, Trash2, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -16,11 +16,9 @@ import {
 
 const MAX_ACTIVE_TIERS = 3;
 
-const IS_ELECTRON = typeof window !== "undefined" && !!window.navigator.userAgent.includes("Electron");
-
 const CHECKOUT_URLS: Record<string, string> = {
-  adventurer: `https://aurasanctuary.lemonsqueezy.com/checkout/buy/1e30b4a6-fc0c-4eea-a7ee-71a0c96cb06e${IS_ELECTRON ? "" : "?embed=1"}`,
-  legend: `https://aurasanctuary.lemonsqueezy.com/checkout/buy/acbc9f4b-9907-4457-a80c-490ffb69d136${IS_ELECTRON ? "" : "?embed=1"}`,
+  adventurer: "https://aurasanctuary.lemonsqueezy.com/checkout/buy/1e30b4a6-fc0c-4eea-a7ee-71a0c96cb06e",
+  legend: "https://aurasanctuary.lemonsqueezy.com/checkout/buy/acbc9f4b-9907-4457-a80c-490ffb69d136",
 };
 
 export function SubscriptionPanel() {
@@ -29,31 +27,6 @@ export function SubscriptionPanel() {
   const { data: limits } = useSubscriptionLimits();
   const { data: isAdmin = false } = useIsAdmin();
 
-  // Initialise Lemon Squeezy embed and wire up ESC-to-close.
-  useEffect(() => {
-    if (IS_ELECTRON) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (window as any).createLemonSqueezy?.();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any).LemonSqueezy?.Url?.Close();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  // Show a floating X button whenever the LS checkout iframe is in the DOM.
-  const [lsOpen, setLsOpen] = useState(false);
-  useEffect(() => {
-    if (IS_ELECTRON) return;
-    const check = () =>
-      setLsOpen(!!document.querySelector('iframe[src*="lemonsqueezy.com"]'));
-    const obs = new MutationObserver(check);
-    obs.observe(document.body, { childList: true, subtree: true });
-    return () => obs.disconnect();
-  }, []);
 
   const upsertTier = useUpsertSubscriptionTier();
   const deleteTier = useDeleteSubscriptionTier();
@@ -86,20 +59,6 @@ export function SubscriptionPanel() {
 
   return (
     <>
-      {lsOpen && (
-        <button
-          type="button"
-          onClick={() => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (window as any).LemonSqueezy?.Url?.Close();
-          }}
-          className="fixed top-4 right-4 z-[99999] flex items-center justify-center w-9 h-9 bg-black/80 hover:bg-black text-white border border-white/20 rounded-full shadow-lg"
-          title="Close checkout"
-          aria-label="Close checkout"
-        >
-          ✕
-        </button>
-      )}
       <section className="pixel-panel p-4 space-y-4">
       {tiersLoading ? (
         <p className="text-xs text-muted-foreground">Loading plans…</p>
@@ -366,9 +325,9 @@ function TierCard({
             {checkoutUrl ? (
               <a
                 href={checkoutUrl}
-                target={IS_ELECTRON ? "_blank" : undefined}
-                rel={IS_ELECTRON ? "noopener noreferrer" : undefined}
-                className={`w-full block text-center px-2 py-2.5 bg-primary text-primary-foreground text-xs hover:opacity-90${IS_ELECTRON ? "" : " lemonsqueezy-button"}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full block text-center px-2 py-2.5 bg-primary text-primary-foreground text-xs hover:opacity-90"
                 style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
               >
                 SUBSCRIBE
