@@ -12,6 +12,8 @@ export interface SubscriptionTier {
   is_active: boolean;
   max_parties_owned: number;
   max_parties_joined: number;
+  max_notes: number | null;
+  max_tasks: number | null;
   monthly_moonshards: number;
   signup_bonus_moonshards: number;
   perks: Record<string, unknown>;
@@ -105,6 +107,8 @@ export interface UpsertTierInput {
   price_usd?: number;
   max_parties_owned?: number;
   max_parties_joined?: number;
+  max_notes?: number | null;
+  max_tasks?: number | null;
   monthly_moonshards?: number;
   signup_bonus_moonshards?: number;
   perks?: Record<string, unknown>;
@@ -123,6 +127,8 @@ export function useUpsertSubscriptionTier() {
         p_price_usd: input.price_usd ?? 0,
         p_max_parties_owned: input.max_parties_owned ?? 3,
         p_max_parties_joined: input.max_parties_joined ?? 5,
+        p_max_notes: input.max_notes ?? null,
+        p_max_tasks: input.max_tasks ?? null,
         p_monthly_moonshards: input.monthly_moonshards ?? 0,
         p_signup_bonus_moonshards: input.signup_bonus_moonshards ?? 0,
         p_perks: input.perks ?? {},

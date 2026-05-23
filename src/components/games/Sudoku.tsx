@@ -386,7 +386,9 @@ export function Sudoku() {
         }
         // In sticky mode placement happens on keyup; otherwise place immediately
         if (!userSettings.stickyDigitMode && !e.repeat && selected != null) place(n);
-      } else if (e.key === "Backspace" || e.key === "Delete" || e.key === "0") {
+      } else if (e.key === "Backspace") {
+        undo();
+      } else if (e.key === "Delete" || e.key === "0") {
         erase();
       } else if (e.key === "ArrowLeft") {
         setSelected((s) => (s == null ? null : Math.max(0, s - 1)));
