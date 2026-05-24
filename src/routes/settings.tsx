@@ -676,35 +676,51 @@ function SettingsPage() {
               NOTIFICATIONS
             </h2>
           </div>
-          <label className="flex items-center gap-2 text-base">
-            <input
-              type="checkbox"
-              checked={desktopNotifs}
-              onChange={async (e) => {
-                const enabled = e.target.checked;
-                if (enabled && typeof Notification !== "undefined" && Notification.permission !== "granted") {
-                  const result = await Notification.requestPermission();
-                  if (result !== "granted") {
-                    toast.error("Browser blocked desktop notifications. Allow them in your browser settings.");
-                    return;
-                  }
+          {/* Desktop notifications toggle */}
+          <button
+            type="button"
+            className="flex items-center gap-3 group w-full text-left"
+            onClick={async () => {
+              const enabled = !desktopNotifs;
+              if (enabled && typeof Notification !== "undefined" && Notification.permission !== "granted") {
+                const result = await Notification.requestPermission();
+                if (result !== "granted") {
+                  toast.error("Browser blocked desktop notifications. Allow them in your browser settings.");
+                  return;
                 }
-                setDesktopNotifs(enabled);
-                window.localStorage.setItem(DESKTOP_NOTIF_KEY, String(enabled));
-              }}
-            />
-            Enable desktop notifications
-          </label>
-          <label className="flex items-center gap-2 text-base">
-            <input
-              type="checkbox"
-              checked={soundNotifs}
-              onChange={(e) => setSoundNotifs(e.target.checked)}
-            />
-            Enable notification sounds
-          </label>
-          {/* Push notifications */}
-          <div className="border-t border-border pt-4 space-y-2">
+              }
+              setDesktopNotifs(enabled);
+              window.localStorage.setItem(DESKTOP_NOTIF_KEY, String(enabled));
+            }}
+          >
+            <span className={`shrink-0 w-4 h-4 border-2 flex items-center justify-center transition-colors ${desktopNotifs ? "bg-primary border-primary text-primary-foreground" : "border-border group-hover:border-primary bg-transparent"}`}>
+              {desktopNotifs && (
+                <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><polyline points="1,4 4,7 9,1" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" /></svg>
+              )}
+            </span>
+            <span className="text-sm" style={{ fontFamily: "var(--font-pixel)", fontSize: "0.65rem" }}>
+              Enable desktop notifications
+            </span>
+          </button>
+
+          {/* Notification sounds toggle */}
+          <button
+            type="button"
+            className="flex items-center gap-3 group w-full text-left"
+            onClick={() => setSoundNotifs((v) => !v)}
+          >
+            <span className={`shrink-0 w-4 h-4 border-2 flex items-center justify-center transition-colors ${soundNotifs ? "bg-primary border-primary text-primary-foreground" : "border-border group-hover:border-primary bg-transparent"}`}>
+              {soundNotifs && (
+                <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><polyline points="1,4 4,7 9,1" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" /></svg>
+              )}
+            </span>
+            <span className="text-sm" style={{ fontFamily: "var(--font-pixel)", fontSize: "0.65rem" }}>
+              Enable notification sounds
+            </span>
+          </button>
+
+          {/* Push notifications — hidden inside Electron (uses native OS notifications instead) */}
+          {!window.electronAPI && <div className="border-t border-border pt-4 space-y-2">
             <div className="flex items-center gap-2">
               <Smartphone size={14} className="text-primary" />
               <span className="text-sm font-medium" style={{ fontFamily: "var(--font-pixel)", fontSize: "0.6rem" }}>
@@ -752,7 +768,7 @@ function SettingsPage() {
             {pushStatus === "loading" && (
               <p className="text-xs text-muted-foreground animate-pulse">Checking push status...</p>
             )}
-          </div>
+          </div>}
 
           <div className="text-sm text-muted-foreground">
             {notifications.length} total notifications, {unread} unread.

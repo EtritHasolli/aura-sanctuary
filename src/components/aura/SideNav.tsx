@@ -15,10 +15,12 @@ import {
   Gamepad2,
   MoreHorizontal,
   Flame,
+  Shield,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMessageUnreadCounts } from "@/hooks/useMessageUnreadCounts";
 import { useNotifications } from "@/components/aura/NotificationsContext";
+import { useIsAdmin } from "@/hooks/useProfile";
 import { useState } from "react";
 
 const items = [
@@ -65,6 +67,7 @@ export function SideNav() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const getUnread = useUnreadCounts();
   const [moreOpen, setMoreOpen] = useState(false);
+  const { data: isAdmin } = useIsAdmin();
 
   const primaryItems = items.filter((it) => (BOTTOM_PRIMARY as readonly string[]).includes(it.to));
   const secondaryItems = items.filter((it) => !(BOTTOM_PRIMARY as readonly string[]).includes(it.to));
@@ -112,6 +115,25 @@ export function SideNav() {
             );
           })}
         </div>
+
+        {/* Admin (only visible to admins) */}
+        {isAdmin && (
+          <div className="shrink-0 border-t-2 border-border py-2">
+            <Link
+              to="/admin"
+              title="Admin"
+              className={`relative flex items-center justify-center lg:justify-start gap-3 px-2 md:px-4 py-2.5 mx-1.5 md:mx-2 transition-colors text-sm border-2 ${
+                path === "/admin"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-transparent hover:border-border hover:bg-secondary"
+              }`}
+              style={{ fontFamily: "var(--font-pixel)", fontSize: "10px" }}
+            >
+              <Shield size={18} className="shrink-0" />
+              <span className="hidden lg:inline truncate">Admin</span>
+            </Link>
+          </div>
+        )}
 
         {/* Logout */}
         <div className="shrink-0 border-t-2 border-border py-2">
@@ -205,6 +227,22 @@ export function SideNav() {
                   </Link>
                 );
               })}
+              {/* Admin tile — only for admins */}
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  onClick={() => setMoreOpen(false)}
+                  className={`flex flex-col items-center justify-center gap-1 py-3 border-2 transition-colors ${
+                    path === "/admin"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border bg-secondary/40 text-foreground"
+                  }`}
+                  style={{ fontFamily: "var(--font-pixel)", fontSize: "8px" }}
+                >
+                  <Shield size={20} />
+                  <span>Admin</span>
+                </Link>
+              )}
               {/* Logout tile */}
               <button
                 onClick={() => { setMoreOpen(false); void supabase.auth.signOut(); }}

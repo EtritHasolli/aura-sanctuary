@@ -25,6 +25,7 @@ import {
   Trophy,
   X,
   Footprints,
+  Download,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useRef, useState, useEffect, useMemo } from "react";
@@ -332,6 +333,75 @@ function NotificationsBell() {
   );
 }
 
+type GHAsset = { name: string; browser_download_url: string };
+
+function detectOS(): "windows" | "mac" | "linux" | null {
+  const ua = navigator.userAgent;
+  if (/Windows/i.test(ua)) return "windows";
+  if (/Macintosh|Mac OS X/i.test(ua) && !/iPhone|iPad/i.test(ua)) return "mac";
+  if (/Linux/i.test(ua) && !/Android/i.test(ua)) return "linux";
+  return null;
+}
+
+function pickAsset(assets: GHAsset[], os: "windows" | "mac" | "linux"): string | null {
+  if (os === "windows") {
+    return assets.find((a) => a.name.endsWith(".exe") && !a.name.endsWith(".blockmap"))?.browser_download_url ?? null;
+  }
+  if (os === "mac") {
+    const ua = navigator.userAgent;
+    const isArm = /arm64|aarch64/i.test(ua);
+    const arm64 = assets.find((a) => a.name.includes("arm64") && a.name.endsWith(".dmg"));
+    const x64 = assets.find((a) => a.name.endsWith(".dmg") && !a.name.includes("arm64") && !a.name.endsWith(".blockmap"));
+    return (isArm ? (arm64 ?? x64) : (x64 ?? arm64))?.browser_download_url ?? null;
+  }
+  return assets.find((a) => a.name.endsWith(".AppImage"))?.browser_download_url ?? null;
+}
+
+function useDownloadUrl(): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const os = detectOS();
+    if (!os) return;
+
+    const cacheKey = `aura:dl-url:${os}`;
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) { setUrl(cached); return; }
+
+    fetch("https://api.github.com/repos/EtritHasolli/aura-sanctuary/releases/latest")
+      .then((r) => r.json())
+      .then((release: { assets: GHAsset[] }) => {
+        const found = pickAsset(release.assets ?? [], os);
+        if (found) { sessionStorage.setItem(cacheKey, found); setUrl(found); }
+      })
+      .catch(() => {});
+  }, []);
+
+  return url;
+}
+
+function DownloadButton() {
+  const downloadUrl = useDownloadUrl();
+  if (window.electronAPI) return null;
+
+  const os = detectOS();
+  if (!os) return null;
+
+  const label = os === "windows" ? "Windows" : os === "mac" ? "Mac" : "Linux";
+
+  return (
+    <a
+      href={downloadUrl ?? "https://github.com/EtritHasolli/aura-sanctuary/releases/latest"}
+      title={`Download Aura Sanctuary for ${label}`}
+      className="flex items-center gap-1.5 px-2 py-1 border-2 border-border hover:border-primary text-muted-foreground hover:text-primary transition-colors shrink-0"
+      style={{ fontFamily: "var(--font-pixel)", fontSize: "9px" }}
+    >
+      <Download size={13} />
+      <span className="hidden lg:inline">GET APP</span>
+    </a>
+  );
+}
+
 /** Header path portrait — larger than clip; tune for head-only crop. */
 const HUD_PATH_IDLE_SCALE = 3.5;
 /** Negative moves sprite up inside the clip (pixels). Aligns bust with avatar row. */
@@ -485,6 +555,7 @@ export function HUD() {
           <div className="flex items-center gap-2" title="Dexterity (gear included)">
             <Footprints size={18} className="text-[color:var(--color-focus)]" /> {effDex}
           </div>
+          <DownloadButton />
           <ThemeToggle />
         </div>
       </div>

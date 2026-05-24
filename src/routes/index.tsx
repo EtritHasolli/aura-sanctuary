@@ -881,49 +881,89 @@ function SanctuaryPage() {
               <p className="text-xs text-muted-foreground italic">No to-dos right now.</p>
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {todos.map((t) => (
-                  <div key={t.id} className="border border-border p-2">
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={t.completed}
-                        onChange={(e) =>
-                          updateTask.mutate({
-                            id: t.id,
-                            patch: {
-                              completed: e.target.checked,
-                              last_completed_at: new Date().toISOString(),
-                            },
-                          })
-                        }
-                      />
-                      <span className={t.completed ? "line-through text-muted-foreground" : ""}>
-                        {t.title}
-                      </span>
-                    </label>
-                    {(t.checklist ?? []).length > 0 && (
-                      <div className="mt-1 pl-5 space-y-1">
-                        {(t.checklist ?? []).map((c) => (
-                          <label key={c.id} className="flex items-center gap-2 text-xs">
-                            <input
-                              type="checkbox"
-                              checked={c.done}
-                              onChange={(e) =>
-                                updateChecklist.mutate({
-                                  id: c.id,
-                                  patch: { done: e.target.checked },
-                                })
-                              }
-                            />
-                            <span className={c.done ? "line-through text-muted-foreground" : ""}>
-                              {c.title}
-                            </span>
-                          </label>
-                        ))}
+                {todos.map((t) => {
+                  const steps = t.checklist ?? [];
+                  const allStepsDone = steps.length === 0 || steps.every((c) => c.done);
+                  const doneCount = steps.filter((c) => c.done).length;
+                  return (
+                    <div key={t.id} className="border border-border p-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        {/* Pixel checkbox — blocked when steps remain */}
+                        <button
+                          type="button"
+                          title={!allStepsDone ? `Complete all steps first (${doneCount}/${steps.length})` : undefined}
+                          onClick={() => {
+                            if (!allStepsDone) {
+                              toast.error(`Finish all steps first (${doneCount}/${steps.length} done)`);
+                              return;
+                            }
+                            updateTask.mutate({
+                              id: t.id,
+                              patch: {
+                                completed: !t.completed,
+                                last_completed_at: new Date().toISOString(),
+                              },
+                            });
+                          }}
+                          className={`shrink-0 w-4 h-4 border-2 flex items-center justify-center transition-colors ${
+                            t.completed
+                              ? "bg-primary border-primary text-primary-foreground"
+                              : !allStepsDone
+                                ? "border-muted-foreground opacity-40 cursor-not-allowed"
+                                : "border-border hover:border-primary bg-transparent"
+                          }`}
+                          style={{ imageRendering: "pixelated" }}
+                        >
+                          {t.completed && (
+                            <svg width="10" height="8" viewBox="0 0 10 8" fill="none" className="block">
+                              <polyline points="1,4 4,7 9,1" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" />
+                            </svg>
+                          )}
+                        </button>
+                        <span className={`flex-1 text-xs ${t.completed ? "line-through text-muted-foreground" : ""}`} style={{ fontFamily: "var(--font-pixel)", fontSize: "0.6rem" }}>
+                          {t.title}
+                        </span>
+                        {steps.length > 0 && !t.completed && (
+                          <span className="text-[9px] text-muted-foreground shrink-0" style={{ fontFamily: "var(--font-pixel)" }}>
+                            {doneCount}/{steps.length}
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {steps.length > 0 && (
+                        <div className="mt-1.5 pl-6 space-y-1">
+                          {steps.map((c) => (
+                            <div key={c.id} className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateChecklist.mutate({
+                                    id: c.id,
+                                    patch: { done: !c.done },
+                                  })
+                                }
+                                className={`shrink-0 w-3 h-3 border-2 flex items-center justify-center transition-colors ${
+                                  c.done
+                                    ? "bg-primary border-primary text-primary-foreground"
+                                    : "border-border hover:border-primary bg-transparent"
+                                }`}
+                                style={{ imageRendering: "pixelated" }}
+                              >
+                                {c.done && (
+                                  <svg width="7" height="6" viewBox="0 0 7 6" fill="none" className="block">
+                                    <polyline points="1,3 3,5 6,1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" strokeLinejoin="miter" />
+                                  </svg>
+                                )}
+                              </button>
+                              <span className={`text-[10px] ${c.done ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                                {c.title}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

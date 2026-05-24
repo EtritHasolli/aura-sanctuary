@@ -20,6 +20,7 @@ module.exports = {
 
   win: {
     target: [{ target: "nsis", arch: ["x64"] }],
+    artifactName: "Aura-Sanctuary-Setup.exe",
   },
   mac: {
     // zip must be listed first — electron-updater uses the first file in
@@ -31,6 +32,7 @@ module.exports = {
   },
   linux: {
     target: [{ target: "AppImage", arch: ["x64"] }],
+    artifactName: "Aura-Sanctuary.AppImage",
   },
 
   publish: {
