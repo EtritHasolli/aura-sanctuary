@@ -10,13 +10,14 @@ export function desktopNotifsEnabled() {
 }
 
 export async function fireLocalNotification(title: string, body: string, options?: { tag?: string; url?: string }) {
-  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  if (!desktopNotifsEnabled()) return;
+  if (typeof window !== "undefined" && window.electronAPI?.showNotification) {
+    await window.electronAPI.showNotification(title, body);
+    return;
+  }
   if ("serviceWorker" in navigator) {
     const reg = await navigator.serviceWorker.ready.catch(() => null);
     if (reg) {
-      // Skip if push subscription exists — SW will handle it via FCM
-      const pushSub = await reg.pushManager.getSubscription().catch(() => null);
-      if (pushSub) return;
       await reg.showNotification(title, {
         body,
         icon: "/aura-logo-full.png",

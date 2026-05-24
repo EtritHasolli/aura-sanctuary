@@ -80,4 +80,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("music:reveal-folder", folderPath),
   getBundledTracks: (): Promise<{ lofi: Array<{ name: string; path: string }>; ambient: Array<{ name: string; path: string }> }> =>
     ipcRenderer.invoke("music:get-bundled-tracks"),
+
+  showNotification: (title: string, body: string): Promise<void> =>
+    ipcRenderer.invoke("notification:show", title, body),
 });

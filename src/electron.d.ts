@@ -32,6 +32,7 @@ declare global {
       scanLibrary: () => Promise<{ lofi: Array<{ name: string; path: string }>; ambient: Array<{ name: string; path: string }> }>;
       revealFolder: (folderPath: string) => Promise<void>;
       getBundledTracks: () => Promise<{ lofi: Array<{ name: string; path: string }>; ambient: Array<{ name: string; path: string }> }>;
+      showNotification: (title: string, body: string) => Promise<void>;
     };
   }
 }

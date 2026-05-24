@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { fireLocalNotification } from "@/lib/notifications";
@@ -57,6 +57,14 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const userId = user?.id;
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const electronWinFocused = useRef(true);
+
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    const offBlur = window.electronAPI.onWindowMinimize(() => { electronWinFocused.current = false; });
+    const offFocus = window.electronAPI.onWindowRestore(() => { electronWinFocused.current = true; });
+    return () => { offBlur(); offFocus(); };
+  }, []);
 
   // Load existing notifications on mount.
   useEffect(() => {
@@ -87,8 +95,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         (payload) => {
           const notif = toAppNotif(payload.new as NotificationRow);
           setNotifications((prev) => [notif, ...prev].slice(0, 50));
-          // Fire local notification only when app is backgrounded and push is not subscribed
-          if (document.visibilityState !== "visible") {
+          const isBackgrounded = window.electronAPI
+            ? !electronWinFocused.current
+            : document.visibilityState !== "visible";
+          if (isBackgrounded) {
             const displayMsg = notif.message.replace(/\s*\/\S+\?\S+\s*$/, "").trim();
             void fireLocalNotification("Aura", displayMsg, { tag: notif.id });
           }

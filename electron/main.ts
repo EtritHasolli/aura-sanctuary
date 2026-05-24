@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, net, protocol, screen, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, net, Notification, protocol, screen, session, shell } from "electron";
 import { autoUpdater } from "electron-updater";
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
@@ -98,6 +98,15 @@ function createWindow(): BrowserWindow {
 }
 
 // --- Window controls ---
+
+ipcMain.handle("notification:show", (_event, title: string, body: string) => {
+  if (!Notification.isSupported()) return;
+  const iconPath = isDev
+    ? path.join(__dirname, "../public/aura-logo.png")
+    : path.join(app.getAppPath(), "dist/aura-logo.png");
+  const notif = new Notification({ title, body, icon: iconPath });
+  notif.show();
+});
 
 ipcMain.handle("window:minimize", () => mainWin?.minimize());
 ipcMain.handle("window:toggle-maximize", () => {
