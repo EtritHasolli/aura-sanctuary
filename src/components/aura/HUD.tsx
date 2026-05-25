@@ -25,7 +25,6 @@ import {
   Trophy,
   X,
   Footprints,
-  Download,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useRef, useState, useEffect, useMemo } from "react";
@@ -396,7 +395,6 @@ function DownloadButton() {
       className="flex items-center gap-1.5 px-2 py-1 border-2 border-border hover:border-primary text-muted-foreground hover:text-primary transition-colors shrink-0"
       style={{ fontFamily: "var(--font-pixel)", fontSize: "9px" }}
     >
-      <Download size={13} />
       <span className="hidden lg:inline">GET APP</span>
     </a>
   );
