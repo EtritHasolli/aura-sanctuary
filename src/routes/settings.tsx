@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Clock3, Info, Link2, Link2Off, ScrollText, ShieldCheck, Smartphone, Trash2, UserRound } from "lucide-react";
+import { Bell, Clock3, Info, Link2, Link2Off, ScrollText, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import { useProfile, useUpdateProfile, useIsAdmin } from "@/hooks/useProfile";
 import { useNotifications } from "@/components/aura/NotificationsContext";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
@@ -17,7 +17,6 @@ import { AURA_PATHS, xpForLevel, type AuraPath } from "@/lib/aura/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
 import swordsmanIdle from "../../characters/swordsman/idle.gif";
 import swordsmanStance from "../../characters/swordsman/stance.gif";
 import mageIdle from "../../characters/mage/idle.gif";
@@ -133,8 +132,7 @@ function SettingsPage() {
   const [alignment, setAlignment] = useState<"good" | "evil" | null>(null);
   const [desktopNotifs, setDesktopNotifs] = useState(false);
   const [soundNotifs, setSoundNotifs] = useState(true);
-  const { status: pushStatus, subscribe: subscribePush, unsubscribe: unsubscribePush } = usePushNotifications();
-  const [pathTestingOverride, setPathTestingOverride] = useState(false);
+const [pathTestingOverride, setPathTestingOverride] = useState(false);
   const [pathModalOpen, setPathModalOpen] = useState(false);
   const [isRerolling, setIsRerolling] = useState(false);
   const [showStatsInfo, setShowStatsInfo] = useState(false);
@@ -699,7 +697,7 @@ function SettingsPage() {
               )}
             </span>
             <span className="text-sm" style={{ fontFamily: "var(--font-pixel)", fontSize: "0.65rem" }}>
-              Enable desktop notifications
+              Enable notifications on device
             </span>
           </button>
 
@@ -719,56 +717,6 @@ function SettingsPage() {
             </span>
           </button>
 
-          {/* Push notifications — hidden inside Electron (uses native OS notifications instead) */}
-          {!window.electronAPI && <div className="border-t border-border pt-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <Smartphone size={14} className="text-primary" />
-              <span className="text-sm font-medium" style={{ fontFamily: "var(--font-pixel)", fontSize: "0.6rem" }}>
-                PUSH NOTIFICATIONS (MOBILE / DESKTOP APP)
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Get notified even when the app is closed — quest reminders, streak alerts, party events.
-            </p>
-            {pushStatus === "unsupported" && (
-              <p className="text-xs text-muted-foreground italic">Push notifications are not supported in this browser.</p>
-            )}
-            {pushStatus === "denied" && (
-              <p className="text-xs text-destructive">Push notifications are blocked. Allow them in your browser/OS settings, then reload.</p>
-            )}
-            {(pushStatus === "prompt" || pushStatus === "subscribed") && (
-              <div className="flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full shrink-0 ${pushStatus === "subscribed" ? "bg-green-500" : "bg-muted-foreground"}`} />
-                <span className="text-sm text-muted-foreground flex-1">
-                  {pushStatus === "subscribed" ? "Push notifications enabled on this device." : "Push notifications disabled."}
-                </span>
-                <button
-                  onClick={async () => {
-                    if (pushStatus === "subscribed") {
-                      const ok = await unsubscribePush();
-                      if (ok) toast.success("Push notifications disabled.");
-                      else toast.error("Failed to disable push notifications.");
-                    } else {
-                      const ok = await subscribePush();
-                      if (ok) toast.success("Push notifications enabled!");
-                      else toast.error("Could not enable push notifications.");
-                    }
-                  }}
-                  className={`px-3 py-1.5 border-2 text-xs shrink-0 ${
-                    pushStatus === "subscribed"
-                      ? "border-destructive text-destructive hover:bg-destructive/10"
-                      : "border-primary text-primary hover:bg-primary/10"
-                  }`}
-                  style={{ fontFamily: "var(--font-pixel)", fontSize: "0.55rem" }}
-                >
-                  {pushStatus === "subscribed" ? "DISABLE" : "ENABLE"}
-                </button>
-              </div>
-            )}
-            {pushStatus === "loading" && (
-              <p className="text-xs text-muted-foreground animate-pulse">Checking push status...</p>
-            )}
-          </div>}
 
           <div className="text-sm text-muted-foreground">
             {notifications.length} total notifications, {unread} unread.

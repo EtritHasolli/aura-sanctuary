@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pencil, Sparkles, Trash2, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -198,6 +198,8 @@ function TierCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const inactive = !tier.is_active;
+
   const priceLabel = tier.is_free
     ? "Free"
     : tier.price_usd > 0
@@ -233,7 +235,7 @@ function TierCard({
     <div
       className={`relative pixel-panel p-3 flex flex-col gap-2 ${
         current ? "border-primary" : ""
-      }`}
+      } ${inactive && !isAdmin ? "opacity-60" : ""}`}
     >
       {current && (
         <span
@@ -241,6 +243,14 @@ function TierCard({
           style={{ fontFamily: "var(--font-pixel)" }}
         >
           Current plan
+        </span>
+      )}
+      {inactive && isAdmin && (
+        <span
+          className="absolute -top-2 right-3 bg-destructive text-destructive-foreground px-2 py-0.5 text-[9px] uppercase"
+          style={{ fontFamily: "var(--font-pixel)" }}
+        >
+          Inactive
         </span>
       )}
       <div className="flex items-start justify-between gap-2">
@@ -302,7 +312,16 @@ function TierCard({
         ))}
       </ul>
       <div className="mt-auto pt-2 flex flex-col gap-1">
-        {current ? (
+        {inactive && !isAdmin ? (
+          <button
+            type="button"
+            disabled
+            className="w-full px-3 py-2.5 border-2 border-border text-muted-foreground text-xs cursor-not-allowed"
+            style={{ fontFamily: "var(--font-pixel)" }}
+          >
+            COMING SOON
+          </button>
+        ) : current ? (
           <button
             type="button"
             disabled

@@ -39,7 +39,6 @@ export function useSubscriptionTiers() {
       const { data, error } = await supabase
         .from("subscription_tiers")
         .select("*")
-        .eq("is_active", true)
         .order("sort_order", { ascending: true });
       if (error) throw error;
       return (data ?? []) as SubscriptionTier[];
