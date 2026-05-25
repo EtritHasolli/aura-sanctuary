@@ -23,6 +23,7 @@ import {
 } from "@/lib/aura/sanctuaryCharacterWander";
 import { useSanctuaryIdleWander } from "@/hooks/useSanctuaryIdleWander";
 import { AURA_PATHS } from "@/lib/aura/types";
+import { SanctuaryWindow } from "@/components/aura/SanctuaryWindow";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -186,6 +187,7 @@ function SanctuaryPage() {
   });
 
   const prevWalkDirectionRef = useRef(idleWander.walkDirection);
+  const windowGazeTimerRef = useRef<number | null>(null);
 
   const xPan = useMotionValue(0);
   const sanctuaryPanCtlRef = useRef<ReturnType<typeof animate> | null>(null);
@@ -242,6 +244,28 @@ function SanctuaryPage() {
     }
     prevWalkDirectionRef.current = idleWander.walkDirection;
   }, [idleWander.walkDirection]);
+
+  // Periodically make the character gaze toward the window using idleBack sprite
+  useEffect(() => {
+    function scheduleGaze() {
+      const wait = 20_000 + Math.random() * 40_000; // 20–60 s between gazes
+      windowGazeTimerRef.current = window.setTimeout(() => {
+        if (characterStateRef.current === "idle") {
+          setIsBackOrientation(true);
+          windowGazeTimerRef.current = window.setTimeout(() => {
+            setIsBackOrientation(false);
+            scheduleGaze();
+          }, 5_000 + Math.random() * 5_000); // hold gaze 5–10 s
+        } else {
+          scheduleGaze(); // not idle right now, try again later
+        }
+      }, wait);
+    }
+    scheduleGaze();
+    return () => {
+      if (windowGazeTimerRef.current != null) window.clearTimeout(windowGazeTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const prev = previousCharacterStateRef.current;
@@ -346,6 +370,7 @@ function SanctuaryPage() {
       if (sanctuaryTapTimeoutRef.current != null) window.clearTimeout(sanctuaryTapTimeoutRef.current);
       if (sleepTransitionTimeoutRef.current != null) window.clearTimeout(sleepTransitionTimeoutRef.current);
       if (volHideTimerRef.current != null) window.clearTimeout(volHideTimerRef.current);
+      if (windowGazeTimerRef.current != null) window.clearTimeout(windowGazeTimerRef.current);
     };
   }, []);
 
@@ -722,6 +747,9 @@ function SanctuaryPage() {
                 }}
               />
             </div>
+
+            {/* Window with live weather animation */}
+            <SanctuaryWindow />
 
             {/* Path-specific table — left side of sanctuary */}
             {profile?.aura_path && (
