@@ -11,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile, useApplyReward } from "@/hooks/useProfile";
 import { useTaskReminders } from "@/hooks/useTaskReminders";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { desktopNotifsEnabled } from "@/lib/notifications";
 import { HUD } from "@/components/aura/HUD";
 import { SideNav } from "@/components/aura/SideNav";
 import { AiAssistant } from "@/components/aura/AiAssistant";
@@ -501,6 +503,19 @@ function useMoonshardAwardToasts(push: (msg: string, type: "success") => void) {
   }, [push]);
 }
 
+// Silently re-subscribes web users who had notifications enabled (via localStorage)
+// but lost their push subscription (e.g. cleared browser data or registered before
+// push subscriptions were added). Electron uses native notifications instead.
+function PushAutoSubscribe() {
+  const { subscribe, status } = usePushNotifications();
+  useEffect(() => {
+    if (window.electronAPI) return;
+    if (!desktopNotifsEnabled()) return;
+    if (status === "prompt") void subscribe();
+  }, [status, subscribe]);
+  return null;
+}
+
 function AppGate() {
   const { user, loading } = useAuth();
   const { data: profile, isLoading: profileLoading } = useProfile();
@@ -573,6 +588,7 @@ function AppGate() {
         <>
           <FocusReward />
           <StaminaRecoveryLoop />
+          <PushAutoSubscribe />
           <div className="h-full flex flex-col bg-background overflow-hidden">
             <HUD />
             <div className="flex-1 flex overflow-hidden">

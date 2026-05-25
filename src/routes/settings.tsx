@@ -5,6 +5,7 @@ import { Bell, Clock3, Info, Link2, Link2Off, ScrollText, ShieldCheck, Trash2, U
 import { useProfile, useUpdateProfile, useIsAdmin } from "@/hooks/useProfile";
 import { useNotifications } from "@/components/aura/NotificationsContext";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import {
   useConnectHabitica,
   useDisconnectHabitica,
@@ -124,6 +125,7 @@ function SettingsPage() {
   const { data: isAdmin = false } = useIsAdmin();
   const { notifications, unread, markAllRead, clear } = useNotifications();
   const { focusMinutes, breakMinutes, updateDurations, sessionPlan, updateSessionPlan } = usePomodoro();
+  const { subscribe: subscribePush, unsubscribe: unsubscribePush } = usePushNotifications();
 
   const [displayName, setDisplayName] = useState("");
   const [characterName, setCharacterName] = useState("");
@@ -680,12 +682,26 @@ const [pathTestingOverride, setPathTestingOverride] = useState(false);
             className="flex items-center gap-3 group w-full text-left"
             onClick={async () => {
               const enabled = !desktopNotifs;
-              if (enabled && typeof Notification !== "undefined" && Notification.permission !== "granted") {
-                const result = await Notification.requestPermission();
-                if (result !== "granted") {
-                  toast.error("Browser blocked desktop notifications. Allow them in your browser settings.");
-                  return;
+              if (enabled) {
+                if (window.electronAPI) {
+                  // Electron: request native system permission
+                  if (typeof Notification !== "undefined" && Notification.permission !== "granted") {
+                    const result = await Notification.requestPermission();
+                    if (result !== "granted") {
+                      toast.error("Notifications blocked. Allow them in your system settings.");
+                      return;
+                    }
+                  }
+                } else {
+                  // Web/mobile: subscribe to push (handles permission internally)
+                  const ok = await subscribePush();
+                  if (!ok) {
+                    toast.error("Notifications blocked. Allow them in your browser settings.");
+                    return;
+                  }
                 }
+              } else if (!window.electronAPI) {
+                await unsubscribePush();
               }
               setDesktopNotifs(enabled);
               window.localStorage.setItem(DESKTOP_NOTIF_KEY, String(enabled));
