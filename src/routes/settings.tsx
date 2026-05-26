@@ -683,23 +683,15 @@ const [pathTestingOverride, setPathTestingOverride] = useState(false);
             onClick={async () => {
               const enabled = !desktopNotifs;
               if (enabled) {
-                if (window.electronAPI) {
-                  // Electron: request native system permission
-                  if (typeof Notification !== "undefined" && Notification.permission !== "granted") {
-                    const result = await Notification.requestPermission();
-                    if (result !== "granted") {
-                      toast.error("Notifications blocked. Allow them in your system settings.");
-                      return;
-                    }
-                  }
-                } else {
-                  // Web/mobile: subscribe to push (handles permission internally)
+                if (!window.electronAPI) {
+                  // Web/mobile: subscribe to push (handles browser permission internally)
                   const ok = await subscribePush();
                   if (!ok) {
                     toast.error("Notifications blocked. Allow them in your browser settings.");
                     return;
                   }
                 }
+                // Electron: uses native IPC — no browser permission prompt needed
               } else if (!window.electronAPI) {
                 await unsubscribePush();
               }

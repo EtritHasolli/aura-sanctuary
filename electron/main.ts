@@ -372,16 +372,23 @@ app.whenReady().then(() => {
     },
   );
 
-  // Grant camera/microphone permissions for LiveKit study calls.
-  // Both handlers are required: setPermissionCheckHandler gates whether the
-  // request is even allowed to proceed; setPermissionRequestHandler decides
-  // the outcome. Electron silently denies media access if either is missing.
-  const MEDIA_PERMISSIONS = ["media", "camera", "microphone", "audio-capture", "video-capture", "display-capture"];
+  // Grant required permissions. Both handlers are required: setPermissionCheckHandler
+  // gates whether a permission query returns "granted"; setPermissionRequestHandler
+  // decides the outcome when code calls requestPermission(). Electron silently denies
+  // access if either is missing for the requested permission.
+  const ALLOWED_PERMISSIONS = [
+    "media", "camera", "microphone", "audio-capture", "video-capture", "display-capture",
+    // geolocation: needed for weather widget in SanctuaryWindow
+    "geolocation",
+    // notifications: needed so Notification.requestPermission() resolves "granted"
+    // (Electron native Notification via IPC doesn't require this, but the web API check does)
+    "notifications",
+  ];
   session.defaultSession.setPermissionCheckHandler((_webContents, permission) =>
-    MEDIA_PERMISSIONS.includes(permission),
+    ALLOWED_PERMISSIONS.includes(permission),
   );
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) =>
-    callback(MEDIA_PERMISSIONS.includes(permission)),
+    callback(ALLOWED_PERMISSIONS.includes(permission)),
   );
 
   mainWin = createWindow();
