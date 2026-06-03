@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -69,7 +69,9 @@ type HabiticaAction =
   | "tagSync"
   | "pushTask"
   | "createTask"
-  | "deleteTask";
+  | "deleteTask"
+  | "checkCron"
+  | "runCron";
 
 interface InvokeOptions {
   action: HabiticaAction;
@@ -516,6 +518,85 @@ export function usePushNewTaskToHabitica() {
     },
     [qc],
   );
+}
+
+export interface HabiticaPendingDaily {
+  auraTaskId: string;
+  title: string;
+  habiticaTaskId: string;
+}
+
+export interface HabiticaCheckCronResult {
+  needsCron: boolean;
+  pendingDailies: HabiticaPendingDaily[];
+}
+
+export interface HabiticaRunCronResult {
+  cronRun: boolean;
+  habitsUpdated: number;
+  dailiesUpdated: number;
+  completionsApplied: number;
+}
+
+/**
+ * Check whether Habitica's daily cron hasn't run yet (new day pending).
+ * Returns the list of linked Aura dailies that were incomplete yesterday.
+ * Only fires once per session per user, same pattern as useHabiticaAutoSync.
+ * Exposes `open` so callers can show/hide the modal, and `dismiss` to close
+ * without running cron (user ignored the modal).
+ */
+export function useHabiticaDayCron() {
+  const { user } = useAuth();
+  const { data: status } = useHabiticaStatus();
+  const qc = useQueryClient();
+  const [cronState, setCronState] = useState<HabiticaCheckCronResult | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const firedFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!user || !status?.connected) return;
+    if (firedFor.current === user.id) return;
+    firedFor.current = user.id;
+
+    void invokeHabitica<HabiticaCheckCronResult>({ action: "checkCron" })
+      .then((result) => {
+        if (result.needsCron) setCronState(result);
+      })
+      .catch(() => {
+        // silent — don't block the app if this check fails
+      });
+  }, [user, status?.connected]);
+
+  const runCron = useCallback(
+    async (scoreHabiticaTaskIds: string[]) => {
+      setIsRunning(true);
+      try {
+        await invokeHabitica<HabiticaRunCronResult>({
+          action: "runCron",
+          payload: { scoreTaskIds: scoreHabiticaTaskIds },
+        });
+        qc.invalidateQueries({ queryKey: ["tasks"] });
+        qc.invalidateQueries({ queryKey: ["profile"] });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Could not start the new day.";
+        toast.error(message);
+      } finally {
+        setIsRunning(false);
+        setCronState(null);
+      }
+    },
+    [qc],
+  );
+
+  const dismiss = useCallback(() => setCronState(null), []);
+
+  return {
+    open: cronState !== null,
+    pendingDailies: cronState?.pendingDailies ?? [],
+    runCron,
+    isRunning,
+    dismiss,
+  };
 }
 
 /**

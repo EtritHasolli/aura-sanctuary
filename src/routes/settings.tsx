@@ -1390,6 +1390,8 @@ function HabiticaSection() {
     }
   }, [lastSyncedAt]);
 
+  const [showHabiticaInfo, setShowHabiticaInfo] = useState(false);
+
   return (
     <section className="pixel-panel p-5 space-y-4 min-w-0">
       <div className="flex items-center gap-2">
@@ -1397,7 +1399,76 @@ function HabiticaSection() {
         <h2 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
           HABITICA SYNC
         </h2>
+        <button
+          type="button"
+          onClick={() => setShowHabiticaInfo(true)}
+          className="ml-auto text-muted-foreground hover:text-primary"
+          title="How Habitica sync works"
+        >
+          <Info size={16} />
+        </button>
       </div>
+
+      {showHabiticaInfo && (
+        <div
+          className="fixed inset-0 z-130 bg-black/50 p-4 flex items-center justify-center"
+          onClick={() => setShowHabiticaInfo(false)}
+        >
+          <div
+            className="pixel-panel w-full max-w-xl p-4 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+                HABITICA SYNC GUIDE
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowHabiticaInfo(false)}
+                className="px-2 py-0.5 border border-border hover:border-primary text-xs"
+                style={{ fontFamily: "var(--font-pixel)" }}
+              >
+                CLOSE
+              </button>
+            </div>
+            <ul className="list-disc pl-5 space-y-2 text-base text-muted-foreground">
+              <li>
+                <strong className="text-foreground">Aura → Habitica:</strong> completing a linked
+                task in Aura pushes a score to Habitica instantly (when auto-sync is on). Your
+                Habitica XP, gold, and HP update right away.
+              </li>
+              <li>
+                <strong className="text-foreground">Habitica → Aura:</strong> completions you make
+                directly in Habitica are picked up on the next sync. Aura grants its own XP &amp;
+                gold for those.
+              </li>
+              <li>
+                <strong className="text-foreground">Catch-up rewards:</strong> if you use Habitica
+                without opening Aura, you&apos;ll receive Aura rewards for up to{" "}
+                <strong className="text-foreground">14 days</strong> of completed dailies when you
+                come back and sync.
+              </li>
+              <li>
+                <strong className="text-foreground">New day modal:</strong> Habitica resets dailies
+                each morning. When you open Aura before that reset runs, a modal appears so you can
+                mark any yesterday&apos;s dailies you actually finished — preventing the HP penalty
+                for those ones.
+              </li>
+              <li>
+                <strong className="text-foreground">HP damage:</strong> dailies left unchecked in
+                the new-day modal still incur Habitica&apos;s normal HP penalty, same as missing
+                them.
+              </li>
+              <li>
+                <strong className="text-foreground">Disconnecting</strong> clears your stored token
+                and removes all task mappings. Imported Aura quests are kept — they just stop
+                syncing.
+              </li>
+            </ul>
+          </div>
+        </div>
+      )}
+
       <p className="text-sm text-muted-foreground">
         Link your Habitica account to mirror habits &amp; dailies across devices. Completions in
         Aura push to Habitica, and you can pull Habitica progress back any time.

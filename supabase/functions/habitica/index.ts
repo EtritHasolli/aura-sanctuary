@@ -599,6 +599,44 @@ async function persistRefresh(
           patch.last_completed_local_date = null;
           patch.last_completed_at = null;
         }
+
+        // Catch-up rewards: scan the last 14 days of Habitica history for
+        // completions that happened after our last recorded local completion.
+        // This handles the case where the user completed dailies on Habitica
+        // while not using Aura at all (history entries have `scoredUp >= 1`).
+        const CATCHUP_DAYS = 14;
+        const catchupCutoff = new Date();
+        catchupCutoff.setUTCDate(catchupCutoff.getUTCDate() - CATCHUP_DAYS);
+        const catchupCutoffMs = catchupCutoff.getTime();
+
+        // The date after which we haven't yet granted a reward (exclusive).
+        const awardedUpTo = localRow.last_completed_local_date
+          ? new Date(localRow.last_completed_local_date + "T00:00:00Z").getTime()
+          : 0;
+
+        if (Array.isArray(remote.history) && remote.history.length > 0) {
+          let catchupCount = 0;
+          for (const entry of remote.history) {
+            const entryMs = typeof entry.date === "number" ? entry.date : 0;
+            // Only consider entries within the 14-day window and after our
+            // last recorded local completion (to avoid double-counting).
+            if (entryMs < catchupCutoffMs) continue;
+            // entryMs is the start of that day; skip today's date (handled above).
+            const entryDateStr = new Date(entryMs).toISOString().slice(0, 10);
+            if (entryDateStr === todayUtc) continue;
+            if (entryMs <= awardedUpTo) continue;
+            // scoredUp >= 1 means the daily was checked off that day.
+            if (typeof entry.scoredUp === "number" && entry.scoredUp >= 1) {
+              catchupCount += 1;
+            }
+          }
+          if (catchupCount > 0) {
+            completionsApplied += catchupCount;
+            xpGranted += (DIFFICULTY_XP[localRow.difficulty ?? "easy"] ?? 5) * catchupCount;
+            goldGranted += (DIFFICULTY_GOLD[localRow.difficulty ?? "easy"] ?? 3) * catchupCount;
+          }
+        }
+
         dailiesUpdated += 1;
       }
     } else if (localRow.type === "habit" && remote.type === "habit") {
@@ -1305,6 +1343,108 @@ async function actionCreateTask(ctx: Ctx, body: Record<string, unknown>) {
   return jsonResponse({ created: true, habiticaTaskId: created.id });
 }
 
+// ---------------------------------------------------------------------------
+// checkCron — detect whether Habitica's daily cron hasn't run yet today and
+// return the list of linked Aura dailies that were incomplete yesterday.
+// ---------------------------------------------------------------------------
+async function actionCheckCron(ctx: Ctx) {
+  const row = await loadIntegration(ctx);
+  if (!row) return jsonResponse({ needsCron: false, pendingDailies: [] });
+
+  const creds: HabiticaCreds = {
+    external_user_id: row.external_user_id,
+    api_token: row.api_token,
+  };
+
+  // Fetch minimal user fields — `needsCron` lives in the top-level user object.
+  interface CronUserData {
+    needsCron?: boolean;
+    preferences?: { dayStart?: number; timezoneOffset?: number };
+  }
+  let userData: CronUserData;
+  try {
+    userData = await callHabitica<CronUserData>("/user?userFields=needsCron,preferences", {
+      method: "GET",
+      creds,
+    });
+  } catch {
+    return jsonResponse({ needsCron: false, pendingDailies: [] });
+  }
+
+  if (!userData.needsCron) {
+    return jsonResponse({ needsCron: false, pendingDailies: [] });
+  }
+
+  // Fetch yesterday's incomplete dailies that are linked to Aura tasks.
+  let remoteDailies: HabiticaTask[] = [];
+  try {
+    remoteDailies = await fetchHabiticaTasks(creds, "dailys");
+  } catch {
+    return jsonResponse({ needsCron: true, pendingDailies: [] });
+  }
+
+  const incompleteDailies = remoteDailies.filter((d) => d.completed === false && d.type === "daily");
+  if (incompleteDailies.length === 0) {
+    return jsonResponse({ needsCron: true, pendingDailies: [] });
+  }
+
+  const remoteIdSet = new Set(incompleteDailies.map((d) => d.id));
+  const { data: linked } = await ctx.adminClient
+    .from("tasks")
+    .select("id, title, habitica_task_id")
+    .eq("user_id", ctx.userId)
+    .eq("type", "daily")
+    .not("habitica_task_id", "is", null);
+
+  type LinkedRow = { id: string; title: string; habitica_task_id: string };
+  const linkedRows = (linked ?? []) as LinkedRow[];
+
+  const pendingDailies = linkedRows
+    .filter((r) => remoteIdSet.has(r.habitica_task_id))
+    .map((r) => ({ auraTaskId: r.id, title: r.title, habiticaTaskId: r.habitica_task_id }));
+
+  return jsonResponse({ needsCron: true, pendingDailies });
+}
+
+// ---------------------------------------------------------------------------
+// runCron — score any chosen yesterday's dailies then trigger Habitica's cron
+// (POST /api/v3/cron) to start the new day, then do a full syncPull.
+// ---------------------------------------------------------------------------
+async function actionRunCron(ctx: Ctx, body: Record<string, unknown>) {
+  const row = await requireIntegration(ctx);
+  const creds: HabiticaCreds = {
+    external_user_id: row.external_user_id,
+    api_token: row.api_token,
+  };
+
+  // Score any dailies the user chose to retroactively complete.
+  const toScore = Array.isArray(body.scoreTaskIds) ? (body.scoreTaskIds as string[]) : [];
+  for (const habiticaTaskId of toScore) {
+    try {
+      await scoreHabiticaTask(creds, habiticaTaskId, "up");
+    } catch {
+      // best-effort per task
+    }
+  }
+
+  // Trigger Habitica cron to start the new day.
+  try {
+    await callHabitica<unknown>("/cron", { method: "POST", body: JSON.stringify({}), creds });
+  } catch {
+    // If cron fails (already ran, rate-limit, etc.) continue to sync anyway.
+  }
+
+  // Full sync so Aura reflects the new day state (dailies reset to incomplete).
+  const summary = await persistRefresh(ctx, creds, { reconcileCompletions: true });
+
+  return jsonResponse({
+    cronRun: true,
+    habitsUpdated: summary.habitsUpdated,
+    dailiesUpdated: summary.dailiesUpdated,
+    completionsApplied: summary.completionsApplied,
+  });
+}
+
 async function actionDeleteTask(ctx: Ctx, body: Record<string, unknown>) {
   const auraTaskId = typeof body.auraTaskId === "string" ? body.auraTaskId : "";
   if (!auraTaskId) return badRequest("auraTaskId is required.");
@@ -1401,6 +1541,10 @@ Deno.serve(async (req: Request) => {
         return await actionCreateTask(ctx, body);
       case "deleteTask":
         return await actionDeleteTask(ctx, body);
+      case "checkCron":
+        return await actionCheckCron(ctx);
+      case "runCron":
+        return await actionRunCron(ctx, body);
       default:
         return badRequest(`Unknown action: ${action || "<missing>"}`);
     }

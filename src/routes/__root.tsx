@@ -24,6 +24,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { publicAsset } from "@/lib/utils";
 import { RoamingBug } from "@/components/aura/BugLoader";
+import { HabiticaDayCronModal } from "@/components/aura/HabiticaDayCronModal";
 
 const FOCUS_STAMINA_RESTORE = 15;
 
@@ -588,6 +589,7 @@ function AppGate() {
         <>
           <FocusReward />
           <StaminaRecoveryLoop />
+          <HabiticaDayCronModal />
           <PushAutoSubscribe />
           <div className="h-full flex flex-col bg-background overflow-hidden">
             <HUD />
