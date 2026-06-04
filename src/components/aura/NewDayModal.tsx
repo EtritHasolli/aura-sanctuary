@@ -85,12 +85,12 @@ export function NewDayModal() {
           </div>
         )}
 
-        <div className="border-t border-border px-4 py-3 flex justify-end">
+        <div className="border-t border-border px-4 py-3">
           <button
             type="button"
             onClick={handleStart}
             disabled={isSubmitting}
-            className="text-xs px-4 py-2 border-2 border-primary bg-primary/20 text-primary hover:bg-primary/30 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full text-xs px-4 py-2 border-2 border-primary bg-primary/20 text-primary hover:bg-primary/30 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ fontFamily: "var(--font-pixel)" }}
           >
             {isSubmitting ? "SAVING..." : "START YOUR DAY"}

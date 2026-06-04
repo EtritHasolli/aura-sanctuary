@@ -124,6 +124,8 @@ export interface Profile {
   character_state: CharacterState;
   /** Unique 8-digit code (may include leading zeros) for friend requests. Server-assigned, not editable. */
   friend_code?: string;
+  /** ISO date (YYYY-MM-DD) of the last day the new-day modal was shown. Shared across all platforms/sessions. */
+  new_day_settled_date?: string | null;
 }
 
 export interface Tag {

@@ -190,6 +190,7 @@ export type Database = {
           level: number
           max_stamina: number
           max_hp: number
+          new_day_settled_date: string | null
           path_reroll_used: boolean
           path_testing_override: boolean
           pet_name: string
@@ -224,6 +225,7 @@ export type Database = {
           level?: number
           max_stamina?: number
           max_hp?: number
+          new_day_settled_date?: string | null
           path_reroll_used?: boolean
           path_testing_override?: boolean
           pet_name?: string
@@ -258,6 +260,7 @@ export type Database = {
           level?: number
           max_stamina?: number
           max_hp?: number
+          new_day_settled_date?: string | null
           path_reroll_used?: boolean
           path_testing_override?: boolean
           pet_name?: string

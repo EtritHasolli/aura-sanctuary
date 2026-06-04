@@ -48,24 +48,33 @@ export function useNewDayModal() {
   useEffect(() => {
     if (!user || !profile || !tasks) return;
     if (checkedRef.current) return;
+    checkedRef.current = true;
 
     const tz = profile.timezone || "UTC";
     const today = calendarDateInTimeZone(tz);
-    const storageKey = `aura:new-day-modal:${user.id}:${today}`;
 
-    if (window.localStorage.getItem(storageKey) === "shown") return;
-
-    checkedRef.current = true;
-    window.localStorage.setItem(storageKey, "shown");
+    // Already settled today on any platform/session — skip
+    if (profile.new_day_settled_date === today) return;
 
     const yesterday = addCalendarDays(today, -1);
     const due = tasks.filter((t) => wasYesterdayDue(t, yesterday, tz));
 
-    if (due.length > 0) {
-      setPendingDailies(due.map((t) => ({ id: t.id, title: t.title })));
-      setOpen(true);
-    }
-  }, [user, profile, tasks]);
+    if (due.length === 0) return;
+
+    // Mark settled in DB immediately — any other platform/session will see this and skip
+    void supabase
+      .from("profiles")
+      .update({ new_day_settled_date: today })
+      .eq("id", user.id);
+
+    // Optimistically update cache so this session also skips on re-check
+    qc.setQueryData(["profile", user.id], (old: typeof profile) =>
+      old ? { ...old, new_day_settled_date: today } : old,
+    );
+
+    setPendingDailies(due.map((t) => ({ id: t.id, title: t.title })));
+    setOpen(true);
+  }, [user, profile, tasks, qc]);
 
   const markComplete = useMutation({
     mutationFn: async (ids: string[]) => {
