@@ -31,6 +31,13 @@ if ("serviceWorker" in navigator) {
       console.warn("Service worker registration failed:", err);
     });
   });
+
+  // Forward SW postMessages (e.g. notification clicks) as window events
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    if (event.data?.type === "aura:navigate") {
+      window.dispatchEvent(new CustomEvent("aura:navigate", { detail: { url: event.data.url } }));
+    }
+  });
 }
 
 const router = getRouter();

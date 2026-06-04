@@ -1352,8 +1352,8 @@ function SanctuaryPage() {
               ))}
             </div>
           </div>
-          {/* Study Call */}
-          <div className="pixel-panel p-4 space-y-3">
+          {/* Study Call — hide panel while a call is active (full-screen or PiP) */}
+          <div className={`pixel-panel p-4 space-y-3 ${callState ? "hidden" : ""}`}>
             <p className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>STUDY CALL</p>
             <p className="text-xs text-muted-foreground">Study together in a live video call.</p>
             {callError && <p className="text-xs text-destructive">{callError}</p>}

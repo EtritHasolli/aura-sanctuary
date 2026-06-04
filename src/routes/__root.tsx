@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { publicAsset } from "@/lib/utils";
 import { RoamingBug } from "@/components/aura/BugLoader";
 import { HabiticaDayCronModal } from "@/components/aura/HabiticaDayCronModal";
+import { NewDayModal } from "@/components/aura/NewDayModal";
 
 const FOCUS_STAMINA_RESTORE = 15;
 
@@ -266,19 +267,40 @@ function CustomCursorOverlay() {
 }
 
 function PersistentYouTubeAudio() {
-  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+  // baseUrl — the clean canonical URL, never mutated with runtime params
+  const [baseUrl, setBaseUrl] = useState<string | null>(null);
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [slotRect, setSlotRect] = useState<DOMRect | null>(null);
+  const [minimized, setMinimized] = useState(false);
+
+  // Drag state — offset from bottom-right of #aura-main-content
+  const [pos, setPos] = useState<{ right: number; bottom: number } | null>(null);
+  const dragState = useRef<{ startX: number; startY: number; startRight: number; startBottom: number } | null>(null);
+  const badgeDragState = useRef<{ startX: number; startY: number; startRight: number; startBottom: number } | null>(null);
+  const badgeDidDrag = useRef(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const badgeRef = useRef<HTMLButtonElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const savedTimestamp = useRef<number>(0);
+
+  // activeStartParam — only non-zero after restoring from badge; reset to 0 after one use
+  const [startParam, setStartParam] = useState<number>(0);
 
   useEffect(() => {
     const onSet = (event: Event) => {
       const custom = event as CustomEvent<{ embedUrl?: string }>;
       const url = custom.detail?.embedUrl ?? null;
-      setEmbedUrl(url);
-      if (url) window.localStorage.setItem("aura:youtube-embed-url", url);
+      if (url) {
+        setBaseUrl(url);
+        setMinimized(false);
+        setStartParam(0);
+        window.localStorage.setItem("aura:youtube-embed-url", url);
+      }
     };
     const onClear = () => {
-      setEmbedUrl(null);
+      setBaseUrl(null);
+      setStartParam(0);
+      savedTimestamp.current = 0;
       window.localStorage.removeItem("aura:youtube-embed-url");
     };
 
@@ -286,15 +308,13 @@ function PersistentYouTubeAudio() {
     window.addEventListener("aura:clear-youtube-audio", onClear);
 
     if (window.electronAPI) {
-      // YouTube not supported in desktop app — clear any stale stored URL
       window.localStorage.removeItem("aura:youtube-embed-url");
     } else {
       const saved = window.localStorage.getItem("aura:youtube-embed-url");
       if (saved) {
-        // Migrate old youtube.com embeds to youtube-nocookie.com
         const migrated = saved.replace("https://www.youtube.com/embed/", "https://www.youtube-nocookie.com/embed/");
         if (migrated !== saved) window.localStorage.setItem("aura:youtube-embed-url", migrated);
-        setEmbedUrl(migrated);
+        setBaseUrl(migrated);
       }
     }
 
@@ -304,23 +324,15 @@ function PersistentYouTubeAudio() {
     };
   }, []);
 
+  // Slot tracking for sanctuary page
   useEffect(() => {
-    if (path !== "/") {
-      setSlotRect(null);
-      return;
-    }
+    if (path !== "/") { setSlotRect(null); return; }
 
     const setRectIfChanged = (newRect: DOMRect | null) => {
       setSlotRect((prev) => {
         if (!newRect && !prev) return prev;
         if (!newRect || !prev) return newRect;
-        if (
-          prev.left === newRect.left &&
-          prev.top === newRect.top &&
-          prev.width === newRect.width &&
-          prev.height === newRect.height
-        )
-          return prev;
+        if (prev.left === newRect.left && prev.top === newRect.top && prev.width === newRect.width && prev.height === newRect.height) return prev;
         return newRect;
       });
     };
@@ -329,81 +341,279 @@ function PersistentYouTubeAudio() {
       const slot = document.getElementById("aura-youtube-slot");
       setRectIfChanged(slot ? slot.getBoundingClientRect() : null);
     };
-
     updateRect();
 
     const ro = new ResizeObserver(updateRect);
     const mo = new MutationObserver(() => {
       const slot = document.getElementById("aura-youtube-slot");
-      if (slot) {
-        mo.disconnect();
-        ro.observe(slot);
-        updateRect();
-      }
+      if (slot) { mo.disconnect(); ro.observe(slot); updateRect(); }
     });
-
     const slot = document.getElementById("aura-youtube-slot");
-    if (slot) {
-      ro.observe(slot);
-    } else {
-      mo.observe(document.body, { childList: true, subtree: true });
-    }
+    if (slot) { ro.observe(slot); } else { mo.observe(document.body, { childList: true, subtree: true }); }
 
     window.addEventListener("resize", updateRect);
     window.addEventListener("scroll", updateRect, true);
     return () => {
-      ro.disconnect();
-      mo.disconnect();
+      ro.disconnect(); mo.disconnect();
       window.removeEventListener("resize", updateRect);
       window.removeEventListener("scroll", updateRect, true);
     };
   }, [path]);
 
-  if (!embedUrl) return null;
+  // Drag handlers — only the handle bar triggers drag
+  const onHandlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
 
-  const className =
-    path === "/" && slotRect
-      ? "fixed z-50 border-2 border-border bg-black shadow-xl"
-      : "fixed bottom-16 right-2 z-50 w-[min(420px,calc(100vw-1rem))] h-[min(236px,calc((100vw-1rem)*9/16))] md:bottom-4 md:right-4 border-2 border-border bg-black shadow-xl";
+    const main = document.getElementById("aura-main-content");
+    const wrapper = wrapperRef.current;
+    if (!main || !wrapper) return;
 
-  const style =
-    path === "/" && slotRect
-      ? {
-          left: `${slotRect.left}px`,
-          top: `${slotRect.top}px`,
-          width: `${slotRect.width}px`,
-          height: `${slotRect.height}px`,
+    const mainRect = main.getBoundingClientRect();
+    const wRect = wrapper.getBoundingClientRect();
+    dragState.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startRight: mainRect.right - wRect.right,
+      startBottom: mainRect.bottom - wRect.bottom,
+    };
+  };
+
+  const onHandlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragState.current) return;
+    const main = document.getElementById("aura-main-content");
+    const wrapper = wrapperRef.current;
+    if (!main || !wrapper) return;
+
+    const dx = e.clientX - dragState.current.startX;
+    const dy = e.clientY - dragState.current.startY;
+    const mainRect = main.getBoundingClientRect();
+    const W = wrapper.offsetWidth;
+    const H = wrapper.offsetHeight;
+    setPos({
+      right: Math.max(0, Math.min(mainRect.width - W, dragState.current.startRight - dx)),
+      bottom: Math.max(0, Math.min(mainRect.height - H, dragState.current.startBottom - dy)),
+    });
+  };
+
+  const onHandlePointerUp = () => { dragState.current = null; };
+
+  // Badge drag handlers (separate from popup drag)
+  const onBadgePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    badgeDidDrag.current = false;
+    const main = document.getElementById("aura-main-content");
+    const badge = badgeRef.current;
+    if (!main || !badge) return;
+    const mainRect = main.getBoundingClientRect();
+    const bRect = badge.getBoundingClientRect();
+    badgeDragState.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startRight: mainRect.right - bRect.right,
+      startBottom: mainRect.bottom - bRect.bottom,
+    };
+  };
+
+  const onBadgePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!badgeDragState.current) return;
+    const main = document.getElementById("aura-main-content");
+    const badge = badgeRef.current;
+    if (!main || !badge) return;
+    const dx = e.clientX - badgeDragState.current.startX;
+    const dy = e.clientY - badgeDragState.current.startY;
+    if (Math.abs(dx) + Math.abs(dy) > 4) badgeDidDrag.current = true;
+    const mainRect = main.getBoundingClientRect();
+    const W = badge.offsetWidth;
+    const H = badge.offsetHeight;
+    setPos({
+      right: Math.max(0, Math.min(mainRect.width - W, badgeDragState.current.startRight - dx)),
+      bottom: Math.max(0, Math.min(mainRect.height - H, badgeDragState.current.startBottom - dy)),
+    });
+  };
+
+  const onBadgePointerUp = () => { badgeDragState.current = null; };
+
+  // Continuously sample the current time so we always have a fresh value
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      try {
+        const data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
+        if (data?.event === "infoDelivery" && typeof data?.info?.currentTime === "number") {
+          savedTimestamp.current = Math.floor(data.info.currentTime);
         }
-      : undefined;
+      } catch { /* ignore */ }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
 
-  // In Electron, use <webview> instead of <iframe>: it runs in its own renderer
-  // process so YouTube doesn't hit the window.top !== window embed block, and the
-  // useragent attribute lets us strip the "Electron/xx" string that YouTube blocks.
-  if (typeof window !== "undefined" && window.electronAPI) {
-    // Cast to any — <webview> is an Electron-specific custom element unknown to React types.
+  // Poll the iframe for current time every 2s so savedTimestamp stays fresh
+  useEffect(() => {
+    if (minimized || !iframeRef.current) return;
+    const poll = () => {
+      iframeRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: "listening" }), "*",
+      );
+      iframeRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: "command", func: "getCurrentTime", args: [] }), "*",
+      );
+    };
+    const id = window.setInterval(poll, 2000);
+    return () => window.clearInterval(id);
+  }, [minimized]);
+
+  const handleMinimize = () => setMinimized(true);
+
+  const handleClose = () => {
+    window.dispatchEvent(new Event("aura:clear-youtube-audio"));
+  };
+
+  if (!baseUrl) return null;
+
+  // Build the active iframe src from the clean baseUrl + runtime params
+  // Never store derived URLs back into state to avoid URL corruption.
+  const buildSrc = (extra: Record<string, string> = {}): string => {
+    const u = new URL(baseUrl);
+    // Always add enablejsapi so postMessage works
+    u.searchParams.set("enablejsapi", "1");
+    for (const [k, v] of Object.entries(extra)) u.searchParams.set(k, v);
+    return u.toString();
+  };
+
+  // ── Sanctuary page: render inside the slot ───────────────────────────────
+  if (path === "/" && slotRect) {
+    const slotStyle: React.CSSProperties = {
+      position: "fixed",
+      left: `${slotRect.left}px`,
+      top: `${slotRect.top}px`,
+      width: `${slotRect.width}px`,
+      height: `${slotRect.height}px`,
+      zIndex: 50,
+    };
+    const slotSrc = buildSrc(startParam ? { start: String(startParam) } : {});
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const WebView = "webview" as any;
+    if (window.electronAPI) return <WebView title="Persistent YouTube audio" src={slotSrc} style={slotStyle} className="border-2 border-border bg-black shadow-xl" useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" allowpopups="false" />;
+    return <iframe ref={iframeRef} title="Persistent YouTube audio" src={slotSrc} style={slotStyle} className="border-2 border-border bg-black shadow-xl" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" referrerPolicy="no-referrer-when-downgrade" />;
+  }
+
+  // Shared position anchor
+  const defaultRight = 16;
+  const defaultBottom = window.electronAPI ? 16 : 64;
+  const { right: posRight, bottom: posBottom } = pos ?? { right: defaultRight, bottom: defaultBottom };
+  const main = document.getElementById("aura-main-content");
+  const mainRect = main?.getBoundingClientRect();
+
+  const anchorStyle: React.CSSProperties = mainRect
+    ? {
+        position: "fixed",
+        right: `${window.innerWidth - mainRect.right + posRight}px`,
+        bottom: `${window.innerHeight - mainRect.bottom + posBottom}px`,
+        zIndex: 50,
+      }
+    : { position: "fixed", right: `${defaultRight}px`, bottom: `${defaultBottom}px`, zIndex: 50 };
+
+  // ── Minimized badge — matches Electron mini player style ─────────────────
+  if (minimized) {
     return (
-      <WebView
-        title="Persistent YouTube audio"
-        src={embedUrl}
-        className={className}
-        style={style}
-        useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
-        allowpopups="false"
-      />
+      <button
+        ref={badgeRef}
+        type="button"
+        onClick={() => {
+          if (badgeDidDrag.current) return;
+          setStartParam(savedTimestamp.current);
+          setMinimized(false);
+        }}
+        onPointerDown={onBadgePointerDown}
+        onPointerMove={onBadgePointerMove}
+        onPointerUp={onBadgePointerUp}
+        onPointerCancel={onBadgePointerUp}
+        style={{ ...anchorStyle, touchAction: "none" }}
+        className="w-14 h-14 rounded-[14px] bg-[#1a1714] border-2 border-[#40362e] shadow-[0_4px_20px_rgba(0,0,0,0.85)] flex items-center justify-center relative select-none hover:border-primary transition-colors cursor-grab active:cursor-grabbing"
+        aria-label="Restore YouTube player"
+      >
+        <img
+          src={publicAsset("aura-logo.png")}
+          alt=""
+          className="w-8 h-8"
+          style={{ imageRendering: "pixelated" }}
+        />
+        {/* Pulsing gold ring */}
+        <span
+          className="absolute -inset-1 rounded-[18px] border-2 border-primary pointer-events-none"
+          style={{ animation: "pulse-ring 2s ease-in-out infinite" }}
+        />
+      </button>
     );
   }
 
+  // ── Floating draggable popup ──────────────────────────────────────────────
+  const VW = 420;
+  const VH = Math.round(VW * 9 / 16);
+  const floatStyle: React.CSSProperties = {
+    ...anchorStyle,
+    width: `${mainRect ? Math.min(VW, mainRect.width - 8) : VW}px`,
+    height: `${mainRect ? Math.min(VH, mainRect.height - 44) + 36 : VH + 36}px`,
+    touchAction: "none",
+  };
+
+  const popupSrc = buildSrc(startParam ? { start: String(startParam) } : {});
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const WebView = "webview" as any;
+  const mediaEl = window.electronAPI
+    ? <WebView title="Persistent YouTube audio" src={popupSrc} className="w-full h-full" useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" allowpopups="false" />
+    : <iframe ref={iframeRef} title="Persistent YouTube audio" src={popupSrc} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" referrerPolicy="no-referrer-when-downgrade" />;
+
   return (
-    <iframe
-      title="Persistent YouTube audio"
-      src={embedUrl}
-      className={className}
-      style={style}
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-      referrerPolicy="no-referrer-when-downgrade"
-    />
+    <div
+      ref={wrapperRef}
+      style={floatStyle}
+      className="pixel-panel shadow-xl select-none flex flex-col bg-card"
+    >
+      {/* Handle bar — same style as AI chatbot */}
+      <div
+        className="px-3 py-2 border-b-2 border-border flex items-center justify-between shrink-0 cursor-move"
+        onPointerDown={onHandlePointerDown}
+        onPointerMove={onHandlePointerMove}
+        onPointerUp={onHandlePointerUp}
+        onPointerCancel={onHandlePointerUp}
+      >
+        <span className="text-xs text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+          YOUTUBE (DRAG)
+        </span>
+        <div className="flex items-center gap-2">
+          {/* — minimise to badge (audio keeps playing, timestamp saved) */}
+          <button
+            type="button"
+            onClick={handleMinimize}
+            title="Minimise"
+            className="text-muted-foreground hover:text-primary transition-colors leading-none"
+            style={{ fontFamily: "var(--font-pixel)", fontSize: 14 }}
+          >
+            —
+          </button>
+          {/* ✕ close — fully removes the popup */}
+          <button
+            type="button"
+            onClick={handleClose}
+            title="Close"
+            className="text-muted-foreground hover:text-destructive transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 2L12 12M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Media — full pointer events for play/pause/seek */}
+      <div className="flex-1 min-h-0">
+        {mediaEl}
+      </div>
+    </div>
   );
 }
 
@@ -546,6 +756,16 @@ function AppGate() {
     };
   }, [path]);
 
+  // Handle notification click → navigate (fired by Electron main process or SW notificationclick)
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const url = (event as CustomEvent<{ url: string }>).detail?.url;
+      if (url) void router.navigate({ to: url as "/" });
+    };
+    window.addEventListener("aura:navigate", handler);
+    return () => window.removeEventListener("aura:navigate", handler);
+  }, [router]);
+
   useDailyLoginCheckIn(user?.id ?? null, push);
   useMoonshardAwardToasts(push);
   useMonthlyStipendCheckIn(user?.id ?? null);
@@ -590,12 +810,13 @@ function AppGate() {
           <FocusReward />
           <StaminaRecoveryLoop />
           <HabiticaDayCronModal />
+          <NewDayModal />
           <PushAutoSubscribe />
           <div className="h-full flex flex-col bg-background overflow-hidden">
             <HUD />
             <div className="flex-1 flex overflow-hidden">
               <SideNav />
-              <main className="flex-1 overflow-auto pb-14 md:pb-0">
+              <main id="aura-main-content" className="flex-1 overflow-auto pb-14 md:pb-0">
                 <Outlet />
               </main>
             </div>

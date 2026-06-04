@@ -81,6 +81,18 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getBundledTracks: (): Promise<{ lofi: Array<{ name: string; path: string }>; ambient: Array<{ name: string; path: string }> }> =>
     ipcRenderer.invoke("music:get-bundled-tracks"),
 
-  showNotification: (title: string, body: string): Promise<void> =>
-    ipcRenderer.invoke("notification:show", title, body),
+  showNotification: (title: string, body: string, url?: string): Promise<void> =>
+    ipcRenderer.invoke("notification:show", title, body, url),
+
+  scheduleReminders: (
+    reminders: Array<{ id: string; title: string; msUntil: number; url: string }>,
+  ): Promise<void> => ipcRenderer.invoke("reminders:schedule", reminders),
+
+  clearReminders: (): Promise<void> => ipcRenderer.invoke("reminders:clear"),
+
+  onNotificationNavigate: (cb: (url: string) => void) => {
+    const handler = (_: unknown, url: string) => cb(url);
+    ipcRenderer.on("notification:navigate", handler);
+    return () => ipcRenderer.removeListener("notification:navigate", handler);
+  },
 });

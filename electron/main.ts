@@ -99,13 +99,60 @@ function createWindow(): BrowserWindow {
 
 // --- Window controls ---
 
-ipcMain.handle("notification:show", (_event, title: string, body: string) => {
-  if (!Notification.isSupported()) return;
-  const iconPath = isDev
+function getIconPath(): string {
+  return isDev
     ? path.join(__dirname, "../public/aura-logo.png")
     : path.join(app.getAppPath(), "dist/aura-logo.png");
-  const notif = new Notification({ title, body, icon: iconPath });
+}
+
+function showNativeNotification(title: string, body: string, url?: string) {
+  if (!Notification.isSupported()) return;
+  const notif = new Notification({ title, body, icon: getIconPath() });
+  notif.on("click", () => {
+    if (!mainWin || mainWin.isDestroyed()) return;
+    if (mainWin.isMinimized()) mainWin.restore();
+    mainWin.show();
+    mainWin.focus();
+    if (url) mainWin.webContents.send("notification:navigate", url);
+  });
   notif.show();
+}
+
+ipcMain.handle("notification:show", (_event, title: string, body: string, url?: string) => {
+  showNativeNotification(title, body, url);
+});
+
+// Scheduled reminder timers keyed by task id. The main process owns these
+// so they fire even when the window is minimized.
+const reminderTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+ipcMain.handle(
+  "reminders:schedule",
+  (_event, reminders: Array<{ id: string; title: string; msUntil: number; url: string }>) => {
+    // Clear any timers not in the new list
+    const incomingIds = new Set(reminders.map((r) => r.id));
+    for (const [id, timer] of reminderTimers) {
+      if (!incomingIds.has(id)) {
+        clearTimeout(timer);
+        reminderTimers.delete(id);
+      }
+    }
+    // Schedule new ones
+    for (const { id, title, msUntil, url } of reminders) {
+      if (reminderTimers.has(id)) continue; // already scheduled
+      if (msUntil <= 0) continue;
+      const timer = setTimeout(() => {
+        reminderTimers.delete(id);
+        showNativeNotification("⚔️ Quest Reminder", title, url);
+      }, msUntil);
+      reminderTimers.set(id, timer);
+    }
+  },
+);
+
+ipcMain.handle("reminders:clear", () => {
+  for (const timer of reminderTimers.values()) clearTimeout(timer);
+  reminderTimers.clear();
 });
 
 ipcMain.handle("window:minimize", () => mainWin?.minimize());

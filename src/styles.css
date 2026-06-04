@@ -261,6 +261,11 @@
   .glow-primary { box-shadow: 0 0 24px color-mix(in oklab, var(--sanctuary-glow) 50%, transparent); }
 }
 
+@keyframes pulse-ring {
+  0%, 100% { opacity: 0; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(1.06); }
+}
+
 @keyframes aichat-float {
   0%, 100% { transform: translateY(0px); }
   50%       { transform: translateY(-6px); }
@@ -273,51 +278,119 @@
   display: none !important;
 }
 
-/* ── Mobile: icon-only control bar ──────────────────────────────────────────── */
-@media (max-width: 767px) {
-  /* Center buttons vertically in the bar */
-  .lk-control-bar {
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 2px !important;
-    padding: 0 4px !important;
-  }
-  /* Align button-groups (mic+chevron, cam+chevron) the same as solo buttons */
-  .lk-button-group {
-    display: flex !important;
-    align-items: center !important;
-  }
-  /* Collapse text labels — SVGs are unaffected by font-size */
-  .lk-control-bar .lk-button {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    font-size: 0 !important;
-    padding: 10px 8px !important;
-    min-width: 44px !important;
-    height: 44px !important;
-    gap: 0 !important;
-  }
-  /* Buttons inside a group (mic/camera) — narrower since the chevron is beside them */
-  .lk-button-group .lk-button {
-    min-width: 32px !important;
-    padding: 10px 6px !important;
-  }
-  .lk-control-bar .lk-button svg {
-    width: 20px !important;
-    height: 20px !important;
-    flex-shrink: 0 !important;
-  }
-  /* Tighten the chevron group menu button */
-  .lk-button-group-menu {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 10px 4px !important;
-    min-width: 16px !important;
-    height: 44px !important;
-  }
+/* ── LiveKit ControlBar — Aura theme ─────────────────────────────────────────
+   Override LiveKit's default dark-blue/slate palette with our orange pixel look.
+   All colours reference CSS variables so dark/light mode is respected.        */
+
+/* Bar wrapper */
+.lk-control-bar {
+  background: var(--card) !important;
+  border-top: 2px solid var(--border) !important;
+  gap: 4px !important;
+  padding: 8px 12px !important;
 }
+
+/* Every button in the bar */
+.lk-control-bar .lk-button,
+.lk-button-group .lk-button,
+.lk-button-group-menu {
+  background: transparent !important;
+  color: var(--muted-foreground) !important;
+  border: 2px solid var(--border) !important;
+  border-radius: 0 !important;          /* pixel / square corners */
+  font-family: var(--font-pixel) !important;
+  font-size: 9px !important;
+  letter-spacing: 0.08em !important;
+  transition: color 0.15s, border-color 0.15s, background 0.15s !important;
+}
+
+.lk-control-bar .lk-button:hover,
+.lk-button-group .lk-button:hover,
+.lk-button-group-menu:hover {
+  color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  background: color-mix(in oklab, var(--primary) 12%, transparent) !important;
+}
+
+/* Active / "on" state — e.g. mic enabled, camera enabled */
+.lk-control-bar .lk-button[aria-pressed="true"],
+.lk-button-group .lk-button[aria-pressed="true"] {
+  color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  background: color-mix(in oklab, var(--primary) 15%, transparent) !important;
+}
+
+/* Muted / "off" state */
+.lk-control-bar .lk-button[aria-pressed="false"],
+.lk-button-group .lk-button[aria-pressed="false"] {
+  color: var(--muted-foreground) !important;
+  border-color: var(--border) !important;
+  background: transparent !important;
+}
+
+/* Leave button — red destructive */
+.lk-control-bar .lk-disconnect-button,
+.lk-disconnect-button {
+  color: var(--destructive) !important;
+  border-color: var(--destructive) !important;
+  background: transparent !important;
+}
+.lk-control-bar .lk-disconnect-button:hover,
+.lk-disconnect-button:hover {
+  background: color-mix(in oklab, var(--destructive) 15%, transparent) !important;
+}
+
+/* Group separator / chevron menu — must NOT clip overflow so the dropdown shows */
+.lk-button-group {
+  border: 2px solid var(--border) !important;
+  border-radius: 0 !important;
+  gap: 0 !important;
+  overflow: visible !important;
+  position: relative !important;
+}
+.lk-button-group .lk-button {
+  border: none !important;
+  border-right: 1px solid var(--border) !important;
+}
+.lk-button-group-menu {
+  border: none !important;
+  position: relative !important;
+}
+
+/* Device picker — fixed so it escapes the call's fixed inset-0 stacking context.
+   LiveKit positions it via JS so we only need to override position + z-index. */
+.lk-device-menu {
+  position: fixed !important;
+  z-index: 9999 !important;
+  bottom: auto !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  min-width: 260px !important;
+  max-width: 90vw !important;
+  background: var(--card) !important;
+  border: 2px solid var(--border) !important;
+  border-radius: 0 !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+  padding: 8px 0 !important;
+}
+
+/* Dropdown popover from chevron */
+.lk-media-device-select,
+.lk-list {
+  background: var(--card) !important;
+  border: 2px solid var(--border) !important;
+  border-radius: 0 !important;
+  color: var(--foreground) !important;
+  font-size: 12px !important;
+}
+.lk-media-device-select li:hover,
+.lk-list li:hover {
+  background: color-mix(in oklab, var(--primary) 12%, transparent) !important;
+  color: var(--primary) !important;
+}
+
+/* Mobile ControlBar is replaced by MobileControlBar in React — no CSS needed */
 
 /* ── LiveKit chat panel overrides ─────────────────────────────────────────── */
 
@@ -332,7 +405,6 @@
   grid-template-rows: 1fr auto !important;
   width: 100% !important;
   height: 100% !important;
-  /* Prevent LiveKit's @media (max-width:600px) from making this position:fixed */
   position: relative !important;
   top: auto !important;
   right: auto !important;
@@ -341,6 +413,8 @@
   max-width: 100% !important;
   background: var(--card) !important;
   border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .lk-chat-header {
@@ -355,6 +429,9 @@
   overflow-y: auto !important;
   padding: 12px !important;
   min-height: 0 !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* All entries: reset LiveKit defaults */
@@ -407,7 +484,7 @@
 /* Local: right-aligned primary bubble */
 .lk-chat-entry[data-lk-message-origin="local"] .lk-message-body {
   background: color-mix(in oklab, var(--primary) 25%, var(--card)) !important;
-  border: 1px solid color-mix(in oklab, var(--primary) 50%, transparent) !important;
+  border: none !important;
   border-bottom-right-radius: 4px !important;
 }
 
@@ -416,7 +493,12 @@
   display: flex !important;
   gap: 6px !important;
   padding: 8px !important;
-  border-top: 1px solid var(--border) !important;
+  border-top: 2px solid var(--border) !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-bottom: none !important;
+  outline: none !important;
+  box-shadow: none !important;
   background: var(--card) !important;
   max-height: none !important;
 }
@@ -515,6 +597,60 @@
 .lk-device-menu [aria-selected="true"] {
   color: var(--primary) !important;
   background: color-mix(in oklab, var(--primary) 10%, transparent) !important;
+}
+
+/* ── LiveKit participant tile — Aura theme ───────────────────────────────────
+   Override the dark overlay background, blue accent colour, and default font
+   so name labels, audio bars, and the speaking ring all use Aura's orange.   */
+
+/* Name label */
+.lk-participant-name {
+  color: var(--primary) !important;
+  font-family: var(--font-pixel) !important;
+  font-size: 10px !important;
+  letter-spacing: 0.06em !important;
+}
+
+/* Bottom metadata strip (name + audio bars) */
+.lk-participant-metadata-item {
+  background: rgba(0, 0, 0, 0.6) !important;
+  border-radius: 0 !important;   /* square corners to match Aura */
+  padding: 3px 6px !important;
+}
+
+/* Audio bar visualizer wrapper — strip LiveKit's dark background */
+.lk-audio-bar-visualizer {
+  background: transparent !important;
+  gap: 3px !important;
+}
+
+/* Audio level bars — idle state */
+.lk-audio-bar-visualizer > .lk-audio-bar,
+.lk-participant-tile .lk-audio-bar-visualizer > .lk-audio-bar {
+  background-color: color-mix(in oklab, var(--primary) 40%, transparent) !important;
+  border-radius: 2px !important;
+  width: 3px !important;
+}
+
+/* Audio level bars — speaking / highlighted state */
+.lk-audio-bar-visualizer[data-lk-va-state="speaking"] > .lk-audio-bar,
+.lk-audio-bar-visualizer > .lk-audio-bar.lk-highlighted,
+.lk-audio-bar-visualizer > [data-lk-highlighted="true"],
+.lk-participant-tile .lk-audio-bar-visualizer[data-lk-va-state="speaking"] > .lk-audio-bar {
+  background-color: var(--primary) !important;
+}
+
+/* Speaking ring — orange instead of blue */
+.lk-participant-tile[data-lk-speaking="true"]:not([data-lk-source="screen_share"])::after {
+  border-color: var(--primary) !important;
+}
+
+/* Participant tile border radius — square to match Aura */
+.lk-participant-tile {
+  border-radius: 0 !important;
+}
+.lk-participant-tile::after {
+  border-radius: 0 !important;
 }
 
 @keyframes forge-glow-pulse {

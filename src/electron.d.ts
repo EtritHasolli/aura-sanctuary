@@ -32,7 +32,10 @@ declare global {
       scanLibrary: () => Promise<{ lofi: Array<{ name: string; path: string }>; ambient: Array<{ name: string; path: string }> }>;
       revealFolder: (folderPath: string) => Promise<void>;
       getBundledTracks: () => Promise<{ lofi: Array<{ name: string; path: string }>; ambient: Array<{ name: string; path: string }> }>;
-      showNotification: (title: string, body: string) => Promise<void>;
+      showNotification: (title: string, body: string, url?: string) => Promise<void>;
+      scheduleReminders: (reminders: Array<{ id: string; title: string; msUntil: number; url: string }>) => Promise<void>;
+      clearReminders: () => Promise<void>;
+      onNotificationNavigate: (cb: (url: string) => void) => () => void;
     };
   }
 }

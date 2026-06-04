@@ -326,14 +326,16 @@ export function useHabiticaAutoSync() {
   const { user } = useAuth();
   const { data: status } = useHabiticaStatus();
   const sync = useSyncFromHabitica();
+  const syncRef = useRef(sync);
+  syncRef.current = sync;
   const firedFor = useRef<string | null>(null);
 
   useEffect(() => {
     if (!user || !status?.connected) return;
     if (firedFor.current === user.id) return;
     firedFor.current = user.id;
-    sync.mutate({ silent: true });
-  }, [user, status?.connected, sync]);
+    syncRef.current.mutate({ silent: true });
+  }, [user, status?.connected]);
 }
 
 export interface HabiticaScoreReward {
@@ -562,8 +564,8 @@ export function useHabiticaDayCron() {
       .then((result) => {
         if (result.needsCron) setCronState(result);
       })
-      .catch(() => {
-        // silent — don't block the app if this check fails
+      .catch((err) => {
+        console.warn("[HabiticaDayCron] checkCron failed:", err);
       });
   }, [user, status?.connected]);
 

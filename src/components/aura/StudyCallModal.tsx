@@ -12,9 +12,15 @@ import {
   useLayoutContext,
   useTracks,
   CarouselLayout,
+  useMediaDeviceSelect,
+  useTrackToggle,
+  useTrackMutedIndicator,
 } from "@livekit/components-react";
-import { Track } from "livekit-client";
-import { X, Check, UserPlus, Minimize2, Maximize2, Settings } from "lucide-react";
+import { Track, setLogLevel, LogLevel } from "livekit-client";
+
+// Silence LiveKit's internal debug logs in production
+setLogLevel(LogLevel.silent);
+import { X, Check, UserPlus, Minimize2, Maximize2, Settings, Mic, MicOff, Video, VideoOff } from "lucide-react";
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useFriends } from "@/hooks/useFriends";
 import { supabase } from "@/integrations/supabase/client";
@@ -74,7 +80,9 @@ function InvitePanel({ roomName }: { roomName: string }) {
         className="flex items-center gap-1.5 px-2.5 py-1 border border-border hover:border-primary bg-black/40 transition-colors"
         style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
       >
-        {codeCopied ? "COPIED!" : `CODE: ${roomName}`}
+        {codeCopied
+          ? "COPIED!"
+          : <><span className="hidden sm:inline">CODE: </span>{roomName}</>}
       </button>
 
       <div className="relative">
@@ -169,12 +177,13 @@ function SettingsModal({
   return (
     <div
       className="fixed inset-0 z-[510] flex items-center justify-center bg-black/70"
-      onMouseDown={onClose}
+      onClick={(e) => { e.stopPropagation(); onClose(); }}
+      onPointerDown={(e) => e.stopPropagation()}
     >
       <div
-        className="pixel-panel bg-card shadow-2xl"
-        style={{ width: 560 }}
-        onMouseDown={(e) => e.stopPropagation()}
+        className="pixel-panel bg-card shadow-2xl w-[min(340px,92vw)]"
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
@@ -187,36 +196,36 @@ function SettingsModal({
         </div>
 
         {/* Layout */}
-        <div className="px-6 py-5 border-b border-border">
+        <div className="px-4 py-5 border-b border-border text-center">
           <p className="text-[10px] text-muted-foreground mb-4" style={{ fontFamily: "var(--font-pixel)" }}>
             LAYOUT
           </p>
-          <div className={`flex gap-3 transition-opacity ${settings.screenshareMode === "focus" ? "opacity-40 pointer-events-none" : ""}`}>
+          <div className={`flex gap-2 justify-center transition-opacity ${settings.screenshareMode === "focus" ? "opacity-40 pointer-events-none" : ""}`}>
             {layouts.map((l) => (
               <button
                 key={l.id}
                 onClick={() => onChange({ ...settings, layout: l.id })}
-                className={`flex-1 flex flex-col items-center gap-3 py-5 border-2 transition-colors ${
+                title={l.label}
+                className={`w-14 h-14 flex items-center justify-center border-2 transition-colors ${
                   settings.layout === l.id
                     ? "border-primary text-primary bg-primary/10"
                     : "border-border hover:border-primary text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {l.icon}
-                <span className="text-[10px]" style={{ fontFamily: "var(--font-pixel)" }}>{l.label}</span>
               </button>
             ))}
           </div>
           {settings.screenshareMode === "focus" && (
-            <p className="mt-3 text-[10px] text-muted-foreground/60 italic">
+            <p className="mt-3 text-[10px] text-muted-foreground/60 italic text-center">
               Layout is overridden while "Focus screenshare" is on
             </p>
           )}
         </div>
 
         {/* Options */}
-        <div className="px-6 py-5 space-y-1">
-          <p className="text-[10px] text-muted-foreground mb-4" style={{ fontFamily: "var(--font-pixel)" }}>
+        <div className="px-4 py-5 space-y-1">
+          <p className="text-[10px] text-muted-foreground mb-4 text-center" style={{ fontFamily: "var(--font-pixel)" }}>
             OPTIONS
           </p>
 
@@ -351,10 +360,198 @@ function LocalCamPip() {
   );
 }
 
+// ── Mobile device + toggle modal ─────────────────────────────────────────────
+function MobileDeviceModal({
+  kind,
+  enabled,
+  onToggle,
+  onClose,
+}: {
+  kind: "audioinput" | "videoinput";
+  enabled: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+}) {
+  const { devices, activeDeviceId, setActiveMediaDevice } = useMediaDeviceSelect({ kind });
+  const isMic = kind === "audioinput";
+  const label = isMic ? "MICROPHONE" : "CAMERA";
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70"
+      onClick={(e) => { e.stopPropagation(); onClose(); }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <div
+        className="pixel-panel bg-card shadow-2xl w-[min(320px,90vw)]"
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b-2 border-border">
+          <span className="text-xs text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+            {label}
+          </span>
+          <button onClick={onClose} className="hover:text-destructive transition-colors p-0.5">
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Toggle on/off */}
+        <button
+          onClick={() => { onToggle(); onClose(); }}
+          className="w-full flex items-center gap-3 px-4 py-3 border-b-2 border-border text-left transition-colors hover:bg-primary/5"
+        >
+          <span className={`w-8 h-8 border-2 flex items-center justify-center shrink-0 ${
+            enabled ? "border-primary text-primary bg-primary/15" : "border-border text-muted-foreground"
+          }`}>
+            {isMic
+              ? (enabled ? <Mic size={16} /> : <MicOff size={16} />)
+              : (enabled ? <Video size={16} /> : <VideoOff size={16} />)
+            }
+          </span>
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              {enabled ? `Turn off ${isMic ? "microphone" : "camera"}` : `Turn on ${isMic ? "microphone" : "camera"}`}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Currently {enabled ? "on" : "off"}
+            </p>
+          </div>
+        </button>
+
+        {/* Device list */}
+        {devices.length > 0 && (
+          <>
+            <div className="px-4 py-2">
+              <span className="text-[10px] text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>
+                SELECT DEVICE
+              </span>
+            </div>
+            <div className="flex flex-col pb-1">
+              {devices.map((d) => (
+                <button
+                  key={d.deviceId}
+                  onClick={() => { void setActiveMediaDevice(d.deviceId); onClose(); }}
+                  className={`flex items-center gap-3 px-4 py-2.5 text-left text-sm border-t border-border transition-colors ${
+                    d.deviceId === activeDeviceId
+                      ? "text-primary bg-primary/10"
+                      : "text-foreground hover:bg-primary/5 hover:text-primary"
+                  }`}
+                >
+                  <span className={`w-3 h-3 border-2 shrink-0 flex items-center justify-center ${
+                    d.deviceId === activeDeviceId ? "border-primary bg-primary" : "border-border"
+                  }`}>
+                    {d.deviceId === activeDeviceId && <Check size={7} className="text-primary-foreground" />}
+                  </span>
+                  <span className="truncate">{d.label || (isMic ? "Microphone" : "Camera")}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Mobile control bar ───────────────────────────────────────────────────────
+// Replaces LiveKit's ControlBar on mobile with clean custom buttons.
+function MobileControlBar({ onLeave, chatOpen, onToggleChat, onOpenSettings }: {
+  onLeave: () => void;
+  chatOpen: boolean;
+  onToggleChat: () => void;
+  onOpenSettings: () => void;
+}) {
+  const { toggle: toggleMic, enabled: micEnabled } = useTrackToggle({ source: Track.Source.Microphone });
+  const { toggle: toggleCam, enabled: camEnabled } = useTrackToggle({ source: Track.Source.Camera });
+  const [deviceModal, setDeviceModal] = useState<"audioinput" | "videoinput" | null>(null);
+
+  const btn = (active: boolean, danger = false) =>
+    `w-12 h-12 flex items-center justify-center border-2 transition-colors ${
+      danger
+        ? "border-destructive text-destructive hover:bg-destructive/10"
+        : active
+          ? "border-primary text-primary bg-primary/15"
+          : "border-border text-muted-foreground hover:border-primary/50 hover:text-primary"
+    }`;
+
+  return (
+    <>
+      <div className="shrink-0 flex items-center justify-evenly gap-2 px-3 py-3 bg-card border-t-2 border-border">
+        {/* Mic — tap to open modal */}
+        <button
+          className={btn(micEnabled)}
+          onClick={() => setDeviceModal("audioinput")}
+          title="Microphone"
+        >
+          {micEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+        </button>
+
+        {/* Camera — tap to open modal */}
+        <button
+          className={btn(camEnabled)}
+          onClick={() => setDeviceModal("videoinput")}
+          title="Camera"
+        >
+          {camEnabled ? <Video size={20} /> : <VideoOff size={20} />}
+        </button>
+
+        {/* Chat toggle */}
+        <button
+          className={btn(chatOpen)}
+          onClick={onToggleChat}
+          title="Chat"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        </button>
+
+        {/* Settings — opens layout/call settings modal */}
+        <button
+          className={btn(false)}
+          onClick={onOpenSettings}
+          title="Call settings"
+        >
+          <Settings size={18} />
+        </button>
+
+        {/* Leave */}
+        <button
+          className={btn(false, true)}
+          onClick={onLeave}
+          title="Leave call"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+        </button>
+      </div>
+
+      {deviceModal && (
+        <MobileDeviceModal
+          kind={deviceModal}
+          enabled={deviceModal === "audioinput" ? micEnabled : camEnabled}
+          onToggle={deviceModal === "audioinput" ? () => toggleMic() : () => toggleCam()}
+          onClose={() => setDeviceModal(null)}
+        />
+      )}
+    </>
+  );
+}
+
 // ── Room layout ───────────────────────────────────────────────────────────────
-function RoomLayout() {
+function RoomLayout({ onLeave }: { onLeave: () => void }) {
   const [settings, setSettings] = useState<CallSettings>(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
 
   const allCameraTracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: true }],
@@ -442,20 +639,29 @@ function RoomLayout() {
           {renderVideo()}
         </div>
 
-        <div className="shrink-0 border-t border-white/10 relative">
-          <ControlBar
-            controls={{ screenShare: true, microphone: true, camera: true, chat: true, leave: true }}
+        {isMobile ? (
+          <MobileControlBar
+            onLeave={onLeave}
+            chatOpen={chatOpen}
+            onToggleChat={() => layoutCtx?.widget.dispatch?.({ msg: "toggle_chat" })}
+            onOpenSettings={() => setShowSettings(true)}
           />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <button
-              onClick={() => setShowSettings((v) => !v)}
-              title="Call settings"
-              className={`p-1.5 transition-colors ${showSettings ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <Settings size={15} />
-            </button>
+        ) : (
+          <div className="shrink-0 relative">
+            <ControlBar
+              controls={{ screenShare: true, microphone: true, camera: true, chat: true, leave: true }}
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <button
+                onClick={() => setShowSettings((v) => !v)}
+                title="Call settings"
+                className={`p-1.5 transition-colors ${showSettings ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Settings size={15} />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {showSettings && (
           <SettingsModal
@@ -470,28 +676,82 @@ function RoomLayout() {
             Mobile:  absolute bottom sheet (50% height), overlays the video
             Desktop: static side column (280px wide)               ── */}
       {chatOpen && (
-        <div className="
-          flex flex-col bg-card
-          absolute bottom-0 left-3 right-3 z-10 h-[45vh]
-          rounded-t-xl border border-border shadow-2xl overflow-hidden
-          md:static md:rounded-none md:left-auto md:right-auto md:shrink-0
-          md:border-0 md:border-l-2 md:border-border md:shadow-none md:w-[280px] md:h-auto md:z-auto md:overflow-visible
-        ">
-          {/* Close button — mobile only */}
-          <div className="md:hidden shrink-0 flex items-center justify-between px-4 py-2 border-b border-border">
-            <span className="text-xs text-muted-foreground" style={{ fontFamily: "var(--font-pixel)" }}>CHAT</span>
-            <button
-              onClick={() => layoutCtx?.widget.dispatch?.({ msg: "toggle_chat" })}
-              className="p-1 hover:text-destructive transition-colors"
+        <>
+          {/* Mobile: centered overlay */}
+          <div className="md:hidden fixed inset-0 z-20 flex items-center justify-center bg-black/60"
+            onClick={() => layoutCtx?.widget.dispatch?.({ msg: "toggle_chat" })}
+          >
+            <div
+              className="flex flex-col bg-card w-[min(320px,88vw)] h-[60vh] pixel-panel shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
             >
-              <X size={14} />
-            </button>
+              <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b-2 border-border">
+                <span className="text-xs text-primary" style={{ fontFamily: "var(--font-pixel)" }}>CHAT</span>
+                <button
+                  onClick={() => layoutCtx?.widget.dispatch?.({ msg: "toggle_chat" })}
+                  className="p-1 hover:text-destructive transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-hidden [&_.lk-chat]:h-full [&_.lk-chat]:flex [&_.lk-chat]:flex-col [&_.lk-chat]:border-none [&_.lk-chat]:outline-none [&_.lk-chat-header]:hidden [&_.lk-chat-messages]:flex-1 [&_.lk-chat-messages]:min-h-0 [&_.lk-chat-messages]:overflow-y-auto [&_.lk-chat-messages]:border-none [&_.lk-chat-form]:border-t-2 [&_.lk-chat-form]:border-border [&_.lk-empty-state]:flex [&_.lk-empty-state]:items-center [&_.lk-empty-state]:justify-center">
+                <Chat />
+              </div>
+            </div>
           </div>
-          <div className="flex-1 min-h-0 [&_.lk-chat]:h-full [&_.lk-chat]:flex [&_.lk-chat]:flex-col [&_.lk-chat-header]:hidden [&_.lk-message-input]:shrink-0 [&_.lk-chat-messages]:flex-1 [&_.lk-chat-messages]:min-h-0 [&_.lk-chat-messages]:overflow-y-auto [&_.lk-empty-state]:flex [&_.lk-empty-state]:items-center [&_.lk-empty-state]:justify-center">
+
+          {/* Desktop: static side column */}
+          <div className="hidden md:flex md:flex-col md:shrink-0 md:border-l-2 md:border-border md:w-[280px] md:h-auto md:overflow-visible">
             <Chat />
           </div>
-        </div>
+        </>
       )}
+    </div>
+  );
+}
+
+// ── Reactive mute indicator for a single track ───────────────────────────────
+function MuteIcon({ trackRef, icon }: {
+  trackRef: ReturnType<typeof useTracks>[0] | undefined;
+  icon: React.ReactNode;
+}) {
+  const { isMuted } = useTrackMutedIndicator(trackRef);
+  // Always render — full opacity when active, dimmed when muted/missing
+  return (
+    <span className={isMuted ? "opacity-25 text-muted-foreground" : "text-primary"}>
+      {icon}
+    </span>
+  );
+}
+
+// ── PiP participant status row ────────────────────────────────────────────────
+function PipParticipantStatus() {
+  const camTracks = useTracks(
+    [{ source: Track.Source.Camera, withPlaceholder: true }],
+    { onlySubscribed: false },
+  );
+  const micTracks = useTracks(
+    [{ source: Track.Source.Microphone, withPlaceholder: true }],
+    { onlySubscribed: false },
+  );
+
+  // Prefer remote participant; fall back to local so status always shows
+  const remoteCam = camTracks.find((t) => !t.participant.isLocal) ?? camTracks[0];
+  const remoteMic = micTracks.find((t) => !t.participant.isLocal) ?? micTracks[0];
+
+  if (!remoteCam && !remoteMic) return null;
+
+  const name = (remoteCam?.participant ?? remoteMic?.participant)?.name ?? "Participant";
+
+  return (
+    <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-2 py-1 bg-black/60">
+      <span className="text-[9px] text-primary truncate" style={{ fontFamily: "var(--font-pixel)" }}>
+        {name}
+      </span>
+      <div className="flex items-center gap-1">
+        <MuteIcon trackRef={remoteMic} icon={<Mic size={10} />} />
+        <MuteIcon trackRef={remoteCam} icon={<Video size={10} />} />
+      </div>
     </div>
   );
 }
@@ -511,11 +771,75 @@ function PipLayout({ onExpand, onLeave }: { onExpand: () => void; onLeave: () =>
           <button onClick={onLeave} className="hover:text-destructive p-0.5 transition-colors"><X size={11} /></button>
         </div>
       </div>
-      <div className="flex-1 min-h-0 bg-black">
+      <div className="flex-1 min-h-0 bg-black relative">
         <GridLayout tracks={tracks} style={{ height: "100%" }}>
           <ParticipantTile />
         </GridLayout>
+        <PipParticipantStatus />
       </div>
+    </div>
+  );
+}
+
+// ── Draggable PiP wrapper ─────────────────────────────────────────────────────
+function DraggablePip({
+  onExpand,
+  onLeave,
+}: {
+  onExpand: () => void;
+  onLeave: () => void;
+}) {
+  const PIP_W = 260;
+  const PIP_H = 190;
+  const PAD = 16;
+
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const dragState = useRef<{ startX: number; startY: number; startPx: number; startPy: number } | null>(null);
+  const didDrag = useRef(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Default to bottom-right corner
+  const defaultPos = () => ({
+    x: window.innerWidth - PIP_W - PAD,
+    y: window.innerHeight - PIP_H - PAD - 64, // above mobile nav
+  });
+
+  const clamp = (p: { x: number; y: number }) => ({
+    x: Math.max(0, Math.min(window.innerWidth - PIP_W, p.x)),
+    y: Math.max(0, Math.min(window.innerHeight - PIP_H, p.y)),
+  });
+
+  const { x, y } = clamp(pos ?? defaultPos());
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    didDrag.current = false;
+    dragState.current = { startX: e.clientX, startY: e.clientY, startPx: x, startPy: y };
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragState.current) return;
+    const dx = e.clientX - dragState.current.startX;
+    const dy = e.clientY - dragState.current.startY;
+    if (Math.abs(dx) + Math.abs(dy) > 3) didDrag.current = true;
+    setPos(clamp({ x: dragState.current.startPx + dx, y: dragState.current.startPy + dy }));
+  };
+
+  const onPointerUp = () => { dragState.current = null; };
+
+  return (
+    <div
+      ref={wrapperRef}
+      style={{ position: "fixed", left: x, top: y, width: PIP_W, height: PIP_H, zIndex: 520, touchAction: "none" }}
+      className="pixel-panel bg-card overflow-hidden shadow-2xl select-none"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      <PipLayout onExpand={onExpand} onLeave={onLeave} />
     </div>
   );
 }
@@ -542,14 +866,9 @@ export function StudyCallModal({
       <RoomAudioRenderer />
       <LayoutContextProvider>
         {pip ? (
-          <div
-            className="fixed bottom-6 right-6 z-[520] pixel-panel bg-card overflow-hidden shadow-2xl"
-            style={{ width: 260, height: 190 }}
-          >
-            <PipLayout onExpand={() => setPip(false)} onLeave={onLeave} />
-          </div>
+          <DraggablePip onExpand={() => setPip(false)} onLeave={onLeave} />
         ) : (
-          <div className="fixed inset-0 z-[500] flex flex-col bg-black">
+          <div className="fixed inset-0 z-[500] flex flex-col bg-background">
             <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-2 bg-card border-b-2 border-border">
               <span className="text-sm text-primary hidden md:inline" style={{ fontFamily: "var(--font-pixel)" }}>
                 STUDY CALL
@@ -570,7 +889,7 @@ export function StudyCallModal({
             </div>
 
             <div className="flex-1 min-h-0">
-              <RoomLayout />
+              <RoomLayout onLeave={onLeave} />
             </div>
           </div>
         )}
