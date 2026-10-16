@@ -45,3 +45,6 @@ release
 *.njsproj
 *.sln
 *.sw?
+
+# Personal ops notes (addresses, paths — no secrets, but not for the repo)
+RUNBOOK.local.md
