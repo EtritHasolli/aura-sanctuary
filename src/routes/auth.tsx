@@ -6,6 +6,8 @@ import { AURA_PATHS, type AuraPath } from "@/lib/aura/types";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
+import { PasswordInput } from "@/components/aura/PasswordInput";
+import { webOrigin } from "@/lib/utils";
 import swordsmanIdle from "../../characters/swordsman/idle.gif";
 import swordsmanStance from "../../characters/swordsman/stance.gif";
 import mageIdle from "../../characters/mage/idle.gif";
@@ -56,10 +58,11 @@ const dramaticByPath: Record<AuraPath, string> = {
     "You are the whisper in the dark. Malice, cunning, and betrayal are the tools of your deadly trade.",
 };
 
+type AuthMode = "signin" | "signup" | "forgot";
 type SignupPhase = "credentials" | "awaiting_path" | "profile";
 
 function AuthPage() {
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<AuthMode>("signin");
   const [signupPhase, setSignupPhase] = useState<SignupPhase>("credentials");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -131,6 +134,17 @@ function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
+      if (mode === "forgot") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: `${webOrigin()}/reset-password`,
+        });
+        if (error) throw error;
+        // Same message whether or not the account exists, so this can't be used to probe emails.
+        toast.success("If an account exists for that email, a reset link is on its way.");
+        setAuthMode("signin");
+        return;
+      }
+
       if (mode === "signup" && signupPhase === "credentials") {
         if (!email.trim() || password.length < 6) {
           toast.error("Enter a valid email and password (6+ characters).");
@@ -153,7 +167,7 @@ function AuthPage() {
               display_name: name.trim() || email.split("@")[0],
               aura_path: path as AuraPath,
             },
-            emailRedirectTo: `${window.location.origin}/`,
+            emailRedirectTo: `${webOrigin()}/`,
           },
         });
         if (error) throw error;
@@ -173,7 +187,7 @@ function AuthPage() {
     }
   }
 
-  function setAuthMode(next: "signin" | "signup") {
+  function setAuthMode(next: AuthMode) {
     setMode(next);
     setSignupPhase("credentials");
     setPath("");
@@ -276,7 +290,16 @@ function AuthPage() {
             </>
           )}
 
-          {(mode === "signin" || signupOnCredentials) && (
+          {mode === "forgot" && (
+            <p
+              className="text-[10px] text-muted-foreground leading-relaxed"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              Enter your email and we&apos;ll send you a link to choose a new password.
+            </p>
+          )}
+
+          {(mode === "signin" || mode === "forgot" || signupOnCredentials) && (
             <>
               <input
                 type="email"
@@ -291,21 +314,28 @@ function AuthPage() {
                   fontSize: "0.5625rem",
                 }}
               />
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="password"
-                className="w-full px-3 py-2.5 bg-input border-2 border-border focus:border-primary outline-none leading-snug"
-                style={{
-                  fontFamily: "var(--font-pixel)",
-                  /* rem avoids styles.css floor that forces inline 9–11px to 14px */
-                  fontSize: "0.5625rem",
-                }}
-              />
+              {mode !== "forgot" && (
+                <PasswordInput
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="password"
+                  autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                />
+              )}
             </>
+          )}
+
+          {mode === "signin" && (
+            <button
+              type="button"
+              onClick={() => setAuthMode("forgot")}
+              className="block ml-auto text-[10px] text-muted-foreground hover:text-primary"
+              style={{ fontFamily: "var(--font-pixel)" }}
+            >
+              Forgot password?
+            </button>
           )}
 
           <button
@@ -318,9 +348,11 @@ function AuthPage() {
               ? "..."
               : mode === "signin"
                 ? "ENTER"
-                : signupOnCredentials
-                  ? "CONTINUE"
-                  : "BEGIN QUEST"}
+                : mode === "forgot"
+                  ? "SEND RESET LINK"
+                  : signupOnCredentials
+                    ? "CONTINUE"
+                    : "BEGIN QUEST"}
           </button>
         </form>
 
@@ -329,7 +361,11 @@ function AuthPage() {
           className="mt-4 w-full text-xs text-muted-foreground hover:text-primary"
           style={{ fontFamily: "var(--font-pixel)" }}
         >
-          {mode === "signin" ? "» Create account" : "» I have an account"}
+          {mode === "signin"
+            ? "» Create account"
+            : mode === "forgot"
+              ? "« Back to sign in"
+              : "» I have an account"}
         </button>
       </div>
 

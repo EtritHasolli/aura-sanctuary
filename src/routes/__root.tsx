@@ -104,7 +104,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const path = useRouterState({ select: (s) => s.location.pathname });
-  const isAuth = path === "/auth";
+  const isAuth = path === "/auth" || path === "/reset-password";
   return (
     <QueryClientProvider client={queryClient}>
       <NotificationsProvider>
@@ -738,13 +738,23 @@ function AppGate() {
 
   useEffect(() => {
     if (loading) return;
-    if (!user && path !== "/auth") router.navigate({ to: "/auth" });
+    if (!user && path !== "/auth" && path !== "/reset-password") router.navigate({ to: "/auth" });
     if (user && path === "/auth") router.navigate({ to: "/" });
   }, [user, loading, path, router]);
+
+  // A password-reset link signs the user in; send them to choose a new password even if
+  // Supabase redirected to the site root (redirect URL missing from the allow list).
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") void router.navigate({ to: "/reset-password" });
+    });
+    return () => data.subscription.unsubscribe();
+  }, [router]);
 
   useEffect(() => {
     if (loading || !user || profileLoading) return;
     if (!profile) return;
+    if (path === "/reset-password") return;
     if (!profile.aura_path && path !== "/settings") {
       router.navigate({ to: "/settings" });
     }
@@ -803,7 +813,9 @@ function AppGate() {
         );
       }}
     >
-      {!user ? (
+      {path === "/reset-password" ? (
+        <Outlet />
+      ) : !user ? (
         path === "/auth" ? (
           <Outlet />
         ) : null

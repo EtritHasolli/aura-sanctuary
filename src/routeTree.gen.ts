@@ -13,6 +13,7 @@ import { Route as TavernRouteImport } from './routes/tavern'
 import { Route as SubscriptionRouteImport } from './routes/subscription'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as QuestsRouteImport } from './routes/quests'
 import { Route as MinigamesRouteImport } from './routes/minigames'
 import { Route as FriendsRouteImport } from './routes/friends'
@@ -43,6 +44,11 @@ const ShopRoute = ShopRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const QuestsRoute = QuestsRouteImport.update({
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/friends': typeof FriendsRoute
   '/minigames': typeof MinigamesRoute
   '/quests': typeof QuestsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/subscription': typeof SubscriptionRoute
@@ -130,6 +137,7 @@ export interface FileRoutesByTo {
   '/friends': typeof FriendsRoute
   '/minigames': typeof MinigamesRoute
   '/quests': typeof QuestsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/subscription': typeof SubscriptionRoute
@@ -148,6 +156,7 @@ export interface FileRoutesById {
   '/friends': typeof FriendsRoute
   '/minigames': typeof MinigamesRoute
   '/quests': typeof QuestsRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/subscription': typeof SubscriptionRoute
@@ -167,6 +176,7 @@ export interface FileRouteTypes {
     | '/friends'
     | '/minigames'
     | '/quests'
+    | '/reset-password'
     | '/settings'
     | '/shop'
     | '/subscription'
@@ -184,6 +194,7 @@ export interface FileRouteTypes {
     | '/friends'
     | '/minigames'
     | '/quests'
+    | '/reset-password'
     | '/settings'
     | '/shop'
     | '/subscription'
@@ -201,6 +212,7 @@ export interface FileRouteTypes {
     | '/friends'
     | '/minigames'
     | '/quests'
+    | '/reset-password'
     | '/settings'
     | '/shop'
     | '/subscription'
@@ -219,6 +231,7 @@ export interface RootRouteChildren {
   FriendsRoute: typeof FriendsRoute
   MinigamesRoute: typeof MinigamesRoute
   QuestsRoute: typeof QuestsRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SettingsRoute: typeof SettingsRoute
   ShopRoute: typeof ShopRoute
   SubscriptionRoute: typeof SubscriptionRoute
@@ -253,6 +266,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/quests': {
@@ -347,6 +367,7 @@ const rootRouteChildren: RootRouteChildren = {
   FriendsRoute: FriendsRoute,
   MinigamesRoute: MinigamesRoute,
   QuestsRoute: QuestsRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SettingsRoute: SettingsRoute,
   ShopRoute: ShopRoute,
   SubscriptionRoute: SubscriptionRoute,
