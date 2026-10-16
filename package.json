@@ -22,6 +22,9 @@
     "package:dir": "npm run build:renderer-electron && npm run build:electron && electron-builder --dir --config electron-builder.cjs"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
     "@cloudflare/vite-plugin": "^1.40.0",
     "@codemirror/lang-markdown": "^6.5.0",
     "@hookform/resolvers": "^5.4.0",
@@ -89,6 +92,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@eslint/js": "^9.32.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

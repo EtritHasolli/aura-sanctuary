@@ -17,6 +17,7 @@ import { HUD } from "@/components/aura/HUD";
 import { SideNav } from "@/components/aura/SideNav";
 import { AiAssistant } from "@/components/aura/AiAssistant";
 import { UpdateBar } from "@/components/aura/UpdateBar";
+import { AndroidUpdateBar } from "@/components/aura/AndroidUpdateBar";
 import { TitleBar } from "@/components/aura/TitleBar";
 import { PomodoroProvider } from "@/components/aura/PomodoroContext";
 import { NotificationsProvider, useNotifications } from "@/components/aura/NotificationsContext";
@@ -110,6 +111,7 @@ function RootComponent() {
         <div className="h-screen flex flex-col overflow-hidden">
           <TitleBar />
           <UpdateBar />
+          <AndroidUpdateBar />
           <div className="flex-1 min-h-0 relative">
             <CustomCursorOverlay />
             {!isAuth && <PersistentYouTubeAudio />}

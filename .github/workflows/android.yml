@@ -1,0 +1,87 @@
+name: Android APK
+
+# Builds the signed APK and publishes it to the fixed "android-latest" release, so the
+# download link never changes. Web changes don't need this — the app loads the live
+# Netlify site — so it only runs when the native shell itself changes.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - "capacitor.config.ts"
+      - "mobile-shell/**"
+      - "public/android-version.json"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check signing secrets
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KS" ] || [ -z "$PW" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD repository secrets are missing (see RUNBOOK.local.md)"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build signed APK
+        working-directory: android
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          AURA_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          AURA_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          AURA_KEY_ALIAS: aura
+        run: |
+          echo "$KS" | base64 -d > "$RUNNER_TEMP/aura-release.p12"
+          export AURA_KEYSTORE_FILE="$RUNNER_TEMP/aura-release.p12"
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/Aura-Sanctuary.apk"
+
+      - name: Publish to the android-latest release
+        run: |
+          version=$(node -p "require('./public/android-version.json').versionName")
+          code=$(node -p "require('./public/android-version.json').versionCode")
+          notes="Android app ${version} (build ${code}) from ${GITHUB_SHA::7}. Download Aura-Sanctuary.apk on your phone and open it to install or update."
+          # Marked as a pre-release so GitHub's "latest release" stays the desktop one:
+          # the Electron auto-updater reads that and would break if it pointed here.
+          if gh release view android-latest >/dev/null 2>&1; then
+            gh release upload android-latest Aura-Sanctuary.apk --clobber
+            gh release edit android-latest --title "Android app ${version}" --notes "$notes" --prerelease
+          else
+            gh release create android-latest Aura-Sanctuary.apk --target "$GITHUB_SHA" \
+              --title "Android app ${version}" --notes "$notes" --prerelease
+          fi
