@@ -6,6 +6,7 @@ import { AURA_PATHS, type AuraPath } from "@/lib/aura/types";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
+import { X } from "lucide-react";
 import { PasswordInput } from "@/components/aura/PasswordInput";
 import { webOrigin } from "@/lib/utils";
 import swordsmanIdle from "../../characters/swordsman/idle.gif";
@@ -66,6 +67,7 @@ function AuthPage() {
   const [signupPhase, setSignupPhase] = useState<SignupPhase>("credentials");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const emailRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [path, setPath] = useState<AuraPath | "">("");
   const [alignment, setAlignment] = useState<"good" | "evil" | null>(null);
@@ -301,19 +303,36 @@ function AuthPage() {
 
           {(mode === "signin" || mode === "forgot" || signupOnCredentials) && (
             <>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="email"
-                className="w-full px-3 py-2.5 bg-input border-2 border-border focus:border-primary outline-none leading-snug"
-                style={{
-                  fontFamily: "var(--font-pixel)",
-                  /* rem avoids styles.css floor that forces inline 9–11px to 14px */
-                  fontSize: "0.5625rem",
-                }}
-              />
+              <div className="relative">
+                <input
+                  ref={emailRef}
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="email"
+                  autoComplete="email"
+                  className="w-full pl-3 pr-10 py-2.5 bg-input border-2 border-border focus:border-primary outline-none leading-snug"
+                  style={{
+                    fontFamily: "var(--font-pixel)",
+                    /* rem avoids styles.css floor that forces inline 9–11px to 14px */
+                    fontSize: "0.5625rem",
+                  }}
+                />
+                {email && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail("");
+                      emailRef.current?.focus();
+                    }}
+                    aria-label="Clear email"
+                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-primary"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
               {mode !== "forgot" && (
                 <PasswordInput
                   required
