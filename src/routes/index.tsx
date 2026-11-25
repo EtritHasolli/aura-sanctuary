@@ -1,13 +1,15 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useNotes } from "@/hooks/useNotes";
 import { AnimatePresence, animate, motion, useMotionValue } from "framer-motion";
-import { RotateCcw, Music, SkipBack, SkipForward, Play, Pause, Square, ListMusic, Volume2, VolumeX, FolderOpen } from "lucide-react";
+import { RotateCcw, Music, SkipBack, SkipForward, Play, Pause, Square, ListMusic, Volume2, VolumeX, FolderOpen, Pencil, BookOpen } from "lucide-react";
 import { LocalMusicModal } from "@/components/aura/LocalMusicModal";
-import { StudyCallModal } from "@/components/aura/StudyCallModal";
-import { useStudyCall } from "@/hooks/useStudyCall";
+import { useStudyCallContext } from "@/components/aura/StudyCallContext";
+import { PomodoroSessionEditor } from "@/components/aura/PomodoroSessionEditor";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePomodoro } from "@/components/aura/PomodoroContext";
-import { useProfile } from "@/hooks/useProfile";
-import { useTasks, useUpdateTask, useUpdateChecklistItem } from "@/hooks/useTasks";
+import { useApplyReward, useProfile } from "@/hooks/useProfile";
+import { useTasks, useDeleteTask, useUpdateChecklistItem } from "@/hooks/useTasks";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -22,7 +24,8 @@ import {
   SANCTUARY_WANDER_MIN_STEP_PX,
 } from "@/lib/aura/sanctuaryCharacterWander";
 import { useSanctuaryIdleWander } from "@/hooks/useSanctuaryIdleWander";
-import { AURA_PATHS } from "@/lib/aura/types";
+import { AURA_PATHS, DIFFICULTY_GOLD, DIFFICULTY_XP, type Task } from "@/lib/aura/types";
+import { withGoldEquipBonus, withXpEquipBonus } from "@/lib/aura/equipmentBonuses";
 import { SanctuaryWindow } from "@/components/aura/SanctuaryWindow";
 
 export const Route = createFileRoute("/")({
@@ -130,18 +133,34 @@ function ScrollingName({ name }: { name: string }) {
 }
 
 function SanctuaryPage() {
-  const { running, mode, secondsLeft, start, pause, reset, characterState } = usePomodoro();
+  const {
+    running,
+    mode,
+    secondsLeft,
+    start,
+    pause,
+    reset,
+    characterState,
+    sessionPlan,
+    activeSessionIndex,
+    focusNoteId,
+  } = usePomodoro();
+  const { data: notes = [] } = useNotes();
+  const focusNote = focusNoteId ? notes.find((n) => n.id === focusNoteId) : undefined;
+  const [pomodoroEditorOpen, setPomodoroEditorOpen] = useState(false);
   const characterStateRef = useRef(characterState);
   characterStateRef.current = characterState;
   const { data: profile } = useProfile();
   const { data: tasks = [] } = useTasks();
-  const updateTask = useUpdateTask();
+  const deleteTask = useDeleteTask();
+  const reward = useApplyReward();
   const updateChecklist = useUpdateChecklistItem();
+  const [completingTodoIds, setCompletingTodoIds] = useState<Set<string>>(() => new Set());
   const [muted, setMuted] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Study Call
-  const { callState, isLoading: callLoading, error: callError, createCall, joinCall, leaveCall } = useStudyCall();
+  // Study Call — lives in StudyCallProvider so the call survives leaving this page.
+  const { callState, isLoading: callLoading, error: callError, createCall, joinCall } = useStudyCallContext();
   const [joinCode, setJoinCode] = useState("");
   const [showJoinInput, setShowJoinInput] = useState(false);
 
@@ -442,7 +461,33 @@ function SanctuaryPage() {
   const [dropdownMaxH, setDropdownMaxH] = useState(480);
   const [youtubeUrlInput, setYoutubeUrlInput] = useState("");
   const [youtubeEmbedUrl, setYoutubeEmbedUrl] = useState<string | null>(null);
-  const todos = tasks.filter((t) => t.type === "todo").slice(0, 8);
+  const todos = tasks.filter((t) => t.type === "todo" && !t.completed).slice(0, 8);
+
+  /**
+   * Same outcome as completing a to-do on the Quests page: rewards are granted and the
+   * to-do (plus notes created from it) is removed. Previously this only flipped
+   * `completed`, which gave no XP/gold and let the Quests page silently delete it.
+   */
+  const completeTodo = async (task: Task) => {
+    if (completingTodoIds.has(task.id) || !profile) return;
+    setCompletingTodoIds((prev) => new Set(prev).add(task.id));
+    try {
+      const xp = DIFFICULTY_XP[task.difficulty];
+      const gold = DIFFICULTY_GOLD[task.difficulty];
+      await reward.mutateAsync({ xp, gold, stat: "intelligence" });
+      await supabase.from("notes").delete().eq("source_task_id", task.id);
+      await deleteTask.mutateAsync(task.id);
+      toast.success(`+${withXpEquipBonus(xp, profile)} XP · +${withGoldEquipBonus(gold, profile)}g`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not complete quest.");
+    } finally {
+      setCompletingTodoIds((prev) => {
+        const next = new Set(prev);
+        next.delete(task.id);
+        return next;
+      });
+    }
+  };
 
   useEffect(() => {
     const audio = new Audio();
@@ -857,12 +902,26 @@ function SanctuaryPage() {
 
         {/* Pomodoro */}
         <div className="space-y-4">
-          <div className="pixel-panel p-4 md:p-6 text-center">
+          <div className="pixel-panel p-4 md:p-6 text-center relative">
+            <button
+              type="button"
+              onClick={() => setPomodoroEditorOpen(true)}
+              className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center border-2 border-border hover:border-primary text-muted-foreground hover:text-primary transition-colors"
+              title="Edit Pomodoro sessions"
+              aria-label="Edit Pomodoro sessions"
+            >
+              <Pencil size={12} />
+            </button>
             <p
               className="text-xs text-muted-foreground mb-2"
               style={{ fontFamily: "var(--font-pixel)" }}
             >
               {mode === "focus" ? "FOCUS" : "BREAK"}
+              {sessionPlan.length > 1 && (
+                <span className="ml-2 text-muted-foreground/70">
+                  · {activeSessionIndex + 1}/{sessionPlan.length}
+                </span>
+              )}
             </p>
             <div
               className="text-5xl my-4"
@@ -899,6 +958,17 @@ function SanctuaryPage() {
                 <RotateCcw size={14} />
               </button>
             </div>
+            {focusNote && (
+              <Link
+                to="/archives"
+                search={{ id: focusNote.id }}
+                className="mt-3 inline-flex max-w-full items-center gap-1.5 text-xs text-muted-foreground hover:text-primary"
+                title="Open the note you're focusing on"
+              >
+                <BookOpen size={12} className="shrink-0" />
+                <span className="truncate">Studying: {focusNote.title || "Untitled"}</span>
+              </Link>
+            )}
           </div>
 
           <div className="pixel-panel p-4">
@@ -919,19 +989,14 @@ function SanctuaryPage() {
                         {/* Pixel checkbox — blocked when steps remain */}
                         <button
                           type="button"
-                          title={!allStepsDone ? `Complete all steps first (${doneCount}/${steps.length})` : undefined}
+                          title={!allStepsDone ? `Complete all steps first (${doneCount}/${steps.length})` : "Complete quest"}
+                          disabled={completingTodoIds.has(t.id)}
                           onClick={() => {
                             if (!allStepsDone) {
                               toast.error(`Finish all steps first (${doneCount}/${steps.length} done)`);
                               return;
                             }
-                            updateTask.mutate({
-                              id: t.id,
-                              patch: {
-                                completed: !t.completed,
-                                last_completed_at: new Date().toISOString(),
-                              },
-                            });
+                            void completeTodo(t);
                           }}
                           className={`shrink-0 w-4 h-4 border-2 flex items-center justify-center transition-colors ${
                             t.completed
@@ -1359,7 +1424,7 @@ function SanctuaryPage() {
             {callError && <p className="text-xs text-destructive">{callError}</p>}
             <div className="flex flex-col gap-2">
               <button
-                onClick={() => void createCall(profile?.display_name ?? "Adventurer")}
+                onClick={() => void createCall()}
                 disabled={callLoading}
                 className="px-3 py-2 bg-primary text-primary-foreground disabled:opacity-50 w-full"
                 style={{ fontFamily: "var(--font-pixel)", fontSize: 11 }}
@@ -1381,7 +1446,7 @@ function SanctuaryPage() {
                     onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && joinCode.trim()) {
-                        void joinCall(joinCode, profile?.display_name ?? "Adventurer");
+                        void joinCall(joinCode);
                       }
                       if (e.key === "Escape") { setShowJoinInput(false); setJoinCode(""); }
                     }}
@@ -1393,7 +1458,7 @@ function SanctuaryPage() {
                   />
                   <button
                     onClick={() => {
-                      if (joinCode.trim()) void joinCall(joinCode, profile?.display_name ?? "Adventurer");
+                      if (joinCode.trim()) void joinCall(joinCode);
                     }}
                     disabled={callLoading || !joinCode.trim()}
                     className="px-3 py-1.5 bg-primary text-primary-foreground disabled:opacity-50"
@@ -1409,7 +1474,14 @@ function SanctuaryPage() {
       </div>
     </div>
 
-    {callState && <StudyCallModal callState={callState} onLeave={leaveCall} />}
+    <Dialog open={pomodoroEditorOpen} onOpenChange={setPomodoroEditorOpen}>
+      <DialogContent className="max-w-lg w-[calc(100vw-1rem)]">
+        <DialogHeader>
+          <DialogTitle style={{ fontFamily: "var(--font-pixel)" }}>POMODORO SESSIONS</DialogTitle>
+        </DialogHeader>
+        <PomodoroSessionEditor onSaved={() => setPomodoroEditorOpen(false)} />
+      </DialogContent>
+    </Dialog>
 
     {window.electronAPI && (
       <LocalMusicModal isOpen={localModalOpen} onClose={() => setLocalModalOpen(false)} />

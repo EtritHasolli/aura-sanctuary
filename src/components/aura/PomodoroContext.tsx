@@ -30,6 +30,9 @@ interface Ctx {
   updateSessionPlan: (sessions: PomodoroSession[]) => void;
   characterState: "idle" | "working" | "sleeping";
   settingsLoaded: boolean;
+  /** Archives note the user is focusing on during this Pomodoro run (cleared on reset). */
+  focusNoteId: string | null;
+  setFocusNoteId: (noteId: string | null) => void;
 }
 
 const PomodoroCtx = createContext<Ctx | null>(null);
@@ -42,9 +45,12 @@ const MIN_MINUTES = 1;
 const FOCUS_STORAGE_KEY = "aura:pomodoro-focus-minutes";
 const BREAK_STORAGE_KEY = "aura:pomodoro-break-minutes";
 const SESSION_PLAN_STORAGE_KEY = "aura:pomodoro-session-plan";
+const FOCUS_NOTE_STORAGE_KEY = "aura:pomodoro-focus-note";
 
 function sanitizeMinutes(v: number, fallback: number) {
-  if (!Number.isFinite(v)) return fallback;
+  // A missing localStorage key reads as Number(null) === 0; treat that (and any
+  // non-positive value) as "not set" instead of clamping it to a 1-minute session.
+  if (!Number.isFinite(v) || v <= 0) return fallback;
   return Math.max(MIN_MINUTES, Math.round(v));
 }
 
@@ -127,10 +133,35 @@ export function PomodoroProvider({
 
   const [running, setRunning] = useState(false);
   const [mode, setMode] = useState<Mode>("focus");
+  const [focusNoteId, setFocusNoteIdState] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : localStorage.getItem(FOCUS_NOTE_STORAGE_KEY),
+  );
+  const setFocusNoteId = (noteId: string | null) => {
+    setFocusNoteIdState(noteId);
+    if (noteId) localStorage.setItem(FOCUS_NOTE_STORAGE_KEY, noteId);
+    else localStorage.removeItem(FOCUS_NOTE_STORAGE_KEY);
+  };
   const idleTicksRef = useRef(0);
   const [isSleeping, setIsSleeping] = useState(false);
   const cbRef = useRef(onFocusComplete);
   cbRef.current = onFocusComplete;
+  /** Wall-clock end of the current phase while running. Background tabs throttle
+   *  setInterval heavily, so the countdown is derived from this, not from tick counts. */
+  const phaseEndsAtRef = useRef<number | null>(null);
+  const secondsLeftRef = useRef(secondsLeft);
+  secondsLeftRef.current = secondsLeft;
+  // The ticking interval reads the phase from refs, so a phase change is seen by the very
+  // next tick even before React re-renders (a stale closure could fire focus-complete twice).
+  const modeRef = useRef<Mode>("focus");
+  const activeIndexRef = useRef(0);
+  const sessionPlanRef = useRef(sessionPlan);
+
+  const setPhase = (nextMode: Mode, nextIndex: number) => {
+    modeRef.current = nextMode;
+    activeIndexRef.current = nextIndex;
+    setMode(nextMode);
+    setActiveSessionIndex(nextIndex);
+  };
 
   // Debounce timer for DB writes — avoid hammering on every keystroke in settings
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -156,6 +187,7 @@ export function PomodoroProvider({
       if (db) {
         setFocusMinutes(db.focusMinutes);
         setBreakMinutes(db.breakMinutes);
+        sessionPlanRef.current = db.sessionPlan;
         setSessionPlan(db.sessionPlan);
         setSecondsLeft(db.sessionPlan[0].focusMinutes * 60);
         writeLocalSettings(db); // keep local cache in sync
@@ -168,6 +200,7 @@ export function PomodoroProvider({
   // Idle / sleep detection
   useEffect(() => {
     if (!running) {
+      phaseEndsAtRef.current = null;
       idleTicksRef.current = 0;
       setIsSleeping(false);
       const t = setInterval(() => {
@@ -181,27 +214,45 @@ export function PomodoroProvider({
     }
     idleTicksRef.current = 0;
     setIsSleeping(false);
-    const t = setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s > 1) return s - 1;
-        const activeSession =
-          sessionPlan[activeSessionIndex] ?? { focusMinutes, breakMinutes };
-        if (mode === "focus") {
-          cbRef.current?.();
-          if (typeof window !== "undefined") window.dispatchEvent(new Event("aura:focus-complete"));
-          setMode("break");
-          return activeSession.breakMinutes * 60;
-        } else {
-          const nextIdx = (activeSessionIndex + 1) % sessionPlan.length;
-          const nextSession = sessionPlan[nextIdx] ?? activeSession;
-          setActiveSessionIndex(nextIdx);
-          setMode("focus");
-          return nextSession.focusMinutes * 60;
-        }
-      });
-    }, 1000);
-    return () => clearInterval(t);
-  }, [running, mode, focusMinutes, breakMinutes, sessionPlan, activeSessionIndex]);
+    phaseEndsAtRef.current ??= Date.now() + secondsLeftRef.current * 1000;
+
+    const tick = () => {
+      const endsAt = phaseEndsAtRef.current;
+      if (endsAt == null) return;
+      const remaining = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+      if (remaining > 0) {
+        setSecondsLeft(remaining);
+        return;
+      }
+      const plan = sessionPlanRef.current;
+      const index = Math.min(activeIndexRef.current, plan.length - 1);
+      let nextSeconds: number;
+      if (modeRef.current === "focus") {
+        cbRef.current?.();
+        window.dispatchEvent(new Event("aura:focus-complete"));
+        setPhase("break", index);
+        nextSeconds = plan[index].breakMinutes * 60;
+      } else {
+        const nextIdx = (index + 1) % plan.length;
+        setPhase("focus", nextIdx);
+        nextSeconds = plan[nextIdx].focusMinutes * 60;
+      }
+      phaseEndsAtRef.current = Date.now() + nextSeconds * 1000;
+      setSecondsLeft(nextSeconds);
+    };
+
+    const t = setInterval(tick, 1000);
+    // Catch up immediately when a throttled/hidden tab becomes visible again.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+    // Phase state is read through refs, so only starting/stopping re-arms the interval.
+  }, [running]);
 
   const characterState: Ctx["characterState"] =
     running && mode === "focus" ? "working" : isSleeping ? "sleeping" : "idle";
@@ -210,29 +261,34 @@ export function PomodoroProvider({
     document.documentElement.classList.toggle("theme-focused", characterState === "working");
   }, [characterState]);
 
-  const updateDurations: Ctx["updateDurations"] = ({ focusMinutes: f, breakMinutes: b }) => {
-    const nextFocus = sanitizeMinutes(f, DEFAULT_FOCUS);
-    const nextBreak = sanitizeMinutes(b, DEFAULT_BREAK);
-    const nextPlan = [{ focusMinutes: nextFocus, breakMinutes: nextBreak }];
-    setFocusMinutes(nextFocus);
-    setBreakMinutes(nextBreak);
-    setSessionPlan(nextPlan);
-    setActiveSessionIndex(0);
-    setMode("focus");
-    setSecondsLeft((current) => (running ? current : nextFocus * 60));
-    persistSettings({ focusMinutes: nextFocus, breakMinutes: nextBreak, sessionPlan: nextPlan });
-  };
-
-  const updateSessionPlan: Ctx["updateSessionPlan"] = (sessions) => {
-    const nextPlan = sanitizeSessionPlan(sessions, focusMinutes, breakMinutes);
+  /**
+   * Stopped: the timer resets to the new plan's first focus session.
+   * Running: the current phase finishes untouched and the new plan applies afterwards
+   * (resetting mode mid-phase used to show "FOCUS" while break time was counting down).
+   */
+  const applyPlan = (nextPlan: PomodoroSession[]) => {
     const first = nextPlan[0];
+    sessionPlanRef.current = nextPlan;
     setSessionPlan(nextPlan);
     setFocusMinutes(first.focusMinutes);
     setBreakMinutes(first.breakMinutes);
-    setActiveSessionIndex(0);
-    setMode("focus");
-    setSecondsLeft((current) => (running ? current : first.focusMinutes * 60));
+    if (running) {
+      setPhase(modeRef.current, Math.min(activeIndexRef.current, nextPlan.length - 1));
+    } else {
+      setPhase("focus", 0);
+      setSecondsLeft(first.focusMinutes * 60);
+    }
     persistSettings({ focusMinutes: first.focusMinutes, breakMinutes: first.breakMinutes, sessionPlan: nextPlan });
+  };
+
+  const updateDurations: Ctx["updateDurations"] = ({ focusMinutes: f, breakMinutes: b }) => {
+    applyPlan([
+      { focusMinutes: sanitizeMinutes(f, DEFAULT_FOCUS), breakMinutes: sanitizeMinutes(b, DEFAULT_BREAK) },
+    ]);
+  };
+
+  const updateSessionPlan: Ctx["updateSessionPlan"] = (sessions) => {
+    applyPlan(sanitizeSessionPlan(sessions, focusMinutes, breakMinutes));
   };
 
   const value: Ctx = {
@@ -248,14 +304,17 @@ export function PomodoroProvider({
     reset: () => {
       const first = sessionPlan[0] ?? { focusMinutes, breakMinutes };
       setRunning(false);
-      setMode("focus");
-      setActiveSessionIndex(0);
+      phaseEndsAtRef.current = null;
+      setPhase("focus", 0);
       setSecondsLeft(first.focusMinutes * 60);
+      setFocusNoteId(null);
     },
     updateDurations,
     updateSessionPlan,
     characterState,
     settingsLoaded,
+    focusNoteId,
+    setFocusNoteId,
   };
 
   return <PomodoroCtx.Provider value={value}>{children}</PomodoroCtx.Provider>;
