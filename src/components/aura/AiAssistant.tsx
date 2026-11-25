@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Send, X } from "lucide-react";
 import { publicAsset } from "@/lib/utils";
 import { useRouterState } from "@tanstack/react-router";
@@ -64,6 +64,45 @@ function AiChatIcon({ size = 48, evil = false }: { size?: number; evil?: boolean
         transition: "transform 0.15s ease, filter 0.15s ease",
       }}
     />
+  );
+}
+
+function ChatMessages({ messages, loading }: { messages: ChatMessage[]; loading: boolean }) {
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Mounts each time the chat opens, so this jumps to the newest message on open, and
+  // again whenever a message (or the "Thinking..." line) is added.
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, loading]);
+
+  return (
+    <div ref={listRef} className="h-60 md:h-72 overflow-y-auto px-3 py-2 space-y-2">
+      {messages.map((m, idx) => (
+        <div
+          key={`${idx}-${m.role}`}
+          className={`text-xs px-2 py-1.5 border ${
+            m.role === "assistant"
+              ? "bg-secondary border-border text-foreground"
+              : "bg-primary/15 border-primary text-primary"
+          }`}
+        >
+          {m.role === "assistant" ? (
+            <div className="prose prose-xs max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
+              <ReactMarkdown>{m.content}</ReactMarkdown>
+            </div>
+          ) : (
+            m.content
+          )}
+        </div>
+      ))}
+      {loading && (
+        <div className="text-xs px-2 py-1.5 border bg-secondary border-border text-muted-foreground">
+          Thinking...
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -249,31 +288,7 @@ export function AiAssistant() {
         </button>
       </div>
 
-      <div className="h-60 md:h-72 overflow-y-auto px-3 py-2 space-y-2">
-        {messages.map((m, idx) => (
-          <div
-            key={`${idx}-${m.role}`}
-            className={`text-xs px-2 py-1.5 border ${
-              m.role === "assistant"
-                ? "bg-secondary border-border text-foreground"
-                : "bg-primary/15 border-primary text-primary"
-            }`}
-          >
-            {m.role === "assistant" ? (
-              <div className="prose prose-xs max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
-                <ReactMarkdown>{m.content}</ReactMarkdown>
-              </div>
-            ) : (
-              m.content
-            )}
-          </div>
-        ))}
-        {loading && (
-          <div className="text-xs px-2 py-1.5 border bg-secondary border-border text-muted-foreground">
-            Thinking...
-          </div>
-        )}
-      </div>
+      <ChatMessages messages={messages} loading={loading} />
 
       <div className="p-2 border-t-2 border-border flex gap-2">
         <input
@@ -311,7 +326,9 @@ export function AiAssistant() {
           >
             <AiChatIcon size={80} evil={isEvil} />
           </button>
-        ) : chatPanel}
+        ) : (
+          chatPanel
+        )}
       </div>
 
       {/* ── Mobile: draggable bubble, fixed chat panel ── */}
@@ -335,9 +352,7 @@ export function AiAssistant() {
         )}
         {/* Chat panel: always fixed bottom-right, not affected by bubble position */}
         {open && (
-          <div className="fixed z-140 bottom-18 right-3 pointer-events-none">
-            {chatPanel}
-          </div>
+          <div className="fixed z-140 bottom-18 right-3 pointer-events-none">{chatPanel}</div>
         )}
       </div>
     </>

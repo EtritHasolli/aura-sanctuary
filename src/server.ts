@@ -176,7 +176,7 @@ async function handleChatbotRequest(request: Request, env: unknown): Promise<Res
     : [];
 
   const payload = {
-    model: "llama-3.3-70b-versatile",
+    model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
     temperature: 0.2,
     max_tokens: 700,
     messages: [

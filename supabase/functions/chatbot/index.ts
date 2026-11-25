@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { publishableKey } from "../_shared/keys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -83,7 +84,7 @@ Deno.serve(async (req: Request) => {
 
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      publishableKey(),
       { global: { headers: { Authorization: authHeader } } },
     );
 
@@ -137,6 +138,13 @@ Deno.serve(async (req: Request) => {
           .slice(-10)
       : [];
 
+    // Groq retires models over time (llama-3.3-70b-versatile is gone). Override without a
+    // code change by setting the GROQ_MODEL secret on the function.
+    const model = Deno.env.get("GROQ_MODEL") || "openai/gpt-oss-120b";
+    // gpt-oss models reason before answering; reasoning tokens count toward max_tokens, so
+    // keep it brief and leave headroom. The reasoning comes back separately, not in content.
+    const isReasoningModel = model.startsWith("openai/gpt-oss");
+
     const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -144,9 +152,10 @@ Deno.serve(async (req: Request) => {
         authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model,
+        ...(isReasoningModel ? { reasoning_effort: "low" } : {}),
         temperature: isEvil ? 0.5 : 0.2,
-        max_tokens: 700,
+        max_tokens: isReasoningModel ? 1200 : 700,
         messages: [
           { role: "system", content: `${AURA_APP_CONTEXT}\n${persona}\nCurrent route: ${routePath}` },
           ...safeMessages,
