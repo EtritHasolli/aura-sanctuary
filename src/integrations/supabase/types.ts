@@ -78,9 +78,11 @@ export type Database = {
           content: string
           created_at: string
           color: string | null
+          deleted_at: string | null
           id: string
           is_folder: boolean
           parent_id: string | null
+          pinned: boolean
           source_task_id: string | null
           title: string
           updated_at: string
@@ -90,9 +92,11 @@ export type Database = {
           content?: string
           created_at?: string
           color?: string | null
+          deleted_at?: string | null
           id?: string
           is_folder?: boolean
           parent_id?: string | null
+          pinned?: boolean
           source_task_id?: string | null
           title?: string
           updated_at?: string
@@ -102,9 +106,11 @@ export type Database = {
           content?: string
           created_at?: string
           color?: string | null
+          deleted_at?: string | null
           id?: string
           is_folder?: boolean
           parent_id?: string | null
+          pinned?: boolean
           source_task_id?: string | null
           title?: string
           updated_at?: string

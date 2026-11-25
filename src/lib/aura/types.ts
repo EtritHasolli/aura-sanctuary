@@ -213,6 +213,10 @@ export interface Note {
   parent_id: string | null;
   color: string | null;
   is_folder: boolean;
+  /** Optional until migration 20261125010000 is applied everywhere. */
+  pinned?: boolean;
+  /** Set when the note is in the trash; null/undefined for active notes. */
+  deleted_at?: string | null;
   created_at: string;
   updated_at: string;
 }
