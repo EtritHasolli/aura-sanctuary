@@ -1,27 +1,49 @@
 name: Keep Supabase Alive
 
-# Free-tier Supabase projects pause after ~7 days of inactivity. This pings the
-# REST API every 3 days so the project stays warm. Also runnable manually.
+# Free-tier Supabase projects pause after 7 days without database activity, and Aura has
+# no always-on backend (the web app is static on Netlify; the apps talk to Supabase
+# directly). This makes one real database query a day. Daily leaves plenty of room for
+# GitHub delaying or skipping scheduled runs. A failed run emails the repo owner.
 on:
   schedule:
-    - cron: "0 9 */3 * *" # every 3 days at 09:00 UTC
+    - cron: "17 9 * * *" # daily, 09:17 UTC (off the hour: top-of-hour runs are delayed most)
   workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: [".github/workflows/keep-alive.yml"] # runs once whenever this file changes
+
+permissions:
+  contents: read
+  actions: write # for the re-enable step below
 
 jobs:
   ping:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Ping Supabase REST API
+      - name: Query the database
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
         run: |
-          echo "Pinging Supabase to keep the project awake..."
-          code=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "apikey: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}" \
-            "${{ secrets.VITE_SUPABASE_URL }}/rest/v1/")
+          # A select on a real table, not just /rest/v1/: the root endpoint can be answered
+          # from PostgREST's schema cache without reaching Postgres. RLS hides every row from
+          # anonymous callers, so this returns [] — the query still runs, which is what counts.
+          # The publishable key goes on the apikey header only; it isn't a JWT.
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+            --retry 3 --retry-delay 10 --retry-all-errors \
+            -H "apikey: $SUPABASE_KEY" \
+            "${SUPABASE_URL%/}/rest/v1/profiles?select=id&limit=1") || code="000"
           echo "HTTP $code"
-          # Any 2xx/3xx/4xx means the server responded (project is awake).
-          # Only a network failure / 5xx is treated as a problem.
-          if [ "$code" -ge 500 ] || [ "$code" -eq 000 ]; then
-            echo "Supabase did not respond healthily (HTTP $code)"
+          if [ "$code" != "200" ]; then
+            echo "::error::Keepalive query failed (HTTP $code). Check the VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY repository secrets, and whether the project is paused."
             exit 1
           fi
-          echo "Supabase is awake."
+
+      - name: Keep this schedule from being switched off
+        # GitHub disables scheduled workflows in public repos after 60 days without
+        # repository activity. Re-enabling the workflow resets that timer, with no
+        # dummy commits.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/keep-alive.yml/enable"
