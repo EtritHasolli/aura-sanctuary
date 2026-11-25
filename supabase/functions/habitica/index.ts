@@ -10,6 +10,7 @@
 
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { publishableKey, secretKey } from "../_shared/keys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1493,8 +1494,8 @@ Deno.serve(async (req: Request) => {
     if (!authHeader) return unauthorized();
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const SUPABASE_ANON_KEY = publishableKey();
+    const SUPABASE_SERVICE_ROLE_KEY = secretKey();
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
       return serverError("Supabase environment is not fully configured.");
     }

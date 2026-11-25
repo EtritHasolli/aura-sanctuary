@@ -6,7 +6,10 @@
 # to Supabase directly), so nothing touches Postgres while nobody is using it.
 # This runs from cron on the Hetzner box and makes one real query through PostgREST.
 #
-# Config: /etc/aura-keepalive.env  (SUPABASE_URL, SUPABASE_ANON_KEY)
+# Config: /etc/aura-keepalive.env  (SUPABASE_URL, SUPABASE_ANON_KEY — set it to the
+#         publishable key, sb_publishable_…; the variable name is kept so existing env
+#         files keep working). The key goes on the apikey header only: the new keys
+#         aren't JWTs, so "Authorization: Bearer <key>" would be rejected.
 # Log:    /var/log/aura-keepalive.log  (trimmed to the last 500 lines)
 
 set -euo pipefail
@@ -26,7 +29,6 @@ url="${SUPABASE_URL%/}/rest/v1/profiles?select=id&limit=1"
 
 status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 --retry 3 --retry-delay 10 \
   -H "apikey: $SUPABASE_ANON_KEY" \
-  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
   "$url") || status="unreachable (curl exit $?)"
 
 echo "$(date -u +%FT%TZ) $status" >> "$LOG_FILE"

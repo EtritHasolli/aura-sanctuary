@@ -1,6 +1,8 @@
 -- Trigger web push whenever a notification row is inserted for a user
 -- who has at least one push subscription.
 -- Uses pg_net (enabled by default on Supabase) to call the send-push edge function.
+-- SUPERSEDED by 20261125020000_secret_key_from_vault.sql. The key that used to be inline
+-- here was a leaked legacy service_role key and has been removed from this file.
 
 CREATE OR REPLACE FUNCTION public.trigger_push_on_notification()
 RETURNS TRIGGER
@@ -27,7 +29,7 @@ BEGIN
     url     := 'https://wvuoisxjuzyaoapuofrk.supabase.co/functions/v1/send-push',
     headers := jsonb_build_object(
       'Content-Type',  'application/json',
-      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2dW9pc3hqdXp5YW9hcHVvZnJrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODA5MDI0MywiZXhwIjoyMDkzNjY2MjQzfQ.w2Ol1AQeEswXUFRosCvCcvbLqtoFqizuCw9rekzTLLc'
+      'Authorization', 'Bearer <removed: leaked legacy key, see 20261125020000_secret_key_from_vault.sql>'
     ),
     body    := jsonb_build_object(
       'user_id', NEW.user_id,

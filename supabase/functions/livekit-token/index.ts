@@ -1,4 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { publishableKey } from "../_shared/keys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,7 +47,7 @@ Deno.serve(async (req) => {
     // Verify caller is authenticated
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
+      publishableKey(),
       { global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } },
     );
     const { data: { user }, error: authErr } = await supabase.auth.getUser();

@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { isSecretKeyRequest, secretKey } from "../_shared/keys.ts";
 
 const VAPID_PUBLIC_KEY  = Deno.env.get("VAPID_PUBLIC_KEY")!;
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
@@ -123,28 +124,52 @@ async function sendOne(
   }
 }
 
+// ── Caller check ─────────────────────────────────────────────────────────────
+// Only server-side callers may push: the notifications DB trigger and send-reminders,
+// which send the project's secret API key on the `apikey` header. verify_jwt is off
+// for this function (supabase/config.toml), so this check is the gate.
+
 // ── Edge function entry ──────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type" } });
+    return new Response(null, { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type" } });
+  }
+
+  if (!isSecretKeyRequest(req)) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
   }
 
   try {
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, secretKey());
 
     const body = await req.json() as { user_id?: string; title: string; message: string; tag?: string; url?: string };
 
-    let query = supabase.from("push_subscriptions").select("endpoint, p256dh, auth");
-    if (body.user_id) query = query.eq("user_id", body.user_id);
+    // Never broadcast: every push targets exactly one user.
+    if (!body.user_id) {
+      return new Response(JSON.stringify({ error: "user_id required" }), { status: 400 });
+    }
 
-    const { data: subs, error } = await query;
+    const { data: subs, error } = await supabase
+      .from("push_subscriptions")
+      .select("endpoint, p256dh, auth")
+      .eq("user_id", body.user_id);
     console.log("subs found:", subs?.length ?? 0, "user_id:", body.user_id);
     if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500 });
 
     const results = await Promise.all(
       (subs ?? []).map(s => sendOne(s, { title: body.title, body: body.message, tag: body.tag ?? "aura", url: body.url ?? "/" }))
     );
+
+    // 404/410 mean the browser dropped the subscription — stop sending to it.
+    const gone = (subs ?? []).filter((_, i) => results[i].status === 404 || results[i].status === 410);
+    if (gone.length > 0) {
+      await supabase
+        .from("push_subscriptions")
+        .delete()
+        .eq("user_id", body.user_id)
+        .in("endpoint", gone.map((s) => s.endpoint));
+    }
 
     const sent = results.filter(r => r.ok).length;
     return new Response(JSON.stringify({ sent, total: results.length, results }), {

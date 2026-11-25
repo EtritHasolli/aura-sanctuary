@@ -14,7 +14,8 @@ chmod 755 /usr/local/bin/aura-keepalive
 if [ ! -f /etc/aura-keepalive.env ]; then
   cat > /etc/aura-keepalive.env <<'EOF'
 # Same values as VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY in the laptop .env.
-# The anon key is public (it ships in the web bundle). Never put the service-role key here.
+# The publishable key (sb_publishable_…) is public: it ships in the web bundle.
+# Never put a secret key (sb_secret_…) or the legacy service-role key here.
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
 EOF

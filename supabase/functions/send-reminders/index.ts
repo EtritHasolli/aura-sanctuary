@@ -11,16 +11,18 @@
 // is correct regardless of where the server runs.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { isSecretKeyRequest, secretKey } from "../_shared/keys.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SEND_PUSH_URL = `${SUPABASE_URL}/functions/v1/send-push`;
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Called every minute by pg_cron with the secret API key on the `apikey` header.
+// verify_jwt is off for this function (supabase/config.toml), so check the caller here.
 
 function toHHMM(date: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("en-GB", {
@@ -48,8 +50,16 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  if (!isSecretKeyRequest(req)) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
-    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const SECRET_KEY = secretKey();
+    const admin = createClient(SUPABASE_URL, SECRET_KEY);
     const now = new Date();
 
     // Fetch all tasks that have a reminder_time set and are not completed.
@@ -103,7 +113,8 @@ Deno.serve(async (req) => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+            // send-push only accepts the secret API key, on the apikey header.
+            apikey: SECRET_KEY,
           },
           body: JSON.stringify({
             user_id,

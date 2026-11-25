@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { secretKey } from "../_shared/keys.ts";
 
 const WEBHOOK_SECRET = Deno.env.get("LEMONSQUEEZY_WEBHOOK_SECRET")!;
 
@@ -84,7 +85,7 @@ Deno.serve(async (req: Request) => {
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    secretKey(),
   );
 
   // Look up the user by email. listUsers() is paginated (default 50/page), so

@@ -1,1 +1,20 @@
 project_id = "wvuoisxjuzyaoapuofrk"
+
+# Edge Function gateway JWT check (verify_jwt). Functions not listed keep the default
+# (true): chatbot, habitica, livekit-token are called by signed-in users with their
+# session token, which the gateway verifies.
+
+# Called server-to-server — by the notifications trigger and the reminders cron job —
+# with the secret API key on the `apikey` header. The new keys aren't JWTs, so the
+# gateway check is off and each function verifies the key itself
+# (isSecretKeyRequest in functions/_shared/keys.ts).
+[functions.send-push]
+verify_jwt = false
+
+[functions.send-reminders]
+verify_jwt = false
+
+# Called by Lemon Squeezy, which can't send a Supabase token; the function verifies
+# Lemon Squeezy's HMAC signature (X-Signature) instead.
+[functions.lemonsqueezy-webhook]
+verify_jwt = false

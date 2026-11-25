@@ -16,7 +16,6 @@ jobs:
           echo "Pinging Supabase to keep the project awake..."
           code=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "apikey: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}" \
             "${{ secrets.VITE_SUPABASE_URL }}/rest/v1/")
           echo "HTTP $code"
           # Any 2xx/3xx/4xx means the server responded (project is awake).
