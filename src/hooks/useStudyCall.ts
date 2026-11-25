@@ -13,6 +13,10 @@ function generateRoomCode(): string {
   return code;
 }
 
+export function normalizeRoomCode(raw: string) {
+  return raw.toUpperCase().trim();
+}
+
 export function useStudyCall() {
   const [callState, setCallState] = useState<StudyCallState | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -52,21 +56,29 @@ export function useStudyCall() {
     }
   }, [fetchToken]);
 
+  /** Resolves true once the token is fetched and the call UI is shown. */
   const joinCall = useCallback(async (roomName: string, displayName: string) => {
+    const code = normalizeRoomCode(roomName);
     setIsLoading(true);
     setError(null);
     try {
-      const token = await fetchToken(roomName.toUpperCase().trim(), displayName);
-      setCallState({ roomName: roomName.toUpperCase().trim(), token });
+      const token = await fetchToken(code, displayName);
+      setCallState({ roomName: code, token });
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not join call");
+      return false;
     } finally {
       setIsLoading(false);
     }
   }, [fetchToken]);
 
-  const leaveCall = useCallback(() => {
-    setCallState(null);
+  /**
+   * Leaves the call. With `roomName`, only leaves if that room is still the active one, so a
+   * late disconnect event from a previous room can't end a call the user just switched to.
+   */
+  const leaveCall = useCallback((roomName?: string) => {
+    setCallState((current) => (!roomName || current?.roomName === roomName ? null : current));
     setError(null);
   }, []);
 

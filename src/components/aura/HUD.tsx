@@ -2,7 +2,9 @@ import { useProfile } from "@/hooks/useProfile";
 import { useAchievements } from "@/hooks/useAchievements";
 import { useHabiticaAutoSync } from "@/hooks/useHabitica";
 import { HabiticaChip } from "./HabiticaChip";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouter } from "@tanstack/react-router";
+import { useStudyCallContext } from "./StudyCallContext";
+import { notificationDisplayText, notificationLink, studyCallCode } from "@/lib/notificationLinks";
 import {
   effectiveConstitution,
   effectiveDexterity,
@@ -114,90 +116,134 @@ function Bar({
   );
 }
 
+type NotificationTarget =
+  | { kind: "call"; code: string }
+  | { kind: "route"; to: string; search?: Record<string, string> }
+  | { kind: "href"; href: string };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function pickParams(params: URLSearchParams, keys: string[]) {
+  const out: Record<string, string> = {};
+  for (const key of keys) {
+    const value = params.get(key);
+    if (value) out[key] = value;
+  }
+  return out;
+}
+
+function targetForMessage(message: string): NotificationTarget | null {
+  const callCode = studyCallCode(message);
+  if (callCode) return { kind: "call", code: callCode };
+
+  const link = notificationLink(message);
+  if (link?.path === "/tavern") {
+    return { kind: "route", to: "/tavern", search: pickParams(link.params, ["party", "invite", "message"]) };
+  }
+  if (link?.path === "/friends") {
+    const search = pickParams(link.params, ["invite", "friend", "message"]);
+    const friendCode = link.params.get("friendCode") ?? "";
+    if (/^\d{8}$/.test(friendCode)) search.friendCode = friendCode;
+    return { kind: "route", to: "/friends", search };
+  }
+  if (link) return { kind: "href", href: link.href };
+
+  const lower = message.toLowerCase();
+  if (lower.includes("friend request")) return { kind: "route", to: "/friends" };
+  const barePartyId = message.match(/\b([0-9a-f-]{36})\b/i)?.[1];
+  if (barePartyId && UUID_RE.test(barePartyId)) {
+    return { kind: "route", to: "/tavern", search: { party: barePartyId } };
+  }
+  if (lower.includes("party")) return { kind: "route", to: "/tavern" };
+  return null;
+}
+
 function NotificationsBell() {
-  const { notifications, unread, deleteOne, clear } = useNotifications();
+  const { notifications, unread, markRead, markAllRead, deleteOne, clear } = useNotifications();
+  const { joinCall } = useStudyCallContext();
   const [open, setOpen] = useState(false);
   const [allOpen, setAllOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const router = useRouter();
+
+  // Whatever was on screen while the panel was open counts as seen once it closes.
+  const wasShowingRef = useRef(false);
+  useEffect(() => {
+    const showing = open || allOpen;
+    if (wasShowingRef.current && !showing && unread > 0) markAllRead();
+    wasShowingRef.current = showing;
+  }, [open, allOpen, unread, markAllRead]);
 
   const toggle = () => setOpen((o) => !o);
 
-  const targetForMessage = (
-    message: string,
-  ): { to: string; search?: Record<string, string> } | null => {
-    const lower = message.toLowerCase();
-    const tavernMatch = message.match(/\/tavern\?([^\s]+)/i);
-    if (tavernMatch) {
-      const params = new URLSearchParams(tavernMatch[1]);
-      const party = params.get("party") ?? undefined;
-      const invite = params.get("invite") ?? undefined;
-      const msg = params.get("message") ?? undefined;
-      return {
-        to: "/tavern",
-        search: {
-          ...(party ? { party } : {}),
-          ...(invite ? { invite } : {}),
-          ...(msg ? { message: msg } : {}),
-        },
-      };
-    }
-    const friendMatch = message.match(/\/friends\?([^\s]+)/i);
-    if (friendMatch) {
-      const params = new URLSearchParams(friendMatch[1]);
-      const invite = params.get("invite") ?? undefined;
-      const friendCodeRaw = params.get("friendCode") ?? "";
-      const friendCode = /^\d{8}$/.test(friendCodeRaw) ? friendCodeRaw : undefined;
-      const friend = params.get("friend") ?? undefined;
-      const msg = params.get("message") ?? undefined;
-      return {
-        to: "/friends",
-        search: {
-          ...(invite ? { invite } : {}),
-          ...(friendCode ? { friendCode } : {}),
-          ...(friend ? { friend } : {}),
-          ...(msg ? { message: msg } : {}),
-        },
-      };
-    }
-    const inviteMatch = message.match(/\/tavern\?invite=([0-9a-f-]{36})/i);
-    if (inviteMatch) {
-      return { to: "/tavern", search: { invite: inviteMatch[1] } };
-    }
-    const barePartyId = message.match(
-      /\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/i,
-    );
-    if (barePartyId) {
-      return { to: "/tavern", search: { party: barePartyId[1] } };
-    }
-    if (lower.includes("friend request") || lower.includes("accepted your friend request")) {
-      return { to: "/friends" };
-    }
-    if (lower.includes("party")) {
-      return { to: "/tavern" };
-    }
-    return null;
-  };
-
-  const displayMessage = (message: string) =>
-    message.replace(/\s*\/(?:tavern|friends)\?[^\s]+/gi, "").trim();
-
-  const onNotificationClick = (message: string) => {
-    const target = targetForMessage(message);
+  const onNotificationClick = (n: (typeof notifications)[number]) => {
+    markRead(n.id);
+    const target = targetForMessage(n.message);
     if (!target) return;
     setOpen(false);
     setAllOpen(false);
-    void navigate({ to: target.to, search: target.search });
+    if (target.kind === "call") void joinCall(target.code);
+    else if (target.kind === "route") void navigate({ to: target.to, search: target.search });
+    else router.history.push(target.href);
   };
 
-  const notificationClass = (type: (typeof notifications)[number]["type"], clickable: boolean) =>
-    `px-2 py-1.5 border-l-2 text-xs transition-colors ${
-      type === "success"
+  const notificationClass = (n: (typeof notifications)[number], clickable: boolean) =>
+    `relative pl-2 pr-7 py-1.5 border-l-2 text-xs transition-colors ${
+      n.type === "success"
         ? "border-primary text-primary"
-        : type === "warning"
+        : n.type === "warning"
           ? "border-[color:var(--color-gold)] text-[color:var(--color-gold)]"
           : "border-accent text-foreground"
-    } ${clickable ? "cursor-pointer hover:bg-secondary/50" : ""}`;
+    } ${n.read ? "opacity-70" : "bg-secondary/40"} ${clickable ? "cursor-pointer hover:bg-secondary/60" : ""}`;
+
+  const targetLabel = (target: NotificationTarget | null) =>
+    target?.kind === "call" ? "Join study call" : target ? "Open related page" : undefined;
+
+  const renderTime = (at: number, withDate: boolean) =>
+    new Date(at).toLocaleString(
+      [],
+      withDate
+        ? { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" }
+        : { hour: "2-digit", minute: "2-digit" },
+    );
+
+  const renderItem = (n: (typeof notifications)[number], withDate: boolean) => {
+    const target = targetForMessage(n.message);
+    return (
+      <div
+        key={n.id}
+        className={`group ${notificationClass(n, !!target)}`}
+        style={{ fontFamily: "var(--font-display)" }}
+        onClick={() => onNotificationClick(n)}
+        title={targetLabel(target)}
+      >
+        {!n.read && (
+          <span className="absolute right-2 top-2 w-1.5 h-1.5 bg-destructive group-hover:hidden" aria-label="Unread" />
+        )}
+        {notificationDisplayText(n.message)}
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
+          <span>{renderTime(n.at, withDate)}</span>
+          {target?.kind === "call" && (
+            <span className="text-primary" style={{ fontFamily: "var(--font-pixel)", fontSize: 8 }}>
+              ▶ CLICK TO JOIN
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            void deleteOne(n.id);
+          }}
+          className="absolute right-1.5 top-1.5 hidden group-hover:block text-muted-foreground hover:text-destructive"
+          title="Delete notification"
+        >
+          <X size={13} />
+        </button>
+      </div>
+    );
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -235,6 +281,18 @@ function NotificationsBell() {
             </span>
             {notifications.length > 0 && (
               <div className="flex items-center gap-2">
+                {unread > 0 && (
+                  <>
+                    <button
+                      onClick={markAllRead}
+                      className="text-[8px] text-muted-foreground hover:text-primary"
+                      style={{ fontFamily: "var(--font-pixel)" }}
+                    >
+                      READ ALL
+                    </button>
+                    <span className="h-3 border-l-2 border-border" aria-hidden="true" />
+                  </>
+                )}
                 <button
                   onClick={() => {
                     setAllOpen(true);
@@ -262,20 +320,7 @@ function NotificationsBell() {
             </p>
           ) : (
             <div className="space-y-1 max-h-60 overflow-y-auto">
-              {notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className={notificationClass(n.type, !!targetForMessage(n.message))}
-                  style={{ fontFamily: "var(--font-display)" }}
-                  onClick={() => onNotificationClick(n.message)}
-                  title={targetForMessage(n.message) ? "Open related page" : undefined}
-                >
-                  {displayMessage(n.message)}
-                  <div className="text-[10px] text-muted-foreground mt-0.5">
-                    {new Date(n.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                </div>
-              ))}
+              {notifications.map((n) => renderItem(n, false))}
             </div>
           )}
         </div>
@@ -291,39 +336,7 @@ function NotificationsBell() {
             </p>
           ) : (
             <div className="max-h-[65vh] overflow-y-auto space-y-1 pr-1">
-              {notifications.map((n) => {
-                const target = targetForMessage(n.message);
-                return (
-                  <div
-                    key={n.id}
-                    className={`group relative pr-9 ${notificationClass(n.type, !!target)}`}
-                    style={{ fontFamily: "var(--font-display)" }}
-                    onClick={() => onNotificationClick(n.message)}
-                    title={target ? "Open related page" : undefined}
-                  >
-                    {displayMessage(n.message)}
-                    <div className="text-[10px] text-muted-foreground mt-0.5">
-                      {new Date(n.at).toLocaleString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void deleteOne(n.id);
-                      }}
-                      className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
-                      title="Delete notification"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                );
-              })}
+              {notifications.map((n) => renderItem(n, true))}
             </div>
           )}
         </DialogContent>

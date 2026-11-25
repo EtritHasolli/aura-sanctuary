@@ -21,6 +21,7 @@ import { AndroidUpdateBar } from "@/components/aura/AndroidUpdateBar";
 import { TitleBar } from "@/components/aura/TitleBar";
 import { PomodoroProvider } from "@/components/aura/PomodoroContext";
 import { NotificationsProvider, useNotifications } from "@/components/aura/NotificationsContext";
+import { StudyCallProvider } from "@/components/aura/StudyCallContext";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { publicAsset } from "@/lib/utils";
@@ -768,11 +769,12 @@ function AppGate() {
     };
   }, [path]);
 
-  // Handle notification click → navigate (fired by Electron main process or SW notificationclick)
+  // Handle notification click → navigate (fired by Electron main process or SW notificationclick).
+  // history.push parses the query string; navigate({ to }) would treat "?party=…" as part of the path.
   useEffect(() => {
     const handler = (event: Event) => {
       const url = (event as CustomEvent<{ url: string }>).detail?.url;
-      if (url) void router.navigate({ to: url as "/" });
+      if (url && url.startsWith("/")) router.history.push(url);
     };
     window.addEventListener("aura:navigate", handler);
     return () => window.removeEventListener("aura:navigate", handler);
@@ -798,17 +800,10 @@ function AppGate() {
   return (
     <PomodoroProvider
       onFocusComplete={() => {
-        const focusStatLabel =
-          profile?.aura_path === "swordsman"
-            ? "STR"
-            : profile?.aura_path === "tank"
-              ? "CON"
-              : profile?.aura_path === "rogue"
-                ? "DEX"
-                : "INT";
-        toast.success(`+10 ${focusStatLabel} — focus complete!`);
+        const focusStatLabel = FOCUS_STAT_LABEL[focusStatForPath(profile?.aura_path)];
+        toast.success(`+10 XP · +1 ${focusStatLabel} — focus complete!`);
         push(
-          `Focus session complete! +10 ${focusStatLabel} +3 gold +${FOCUS_STAMINA_RESTORE} stamina`,
+          `Focus session complete! +10 XP +1 ${focusStatLabel} +3 gold +${FOCUS_STAMINA_RESTORE} stamina`,
           "success",
         );
       }}
@@ -820,7 +815,7 @@ function AppGate() {
           <Outlet />
         ) : null
       ) : (
-        <>
+        <StudyCallProvider>
           <FocusReward />
           <StaminaRecoveryLoop />
           <HabiticaDayCronModal />
@@ -836,27 +831,45 @@ function AppGate() {
             </div>
             <AiAssistant />
           </div>
-        </>
+        </StudyCallProvider>
       )}
     </PomodoroProvider>
   );
 }
 
-// Awards INT + XP whenever a focus cycle completes
+type FocusStat = "strength" | "intelligence" | "constitution" | "dexterity";
+const FOCUS_STAT_LABEL: Record<FocusStat, string> = {
+  strength: "STR",
+  intelligence: "INT",
+  constitution: "CON",
+  dexterity: "DEX",
+};
+
+/** A focus session trains the path's primary stat (evil paths mirror their good counterpart). */
+function focusStatForPath(path: string | null | undefined): FocusStat {
+  switch (path) {
+    case "swordsman":
+    case "evilswordsman":
+      return "strength";
+    case "tank":
+    case "evilpaladin":
+      return "constitution";
+    case "rogue":
+    case "evilrogue":
+      return "dexterity";
+    default:
+      return "intelligence";
+  }
+}
+
+// Awards XP + the path's primary stat whenever a focus cycle completes
 function FocusReward() {
   const reward = useApplyReward();
   const { data: profile } = useProfile();
   // capture function via state-less effect: re-mount provider would call onFocusComplete prop;
   // simpler: subscribe via a tiny event
   useEffect(() => {
-    const statByPath =
-      profile?.aura_path === "swordsman"
-        ? "strength"
-        : profile?.aura_path === "tank"
-          ? "constitution"
-          : profile?.aura_path === "rogue"
-            ? "dexterity"
-            : "intelligence";
+    const statByPath = focusStatForPath(profile?.aura_path);
     const handler = () =>
       reward.mutate({ xp: 10, gold: 3, stamina: FOCUS_STAMINA_RESTORE, stat: statByPath });
     window.addEventListener("aura:focus-complete", handler);

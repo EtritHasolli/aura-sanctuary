@@ -11,8 +11,27 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
 
+/**
+ * `navigator.serviceWorker.ready` never settles when no worker gets registered
+ * (e.g. registration failed), which left the toggle stuck on "loading".
+ */
+async function getRegistration(timeoutMs = 8000): Promise<ServiceWorkerRegistration | null> {
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+  ]);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const pushSubs = () => (supabase as any).from("push_subscriptions");
+
 export type PushStatus = "unsupported" | "denied" | "prompt" | "subscribed" | "loading";
 
+/**
+ * Web push for this browser. Each device keeps its own row in push_subscriptions
+ * (unique per user + endpoint), so enabling or disabling here never touches the
+ * user's other devices.
+ */
 export function usePushNotifications() {
   const { user } = useAuth();
   const [status, setStatus] = useState<PushStatus>("loading");
@@ -24,34 +43,30 @@ export function usePushNotifications() {
     }
     if (Notification.permission === "denied") { setStatus("denied"); return; }
 
-    const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.getSubscription();
+    const reg = await getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
 
     if (!sub) {
       setStatus("prompt");
       return;
     }
 
-    // Browser has a subscription — verify the DB also has it so the push trigger
-    // can fire. Self-heals if a previous subscribe() wrote to the browser but
-    // failed to write to the DB.
+    // Browser has a subscription — make sure the DB has this exact endpoint so the
+    // push trigger can reach it. Self-heals a subscribe() that failed half way.
     if (user) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: dbSub } = await (supabase as any)
-        .from("push_subscriptions")
-        .select("endpoint")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (!dbSub) {
-        const json = sub.toJSON();
-        const p256dh = json.keys?.p256dh;
-        const auth = json.keys?.auth;
-        if (json.endpoint && p256dh && auth) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (supabase as any).from("push_subscriptions").upsert(
+      const json = sub.toJSON();
+      const p256dh = json.keys?.p256dh;
+      const auth = json.keys?.auth;
+      if (json.endpoint && p256dh && auth) {
+        const { data: dbSub } = await pushSubs()
+          .select("endpoint")
+          .eq("user_id", user.id)
+          .eq("endpoint", json.endpoint)
+          .maybeSingle();
+        if (!dbSub) {
+          await pushSubs().upsert(
             { user_id: user.id, endpoint: json.endpoint, p256dh, auth },
-            { onConflict: "user_id,endpoint" }
+            { onConflict: "user_id,endpoint" },
           );
         }
       }
@@ -69,13 +84,16 @@ export function usePushNotifications() {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") { setStatus("denied"); return false; }
 
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await getRegistration();
+      if (!reg) throw new Error("Service worker not available");
 
       // Clear any existing subscription first. A stale subscription registered
-      // under a different VAPID key would cause subscribe() to throw, leaving
-      // the browser holding a subscription that doesn't match the DB.
+      // under a different VAPID key would cause subscribe() to throw.
       const existing = await reg.pushManager.getSubscription();
-      if (existing) await existing.unsubscribe();
+      if (existing) {
+        await pushSubs().delete().eq("user_id", user.id).eq("endpoint", existing.endpoint);
+        await existing.unsubscribe();
+      }
 
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
@@ -94,16 +112,10 @@ export function usePushNotifications() {
         return false;
       }
 
-      // Remove all old subscriptions for this user first, then insert fresh
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from("push_subscriptions").delete().eq("user_id", user.id);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any).from("push_subscriptions").insert({
-        user_id: user.id,
-        endpoint,
-        p256dh,
-        auth,
-      });
+      const { error } = await pushSubs().upsert(
+        { user_id: user.id, endpoint, p256dh, auth },
+        { onConflict: "user_id,endpoint" },
+      );
 
       if (error) throw error;
       setStatus("subscribed");
@@ -119,11 +131,12 @@ export function usePushNotifications() {
     if (!user) return false;
     setStatus("loading");
     try {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from("push_subscriptions").delete().eq("user_id", user.id);
-      if (sub) await sub.unsubscribe();
+      const reg = await getRegistration();
+      const sub = await reg?.pushManager.getSubscription();
+      if (sub) {
+        await pushSubs().delete().eq("user_id", user.id).eq("endpoint", sub.endpoint);
+        await sub.unsubscribe();
+      }
       setStatus("prompt");
       return true;
     } catch (e) {

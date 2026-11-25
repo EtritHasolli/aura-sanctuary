@@ -20,6 +20,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useMessageUnreadCounts } from "@/hooks/useMessageUnreadCounts";
 import { useNotifications } from "@/components/aura/NotificationsContext";
+import { notificationSection } from "@/lib/notificationLinks";
 import { useIsAdmin } from "@/hooks/useProfile";
 import { useState } from "react";
 
@@ -48,9 +49,8 @@ function useUnreadCounts() {
   const sectionNotifs = notifications.reduce(
     (acc, n) => {
       if (n.read) return acc;
-      const msg = n.message.toLowerCase();
-      if (msg.includes("/tavern?") || msg.includes("tavern") || msg.includes("party")) acc.tavern += 1;
-      else if (msg.includes("/friends?") || msg.includes("friend")) acc.friends += 1;
+      const section = notificationSection(n.message);
+      if (section) acc[section] += 1;
       return acc;
     },
     { friends: 0, tavern: 0 },
