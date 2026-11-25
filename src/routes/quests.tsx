@@ -356,6 +356,7 @@ function TaskRow({
   stat: "strength" | "intelligence" | "constitution";
   notes: Note[];
 }) {
+  const qc = useQueryClient();
   const update = useUpdateTask();
   const updateNote = useUpdateNote();
   const del = useDeleteTask();

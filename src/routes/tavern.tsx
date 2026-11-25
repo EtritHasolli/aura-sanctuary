@@ -468,9 +468,10 @@ function TavernPage() {
       .from("chat_messages")
       .select("*")
       .eq("party_id", partyId)
-      .order("created_at", { ascending: true })
+      // Newest 100, shown oldest-first (ascending + limit returned the party's first 100 ever).
+      .order("created_at", { ascending: false })
       .limit(100);
-    setMessages((msgs ?? []) as ChatMsg[]);
+    setMessages(((msgs ?? []) as ChatMsg[]).reverse());
     const { data: memberRows } = await supabase
       .from("party_members")
       .select("user_id")

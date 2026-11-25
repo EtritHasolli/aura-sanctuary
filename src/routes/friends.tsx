@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { Users } from "lucide-react";
 import {
@@ -15,7 +15,7 @@ import {
 } from "@/hooks/useFriends";
 import { getItemIconUrl } from "@/hooks/useShop";
 import { CompanionSprite } from "@/components/aura/CompanionSprite";
-import { xpForLevel, type Profile } from "@/lib/aura/types";
+import { AURA_PATHS, xpForLevel, type Profile } from "@/lib/aura/types";
 import { pathCharacterSpriteSrc } from "@/lib/aura/pathCharacterSprites";
 import {
   effectiveConstitution,
@@ -25,7 +25,12 @@ import {
 } from "@/lib/aura/equipmentBonuses";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
-import { useMarkMessageScopeRead } from "@/hooks/useMessageUnreadCounts";
+import { useMarkMessageScopeRead, useMessageUnreadCounts } from "@/hooks/useMessageUnreadCounts";
+import {
+  isFriendRequestNotification,
+  notificationFriendId,
+  notificationLink,
+} from "@/lib/notificationLinks";
 import { useFriendHabiticaProfile } from "@/hooks/useHabitica";
 import { HabiticaProfileDetails } from "@/components/aura/HabiticaChip";
 import { useNotifications } from "@/components/aura/NotificationsContext";
@@ -52,6 +57,22 @@ export const Route = createFileRoute("/friends")({
   }),
   component: FriendsPage,
 });
+
+const GOOD_PATH_COLORS: Record<string, string> = {
+  swordsman: "#d97706",
+  mage: "#2563eb",
+  rogue: "#a21caf",
+  tank: "#15803d",
+};
+const EVIL_PATH_COLOR = "#dc2626";
+
+function pathBadge(path: string): { label: string; color: string } {
+  const info = AURA_PATHS.find((p) => p.id === path);
+  return {
+    label: (info?.label ?? path).toUpperCase(),
+    color: info?.alignment === "evil" ? EVIL_PATH_COLOR : (GOOD_PATH_COLORS[path] ?? "#15803d"),
+  };
+}
 
 /** Match HUD-style path portrait crop (head-focused). */
 const FRIEND_PATH_HEAD_SCALE = 3.5;
@@ -104,7 +125,9 @@ function FriendsPage() {
   const acceptFriendRequest = useAcceptFriendRequest();
   const declineFriendRequest = useDeclineFriendRequest();
   const markMessageScopeRead = useMarkMessageScopeRead();
-  const { notifications, markFriendMessagesRead } = useNotifications();
+  const { notifications, markMatchingRead } = useNotifications();
+  const { data: unreadCounts } = useMessageUnreadCounts();
+  const navigate = useNavigate();
   const [copiedCode, setCopiedCode] = useState(false);
   const [showEmailInvite, setShowEmailInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -117,7 +140,12 @@ function FriendsPage() {
   const [selectedInvitePartyId, setSelectedInvitePartyId] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const markMessageScopeReadRef = useRef(markMessageScopeRead);
-  const markFriendMessagesReadRef = useRef(markFriendMessagesRead);
+  /** Marks every notification about this friend (chat messages, call invites) as read. */
+  const markFriendNotificationsRead = useCallback(
+    (friendId: string) => markMatchingRead((message) => notificationFriendId(message) === friendId),
+    [markMatchingRead],
+  );
+  const markFriendMessagesReadRef = useRef(markFriendNotificationsRead);
   const INVITE_PROCESSED_KEY = "friendInviteProcessed";
   const FRIEND_CODE_PROCESSED_KEY = "friendCodeInviteProcessed";
 
@@ -126,8 +154,26 @@ function FriendsPage() {
   }, [markMessageScopeRead]);
 
   useEffect(() => {
-    markFriendMessagesReadRef.current = markFriendMessagesRead;
-  }, [markFriendMessagesRead]);
+    markFriendMessagesReadRef.current = markFriendNotificationsRead;
+  }, [markFriendNotificationsRead]);
+
+  // Requests are listed right on this page, so their notifications count as seen here.
+  useEffect(() => {
+    markMatchingRead(isFriendRequestNotification);
+  }, [markMatchingRead, notifications]);
+
+  /** Per-friend badge: unread chat messages + other unread notifications from them (call invites). */
+  const friendBadgeCounts = useMemo(() => {
+    const counts: Record<string, number> = { ...(unreadCounts?.friendUnreadById ?? {}) };
+    for (const n of notifications) {
+      if (n.read) continue;
+      // Chat-message notifications are already counted via friendUnreadById.
+      if (notificationLink(n.message)?.path === "/friends") continue;
+      const friendId = notificationFriendId(n.message);
+      if (friendId) counts[friendId] = (counts[friendId] ?? 0) + 1;
+    }
+    return counts;
+  }, [notifications, unreadCounts?.friendUnreadById]);
 
   const directRoomId = useMemo(() => {
     if (!user?.id || !selectedFriendId) return null;
@@ -183,8 +229,8 @@ function FriendsPage() {
 
   useEffect(() => {
     if (!selectedFriendId) return;
-    markFriendMessagesRead(selectedFriendId);
-  }, [markFriendMessagesRead, notifications, selectedFriendId]);
+    markFriendNotificationsRead(selectedFriendId);
+  }, [markFriendNotificationsRead, notifications, selectedFriendId]);
 
   useEffect(() => {
     if (!messageSearchId) return;
@@ -249,9 +295,9 @@ function FriendsPage() {
         .or(
           `and(sender_id.eq.${user.id},recipient_id.eq.${selectedFriendId}),and(sender_id.eq.${selectedFriendId},recipient_id.eq.${user.id})`,
         )
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(200);
-      setFriendMessages((data ?? []) as FriendMessage[]);
+      setFriendMessages(((data ?? []) as FriendMessage[]).reverse());
       markFriendMessagesReadRef.current(selectedFriendId);
       markMessageScopeReadRef.current.mutate(
         { scopeType: "friend", scopeId: selectedFriendId },
@@ -272,10 +318,12 @@ function FriendsPage() {
           event: "INSERT",
           schema: "public",
           table: "friend_messages",
-          filter: `sender_id=eq.${selectedFriendId}&recipient_id=eq.${user.id}`,
+          // Realtime accepts a single filter; the sender is checked below.
+          filter: `recipient_id=eq.${user.id}`,
         } as never,
         (payload: { new: FriendMessage }) => {
           const msg = payload.new;
+          if (msg.sender_id !== selectedFriendId) return;
           setFriendMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
           void markMessageScopeReadRef.current.mutateAsync({
             scopeType: "friend",
@@ -527,14 +575,25 @@ function FriendsPage() {
               onClick={() => setSelectedFriendId(f.id)}
             >
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-border bg-secondary overflow-hidden shrink-0">
-                  {f.profile.avatar_url ? (
-                    <img
-                      src={f.profile.avatar_url}
-                      alt={`${f.profile.display_name} avatar`}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : null}
+                <div className="relative shrink-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-border bg-secondary overflow-hidden">
+                    {f.profile.avatar_url ? (
+                      <img
+                        src={f.profile.avatar_url}
+                        alt={`${f.profile.display_name} avatar`}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : null}
+                  </div>
+                  {(friendBadgeCounts[f.id] ?? 0) > 0 && (
+                    <span
+                      className="absolute -top-1.5 -right-1.5 min-w-4.5 h-4.5 px-1 bg-destructive text-destructive-foreground border-2 border-card flex items-center justify-center text-[9px]"
+                      style={{ fontFamily: "var(--font-pixel)" }}
+                      title={`${friendBadgeCounts[f.id]} unread from ${f.profile.display_name}`}
+                    >
+                      {friendBadgeCounts[f.id] > 99 ? "99+" : friendBadgeCounts[f.id]}
+                    </span>
+                  )}
                 </div>
                 <div className="relative h-10 w-10 sm:h-12 sm:w-12 shrink-0 overflow-hidden hidden sm:block">
                   {f.profile.aura_path ? (
@@ -567,20 +626,9 @@ function FriendsPage() {
                     {f.profile.aura_path && (
                       <span
                         className="ml-2 text-[10px] align-middle"
-                        style={{
-                          color:
-                            f.profile.aura_path === "swordsman"
-                              ? "#d97706"
-                              : f.profile.aura_path === "mage"
-                                ? "#2563eb"
-                                : f.profile.aura_path === "rogue"
-                                  ? "#a21caf"
-                                  : "#15803d",
-                        }}
+                        style={{ color: pathBadge(f.profile.aura_path).color }}
                       >
-                        {f.profile.aura_path === "tank"
-                          ? "PALADIN"
-                          : f.profile.aura_path.toUpperCase()}
+                        {pathBadge(f.profile.aura_path).label}
                       </span>
                     )}
                   </div>
@@ -618,7 +666,14 @@ function FriendsPage() {
         </div>
       )}
 
-      <Dialog open={!!selectedFriendId} onOpenChange={(open) => !open && setSelectedFriendId(null)}>
+      <Dialog
+        open={!!selectedFriendId}
+        onOpenChange={(open) => {
+          if (open) return;
+          setSelectedFriendId(null);
+          if (friendSearchId || messageSearchId) void navigate({ to: "/friends", search: {}, replace: true });
+        }}
+      >
         <DialogContent className="max-w-2xl w-[calc(100vw-1rem)] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle style={{ fontFamily: "var(--font-pixel)" }}>Friend Profile</DialogTitle>
