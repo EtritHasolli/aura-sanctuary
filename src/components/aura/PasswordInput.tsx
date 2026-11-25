@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type">;
 
-/** Pixel-styled password field with an eye button that reveals what was typed. */
+/** Password field with an eye button that reveals what was typed. */
 export function PasswordInput({ className, style, ...props }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
 
@@ -18,9 +18,9 @@ export function PasswordInput({ className, style, ...props }: PasswordInputProps
           className,
         )}
         style={{
-          fontFamily: "var(--font-pixel)",
-          /* rem avoids styles.css floor that forces inline 9–11px to 14px */
-          fontSize: "0.5625rem",
+          // Readable mono: the pixel font made l / I / 1 indistinguishable.
+          fontFamily: "var(--font-input)",
+          fontSize: "0.875rem",
           ...style,
         }}
       />

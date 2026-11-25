@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Clock3, Info, Link2, Link2Off, ScrollText, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { Bell, Clock3, Info, Link2, Link2Off, ScrollText, ShieldCheck, UserRound } from "lucide-react";
 import { useProfile, useUpdateProfile, useIsAdmin } from "@/hooks/useProfile";
 import { useNotifications } from "@/components/aura/NotificationsContext";
-import { usePomodoro } from "@/components/aura/PomodoroContext";
+import { PomodoroSessionEditor } from "@/components/aura/PomodoroSessionEditor";
+import { AccountSection } from "@/components/aura/AccountSection";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { playNotificationSound, SOUND_NOTIF_KEY } from "@/lib/notifications";
 import {
   useConnectHabitica,
   useDisconnectHabitica,
@@ -41,7 +43,6 @@ export const Route = createFileRoute("/settings")({
 });
 
 const DESKTOP_NOTIF_KEY = "aura:desktop-notifications";
-const SOUND_NOTIF_KEY = "aura:sound-notifications";
 const SYSTEM_TIMEZONE_VALUE = "__SYSTEM__";
 const FALLBACK_TIMEZONES = [
   "UTC",
@@ -124,8 +125,13 @@ function SettingsPage() {
   const updateProfile = useUpdateProfile();
   const { data: isAdmin = false } = useIsAdmin();
   const { notifications, unread, markAllRead, clear } = useNotifications();
-  const { focusMinutes, breakMinutes, updateDurations, sessionPlan, updateSessionPlan } = usePomodoro();
-  const { subscribe: subscribePush, unsubscribe: unsubscribePush } = usePushNotifications();
+  const {
+    status: pushStatus,
+    subscribe: subscribePush,
+    unsubscribe: unsubscribePush,
+  } = usePushNotifications();
+  // Android's WebView (the APK) and some browsers have no web-push support at all.
+  const pushUnsupported = !window.electronAPI && pushStatus === "unsupported";
 
   const [displayName, setDisplayName] = useState("");
   const [characterName, setCharacterName] = useState("");
@@ -139,9 +145,6 @@ const [pathTestingOverride, setPathTestingOverride] = useState(false);
   const [isRerolling, setIsRerolling] = useState(false);
   const [showStatsInfo, setShowStatsInfo] = useState(false);
   const [settingsPathCardGifMode, setSettingsPathCardGifMode] = useState<"idle" | "stance">("idle");
-  const [nextFocusMinutes, setNextFocusMinutes] = useState(focusMinutes);
-  const [nextBreakMinutes, setNextBreakMinutes] = useState(breakMinutes);
-  const [nextSessionPlan, setNextSessionPlan] = useState(sessionPlan);
   const [avatarDraft, setAvatarDraft] = useState<string | null>(null);
   const [avatarBlob, setAvatarBlob] = useState<Blob | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
@@ -185,12 +188,6 @@ const [pathTestingOverride, setPathTestingOverride] = useState(false);
     const soundPref = window.localStorage.getItem(SOUND_NOTIF_KEY);
     setSoundNotifs(soundPref === null ? true : soundPref === "true");
   }, []);
-
-  useEffect(() => {
-    setNextFocusMinutes(focusMinutes);
-    setNextBreakMinutes(breakMinutes);
-    setNextSessionPlan(sessionPlan);
-  }, [focusMinutes, breakMinutes, sessionPlan]);
 
   const xpToNextLevel = useMemo(() => {
     if (!profile) return 0;
@@ -430,56 +427,6 @@ const [pathTestingOverride, setPathTestingOverride] = useState(false);
     setCropZoom(nextZoom);
   };
 
-  const saveNotificationPrefs = () => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(DESKTOP_NOTIF_KEY, String(desktopNotifs));
-    window.localStorage.setItem(SOUND_NOTIF_KEY, String(soundNotifs));
-    toast.success("Notification preferences saved.");
-  };
-
-  const savePomodoro = () => {
-    updateDurations({
-      focusMinutes: nextFocusMinutes,
-      breakMinutes: nextBreakMinutes,
-    });
-    toast.success("Pomodoro settings updated.");
-  };
-
-  const updateDraftSessionAt = (
-    index: number,
-    patch: Partial<{ focusMinutes: number; breakMinutes: number }>,
-  ) => {
-    setNextSessionPlan((sessions) =>
-      sessions.map((session, i) =>
-        i === index
-          ? {
-              ...session,
-              ...patch,
-            }
-          : session,
-      ),
-    );
-  };
-
-  const addSessionDraft = () => {
-    setNextSessionPlan((sessions) => [
-      ...sessions,
-      { focusMinutes: nextFocusMinutes, breakMinutes: nextBreakMinutes },
-    ]);
-  };
-
-  const removeSessionDraft = (index: number) => {
-    setNextSessionPlan((sessions) => {
-      if (sessions.length <= 1) return sessions;
-      return sessions.filter((_, i) => i !== index);
-    });
-  };
-
-  const saveSessionPlan = () => {
-    updateSessionPlan(nextSessionPlan);
-    toast.success("Pomodoro session queue saved.");
-  };
-
   if (!profile) {
     return <div className="p-6 text-muted-foreground">Loading settings...</div>;
   }
@@ -679,7 +626,8 @@ const [pathTestingOverride, setPathTestingOverride] = useState(false);
           {/* Desktop notifications toggle */}
           <button
             type="button"
-            className="flex items-center gap-3 group w-full text-left"
+            disabled={pushUnsupported}
+            className="flex items-center gap-3 group w-full text-left disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={async () => {
               const enabled = !desktopNotifs;
               if (enabled) {
@@ -687,7 +635,11 @@ const [pathTestingOverride, setPathTestingOverride] = useState(false);
                   // Web/mobile: subscribe to push (handles browser permission internally)
                   const ok = await subscribePush();
                   if (!ok) {
-                    toast.error("Notifications blocked. Allow them in your browser settings.");
+                    toast.error(
+                      typeof Notification !== "undefined" && Notification.permission === "denied"
+                        ? "Notifications are blocked. Allow them in your browser settings."
+                        : "Could not turn on notifications on this device.",
+                    );
                     return;
                   }
                 }
@@ -708,12 +660,23 @@ const [pathTestingOverride, setPathTestingOverride] = useState(false);
               Enable notifications on device
             </span>
           </button>
+          {pushUnsupported && (
+            <p className="text-xs text-muted-foreground -mt-2">
+              This app or browser can&apos;t show system notifications (the Android app doesn&apos;t
+              support them yet). You&apos;ll still get every notification in the bell.
+            </p>
+          )}
 
           {/* Notification sounds toggle */}
           <button
             type="button"
             className="flex items-center gap-3 group w-full text-left"
-            onClick={() => setSoundNotifs((v) => !v)}
+            onClick={() => {
+              const enabled = !soundNotifs;
+              setSoundNotifs(enabled);
+              window.localStorage.setItem(SOUND_NOTIF_KEY, String(enabled));
+              if (enabled) playNotificationSound();
+            }}
           >
             <span className={`shrink-0 w-4 h-4 border-2 flex items-center justify-center transition-colors ${soundNotifs ? "bg-primary border-primary text-primary-foreground" : "border-border group-hover:border-primary bg-transparent"}`}>
               {soundNotifs && (
@@ -744,15 +707,10 @@ const [pathTestingOverride, setPathTestingOverride] = useState(false);
             >
               Clear All
             </button>
-            <button
-              onClick={saveNotificationPrefs}
-              className="px-4 py-2 bg-primary text-primary-foreground text-sm whitespace-nowrap sm:ml-auto"
-              style={{ fontFamily: "var(--font-pixel)", fontSize: 13 }}
-            >
-              Save
-            </button>
           </div>
         </section>
+
+        <AccountSection />
 
         <section className="pixel-panel p-5 space-y-4">
           <div className="flex items-center justify-between gap-2">
@@ -831,90 +789,13 @@ const [pathTestingOverride, setPathTestingOverride] = useState(false);
         </section>
 
         <section className="pixel-panel p-5 space-y-4">
-          <div className="space-y-2 md:space-y-0 md:flex md:items-center md:justify-between md:gap-2">
-            <div className="flex items-center gap-2">
-              <Clock3 size={18} className="text-primary" />
-              <h2 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
-                POMODORO
-              </h2>
-            </div>
-            <button
-              type="button"
-              onClick={addSessionDraft}
-              className="px-2 py-1 border-2 border-border hover:border-primary"
-              style={{ fontFamily: "var(--font-pixel)", fontSize: 9 }}
-            >
-              ADD SESSION
-            </button>
+          <div className="flex items-center gap-2">
+            <Clock3 size={18} className="text-primary" />
+            <h2 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
+              POMODORO
+            </h2>
           </div>
-          <div className="space-y-3">
-            <div className="space-y-2">
-              {nextSessionPlan.map((session, index) => (
-                <div key={`session-${index}`} className="border border-border p-2 space-y-2 bg-background/30">
-                  <div
-                    className="text-[11px] text-muted-foreground"
-                    style={{ fontFamily: "var(--font-pixel)" }}
-                  >
-                    Session {index + 1}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
-                    <label className="text-xs text-muted-foreground">
-                      Focus (min)
-                      <input
-                        type="number"
-                        min={1}
-                        value={session.focusMinutes}
-                        onChange={(e) =>
-                          updateDraftSessionAt(index, {
-                            focusMinutes: Number(e.target.value || session.focusMinutes),
-                          })
-                        }
-                        className="mt-1 w-full px-2 py-1 bg-input border-2 border-border focus:border-primary outline-none text-sm"
-                      />
-                    </label>
-                    <label className="text-xs text-muted-foreground">
-                      Break (min)
-                      <input
-                        type="number"
-                        min={1}
-                        value={session.breakMinutes}
-                        onChange={(e) =>
-                          updateDraftSessionAt(index, {
-                            breakMinutes: Number(e.target.value || session.breakMinutes),
-                          })
-                        }
-                        className="mt-1 w-full px-2 py-1 bg-input border-2 border-border focus:border-primary outline-none text-sm"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => removeSessionDraft(index)}
-                      disabled={nextSessionPlan.length <= 1}
-                      className="h-9 px-2 border-2 border-border hover:border-destructive disabled:opacity-50 disabled:cursor-not-allowed text-destructive"
-                      title="Remove session"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              Start timer manually for Session 1 focus. After that, break and next sessions run
-              automatically in order.
-            </p>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={saveSessionPlan}
-                className="px-4 py-2.5 bg-primary text-primary-foreground"
-                style={{ fontFamily: "var(--font-pixel)", fontSize: 10 }}
-              >
-                SAVE POMODORO
-              </button>
-            </div>
-          </div>
+          <PomodoroSessionEditor />
         </section>
 
         <HabiticaSection />
@@ -1393,7 +1274,7 @@ function HabiticaSection() {
   const [showHabiticaInfo, setShowHabiticaInfo] = useState(false);
 
   return (
-    <section className="pixel-panel p-5 space-y-4 min-w-0">
+    <section className="pixel-panel p-5 space-y-4 min-w-0 xl:col-span-2">
       <div className="flex items-center gap-2">
         <Link2 size={18} className="text-primary" />
         <h2 className="text-lg text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
@@ -1576,7 +1457,7 @@ function HabiticaSection() {
           </label>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="border-2 border-border bg-background/30 p-3 space-y-2">
+            <div className="border-2 border-border bg-background/30 p-3 flex flex-col gap-2">
               <h3 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
                 IMPORT FROM HABITICA
               </h3>
@@ -1584,7 +1465,7 @@ function HabiticaSection() {
                 Pull your Habitica habits and dailies into Aura. Already-linked tasks are skipped,
                 so it&apos;s safe to run again.
               </p>
-              <div className="flex justify-end">
+              <div className="mt-auto flex justify-end pt-1">
                 <button
                   type="button"
                   onClick={() => void handleImport()}
@@ -1597,7 +1478,7 @@ function HabiticaSection() {
               </div>
             </div>
 
-            <div className="border-2 border-border bg-background/30 p-3 space-y-2">
+            <div className="border-2 border-border bg-background/30 p-3 flex flex-col gap-2">
               <h3 className="text-sm text-primary" style={{ fontFamily: "var(--font-pixel)" }}>
                 SYNC FROM HABITICA
               </h3>
@@ -1605,7 +1486,7 @@ function HabiticaSection() {
                 Pull the latest streaks, habit counters, and daily completions from Habitica back
                 into Aura.
               </p>
-              <div className="flex justify-end">
+              <div className="mt-auto flex justify-end pt-1">
                 <button
                   type="button"
                   onClick={() => void handleSyncPull()}

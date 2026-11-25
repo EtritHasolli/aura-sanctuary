@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Press+Start+2P&family=VT323&display=swap");
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
@@ -40,6 +40,9 @@
 
 :root {
   --radius: 0.25rem;
+  /* Typed text in inputs (emails, passwords, names). The pixel fonts make l / I / 1 and
+     O / 0 nearly identical; JetBrains Mono keeps the retro monospace feel but tells them apart. */
+  --font-input: "JetBrains Mono", ui-monospace, Consolas, "Cascadia Mono", monospace;
   /* Hotspots = image center @ 32×32 (matches overlay w-8 h-8 in CustomCursorOverlay). URL set in main.tsx via publicAsset() for Electron file:// */
   --cursor-pointer: auto;
 

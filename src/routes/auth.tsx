@@ -231,7 +231,7 @@ function AuthPage() {
 
         <form onSubmit={submit} className="space-y-3">
           {signupOnProfile && (
-            <p className="text-[10px] text-muted-foreground break-all" style={{ fontFamily: "var(--font-pixel)" }}>
+            <p className="text-muted-foreground break-all" style={{ fontFamily: "var(--font-input)", fontSize: "0.8125rem" }}>
               {email.trim()}
             </p>
           )}
@@ -245,11 +245,7 @@ function AuthPage() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Hero name"
                 className="w-full px-3 py-2.5 bg-input border-2 border-border focus:border-primary outline-none leading-snug"
-                style={{
-                  fontFamily: "var(--font-pixel)",
-                  /* rem avoids styles.css floor that forces inline 9–11px to 14px */
-                  fontSize: "0.5625rem",
-                }}
+                style={{ fontFamily: "var(--font-input)", fontSize: "0.875rem" }}
               />
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground block" style={{ fontFamily: "var(--font-pixel)" }}>
@@ -313,11 +309,7 @@ function AuthPage() {
                   placeholder="email"
                   autoComplete="email"
                   className="w-full pl-3 pr-10 py-2.5 bg-input border-2 border-border focus:border-primary outline-none leading-snug"
-                  style={{
-                    fontFamily: "var(--font-pixel)",
-                    /* rem avoids styles.css floor that forces inline 9–11px to 14px */
-                    fontSize: "0.5625rem",
-                  }}
+                  style={{ fontFamily: "var(--font-input)", fontSize: "0.875rem" }}
                 />
                 {email && (
                   <button
