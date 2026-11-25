@@ -75,6 +75,9 @@ jobs:
         run: |
           version=$(node -p "require('./public/android-version.json').versionName")
           code=$(node -p "require('./public/android-version.json').versionCode")
+          # The app's update check (src/components/aura/AndroidUpdateBar.tsx) reads "(build N)"
+          # from these notes — keep that text. The notes are edited after the APK upload, so
+          # phones are never offered a build that isn't downloadable yet.
           notes="Android app ${version} (build ${code}) from ${GITHUB_SHA::7}. Download Aura-Sanctuary.apk on your phone and open it to install or update."
           # Marked as a pre-release so GitHub's "latest release" stays the desktop one:
           # the Electron auto-updater reads that and would break if it pointed here.
